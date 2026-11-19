@@ -268,8 +268,8 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     withArticleAndDecision();
     render(view());
     const open = screen.getByRole('button', { name: /^Apri accanto art\. 5/ });
-    expect(open).toHaveClass('min-h-[44px]', 'min-w-[44px]');
-    expect(open.querySelector('span')).toHaveClass('hidden', 'md:inline');
+    expect(open).toHaveClass('min-h-11', 'min-w-11');
+    expect(within(open).getByText('Apri accanto')).toHaveClass('hidden', 'md:inline');
   });
 
   it('the count sits after the name, on its row, in the part that gives way to the buttons (R3)', () => {

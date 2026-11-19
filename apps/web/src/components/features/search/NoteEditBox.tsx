@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../../lib/utils';
-import { FOCUS_RING } from '../studia/progress/tokens';
+import { Button } from '../../ui/Button';
 import { FIELD_TEXT } from '../../../constants/interactions';
 
 export interface NoteEditBoxProps {
@@ -27,10 +27,6 @@ export interface NoteEditBoxProps {
      */
     autoFocus?: boolean;
 }
-
-const BUTTON = 'min-h-[44px] rounded-md px-3 text-xs';
-const QUIET = cn(BUTTON, 'font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING);
-const MAIN = cn(BUTTON, 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 font-semibold text-white hover:bg-primary-700', FOCUS_RING);
 
 /**
  * A note's text being edited in place — the note cards' (`NoteCard`): blur or Cmd/Ctrl+Enter saves, Esc cancels;
@@ -102,15 +98,15 @@ export function NoteEditBox({
                     onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); keep(); } }}
                 >
                     <p role="alert" className="mr-auto text-xs font-medium text-slate-700 dark:text-slate-200">Scartare la modifica?</p>
-                    <button ref={keepRef} type="button" onClick={keep} className={QUIET}>Continua</button>
-                    <button type="button" onClick={discard} className={cn(BUTTON, 'font-semibold text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30', FOCUS_RING)}>
+                    <Button ref={keepRef} type="button" variant="quiet" size="sm" onClick={keep}>Continua</Button>
+                    <Button type="button" variant="quiet" size="sm" onClick={discard} className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300">
                         Scarta
-                    </button>
+                    </Button>
                 </div>
             ) : (
                 <div className="mt-1 flex items-center justify-end gap-1">
-                    <button type="button" onClick={cancel} className={QUIET}>Annulla</button>
-                    <button type="button" onClick={onCommit} className={MAIN}>Salva</button>
+                    <Button type="button" variant="quiet" size="sm" onClick={cancel}>Annulla</Button>
+                    <Button type="button" size="sm" onClick={onCommit}>Salva</Button>
                 </div>
             )}
         </div>

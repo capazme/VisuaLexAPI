@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type Ref } from
 import { Check, Flag, MoveHorizontal, Pencil, Trash2 } from 'lucide-react';
 import type { AiReviewState, Proposal } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
 import { GLOSS_WORDS } from '../../../constants/glossWords';
 import { assistantProposalsStore } from '../../../store/assistantProposals';
 import { NoteEditBox } from './NoteEditBox';
@@ -46,13 +47,8 @@ const STATE_TONE: Record<AiReviewState, string> = {
     validated: 'text-emerald-700 dark:text-emerald-400',
 };
 
-// 44 px on a touch screen (the phone's popover, a tablet's column); a computer's pointer has the compact row.
-const ACTION = cn(
-    'inline-flex min-h-[44px] items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors motion-reduce:transition-none',
-    '[@media(pointer:fine)]:min-h-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-);
-const QUIET = 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100';
-const LINK = 'inline-flex min-h-[44px] items-center rounded px-0.5 text-xs font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 [@media(pointer:fine)]:min-h-7 dark:text-primary-300 dark:hover:text-primary-200';
+// The card's commands: `Button`'s small quiet row (32 px from md, 44 on a phone), the gap and padding of a compact row.
+const ACTION_ROW = 'gap-1 px-2';
 
 /**
  * An application's gloss on a passage (D8), as a word processor's comment: its state, the passage it is on, its text,
@@ -134,7 +130,7 @@ export function GlossCard({
                 onEscape();
             }}
             className={cn(
-                'rounded-lg border bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none transition-[border-color,box-shadow] motion-reduce:transition-none dark:bg-slate-900',
+                'rounded-[8px] border bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none transition-[border-color,box-shadow] motion-reduce:transition-none dark:bg-slate-900',
                 active ? 'border-primary-500 ring-1 ring-primary-500 dark:border-primary-400 dark:ring-primary-400' : 'border-slate-200 dark:border-slate-700',
                 'focus-visible:ring-2 focus-visible:ring-primary-500',
                 className,
@@ -173,14 +169,14 @@ export function GlossCard({
             {(edited || gloss.rangeEdited) && (
                 <div className="mt-1 flex flex-wrap gap-x-3">
                     {edited && (
-                        <button type="button" aria-expanded={showOriginal} aria-controls={showOriginal ? originalId : undefined} onClick={() => setShowOriginal((v) => !v)} className={LINK}>
+                        <Button type="button" variant="link" size="sm" aria-expanded={showOriginal} aria-controls={showOriginal ? originalId : undefined} onClick={() => setShowOriginal((v) => !v)}>
                             {showOriginal ? "Nascondi la versione dell'IA" : "Vedi la versione dell'IA"}
-                        </button>
+                        </Button>
                     )}
                     {gloss.rangeEdited && (
-                        <button type="button" aria-expanded={showPassage} aria-controls={showPassage ? passageId : undefined} onClick={() => setShowPassage((v) => !v)} className={LINK}>
+                        <Button type="button" variant="link" size="sm" aria-expanded={showPassage} aria-controls={showPassage ? passageId : undefined} onClick={() => setShowPassage((v) => !v)}>
                             {showPassage ? "Nascondi il passaggio dell'IA" : "Vedi il passaggio dell'IA"}
-                        </button>
+                        </Button>
                     )}
                 </div>
             )}
@@ -197,57 +193,60 @@ export function GlossCard({
                 </div>
             )}
             <div className="-mx-1.5 mt-1.5 flex flex-wrap items-center gap-0.5">
-                <button
+                <Button
                     type="button"
+                    variant="quiet"
+                    size="sm"
                     aria-pressed={validated}
                     aria-disabled={busy || undefined}
                     onClick={() => { if (!busy) actions.validate(gloss.id, !validated); }}
+                    icon={<Check size={13} strokeWidth={2.5} aria-hidden />}
                     className={cn(
-                        ACTION,
+                        ACTION_ROW,
                         busy && 'cursor-wait opacity-60',
                         validated
                             ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                            : 'text-emerald-800 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30',
+                            : 'text-emerald-800 hover:bg-emerald-50 hover:text-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-200',
                     )}
                 >
-                    <Check size={13} strokeWidth={2.5} aria-hidden /> Valida
-                </button>
-                <button
+                    Valida
+                </Button>
+                <Button
                     type="button"
+                    variant="quiet"
+                    size="sm"
                     aria-pressed={flagged}
                     aria-disabled={busy || undefined}
                     onClick={() => { if (!busy) actions.flag(gloss.id, !flagged); }}
+                    icon={<Flag size={12} aria-hidden className={cn(flagged && 'fill-current')} />}
                     className={cn(
-                        ACTION,
+                        ACTION_ROW,
                         busy && 'cursor-wait opacity-60',
                         flagged
                             ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
-                            : 'text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30',
+                            : 'text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300',
                     )}
                 >
-                    <Flag size={12} aria-hidden className={cn(flagged && 'fill-current')} /> Da rivedere
-                </button>
-                <button
-                    ref={editRef}
-                    type="button"
-                    onClick={() => setDraft(text)}
-                    disabled={draft !== null}
-                    className={cn(ACTION, QUIET, 'disabled:opacity-50')}
-                >
-                    <Pencil size={12} aria-hidden /> Modifica
-                </button>
+                    Da rivedere
+                </Button>
+                <Button ref={editRef} type="button" variant="quiet" size="sm" onClick={() => setDraft(text)} disabled={draft !== null} icon={<Pencil size={12} aria-hidden />} className={ACTION_ROW}>
+                    Modifica
+                </Button>
                 {actions.move && (
-                    <button type="button" onClick={onMove ?? (() => actions.move!(gloss.id))} className={cn(ACTION, QUIET)}>
-                        <MoveHorizontal size={13} aria-hidden /> Sposta
-                    </button>
+                    <Button type="button" variant="quiet" size="sm" onClick={onMove ?? (() => actions.move!(gloss.id))} icon={<MoveHorizontal size={13} aria-hidden />} className={ACTION_ROW}>
+                        Sposta
+                    </Button>
                 )}
-                <button
+                <Button
                     type="button"
+                    variant="quiet"
+                    size="sm"
                     onClick={onRemove ?? (() => actions.remove(gloss.id))}
-                    className={cn(ACTION, 'text-slate-700 hover:bg-red-50 hover:text-red-700 dark:text-slate-300 dark:hover:bg-red-950/30 dark:hover:text-red-400')}
+                    icon={<Trash2 size={12} aria-hidden />}
+                    className={cn(ACTION_ROW, 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400')}
                 >
-                    <Trash2 size={12} aria-hidden /> Rimuovi
-                </button>
+                    Rimuovi
+                </Button>
             </div>
             {flagged && (
                 <div className="mt-1 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 dark:border-red-900/60 dark:bg-red-950/30">

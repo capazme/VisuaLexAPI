@@ -5,12 +5,13 @@ import { HeldInMark } from '../dossier/HeldInMark';
 import { cn } from '../../../lib/utils';
 import { MenuButton } from '../../ui/MenuButton';
 import { Expand } from '../../ui/Expand';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { buttonClassName } from '../../ui/buttonStyles';
 import { rowDossierItems, type RowDossier } from './inDossier';
 import { RowMovePicker, RowNoteComposer } from './RowDossierPanels';
 import { useFontiTools } from './fontiTools';
 
-const ICON_BUTTON =
-  'flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20';
 
 /** A row that can be read beside the table: in a window on the desktop (spec §4.2, T5), in the
  *  full-screen reader on a phone (§8), where no row ever folds. */
@@ -57,10 +58,10 @@ export function NotInDossier() {
   );
 }
 
-const ADD_BUTTON =
-  'min-h-[44px] flex-shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 md:min-h-0 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
-const MENU_TRIGGER =
-  'flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 -mr-3 md:mr-0 md:min-h-0 md:min-w-0 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+/** The row's commands on `Button`'s quiet look: 36 px on a computer, 44 on a phone. */
+const ROW_COMMAND = 'shrink-0 gap-1 px-2';
+/** «Azioni» (the row's «⋯»): `IconButton`'s square; on a phone its 44 px reach into the page's margin (R3b). */
+const ROW_MENU = cn(buttonClassName('quiet'), 'min-w-11 shrink-0 px-0 -mr-3 md:mr-0 md:min-w-9');
 
 /**
  * The shell shared by the practice's rows (articles and decisions): a header that toggles the row
@@ -106,12 +107,13 @@ export function PracticeRowShell({
       data-row-open={isOpen || undefined}
       // Clear of the act's sticky heading (`--practice-head`, set by the act block) when scrolled into view.
       // `@container`: a narrow column (the overview's decisions, a phone) keeps the row's name whole (LC59, #536).
-      className="group @container scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-lg py-1 md:pl-2 md:pr-1"
+      className="group @container scroll-mt-[calc(var(--practice-head,5rem)+0.5rem)] rounded-[8px] py-1 md:pl-2 md:pr-1"
     >
-      <div className="flex items-center gap-1 rounded-lg transition-colors hover:bg-slate-50 md:gap-2 dark:hover:bg-slate-800/60">
+      <div className="flex items-center gap-1 rounded-[8px] transition-colors hover:bg-slate-50 md:gap-2 dark:hover:bg-slate-800/60">
         {/* Outside the toggle (gotcha 22): its own control, 44 px to touch. */}
         {selectable && (
           <label className="-ml-2 flex min-h-[44px] min-w-[44px] flex-shrink-0 cursor-pointer items-center justify-center md:ml-0 md:min-h-0 md:min-w-0 md:p-1">
+            {/* bare-input: the row's checkbox while selecting, inside its 44 px label. */}
             <input
               type="checkbox"
               checked={ticked}
@@ -167,48 +169,42 @@ export function PracticeRowShell({
         </div>
         {/* Beside the mark on a computer; a phone has it in «⋯», where the row's name needs the width. */}
         {outside && dossier.add && (
-          <button type="button" onClick={dossier.add} aria-label={`Aggiungi alla pratica ${removeName}`} className={cn(ADD_BUTTON, 'hidden md:flex')}>
-            <FolderPlus size={14} aria-hidden />
+          <Button type="button" variant="quiet" onClick={dossier.add} aria-label={`Aggiungi alla pratica ${removeName}`} icon={<FolderPlus size={14} aria-hidden />} className={cn(ROW_COMMAND, 'hidden md:inline-flex')}>
             Aggiungi alla pratica
-          </button>
+          </Button>
         )}
         {corpus && (
-          <button type="button" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi alla pratica ${removeName}`} title="Aggiungi alla pratica" className={cn(ADD_BUTTON, 'hidden md:flex')}>
-            <FolderPlus size={14} aria-hidden />
+          <Button type="button" variant="quiet" onClick={(e) => adding.open(e.currentTarget)} aria-label={`Aggiungi alla pratica ${removeName}`} title="Aggiungi alla pratica" icon={<FolderPlus size={14} aria-hidden />} className={cn(ROW_COMMAND, 'hidden md:inline-flex')}>
             {/* Icon only in a narrow column: the row's name is never the one cut. */}
             <span className="hidden @[40rem]:inline">Aggiungi alla pratica</span>
-          </button>
+          </Button>
         )}
         {beside && (folded ? (
           <span className="flex flex-shrink-0 items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
             Aperto accanto ·
-            <button
-              type="button"
-              onClick={beside.onClose}
-              aria-label={`Chiudi la finestra su ${removeName}`}
-              className="rounded px-1 font-medium text-primary-600 underline hover:text-primary-700 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
+            <Button type="button" variant="link" size="sm" onClick={beside.onClose} aria-label={`Chiudi la finestra su ${removeName}`}>
               Chiudi la finestra
-            </button>
+            </Button>
           </span>
         ) : (
-          <button
+          <Button
             type="button"
+            variant="quiet"
             onClick={beside.onOpen}
             aria-label={`Apri accanto ${removeName}`}
             title="Apri accanto"
-            // 14 px in a dossier's «Lettura» (LC55, a reader of fifty); the Corpus keeps its 12.
-            className={cn('practice-row-beside flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center gap-1 rounded-md px-2 py-1 font-medium', dossier ? 'text-sm' : 'text-xs', 'text-slate-500 md:min-h-0 md:min-w-0 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500')}
+            icon={<PanelRightOpen size={14} aria-hidden />}
+            // 14 px in a dossier's «Lettura» (LC55, a reader of fifty); the Corpus keeps its 12. Square on a phone.
+            className={cn('practice-row-beside min-w-11 md:min-w-0', ROW_COMMAND, dossier ? 'text-sm' : 'text-xs')}
           >
-            <PanelRightOpen size={14} aria-hidden />
             {/* Icon-only on a phone, where the row's name needs the width. */}
             <span className="hidden md:inline">Apri accanto</span>
-          </button>
+          </Button>
         ))}
         {dossier ? (
           <MenuButton
             label={`Azioni su ${removeName}`}
-            triggerClassName={MENU_TRIGGER}
+            triggerClassName={ROW_MENU}
             items={rowDossierItems(dossier, onRemove, { note: dossier.addNote && (() => setPanel('note')), move: () => setPanel('move') })}
           >
             <MoreHorizontal size={16} aria-hidden />
@@ -220,7 +216,7 @@ export function PracticeRowShell({
               <MenuButton
                 label={`Azioni su ${removeName}`}
                 className="md:hidden"
-                triggerClassName={MENU_TRIGGER}
+                triggerClassName={ROW_MENU}
                 items={[
                   { label: 'Aggiungi alla pratica', icon: FolderPlus, onSelect: () => adding.open(null) },
                   { label: 'Togli dal tavolo', icon: X, danger: true, onSelect: onRemove },
@@ -229,16 +225,14 @@ export function PracticeRowShell({
                 <MoreHorizontal size={16} aria-hidden />
               </MenuButton>
             )}
-            <button
-              type="button"
+            <IconButton
               onClick={onRemove}
               aria-label={`Togli dal tavolo ${removeName}`}
               title="Togli dal tavolo"
+              icon={<X aria-hidden />}
               // On a phone its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
-              className={cn(ICON_BUTTON, '-mr-3 md:mr-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100', corpus && 'hidden md:flex')}
-            >
-              <X size={16} aria-hidden />
-            </button>
+              className={cn('shrink-0 -mr-3 text-slate-400 hover:bg-red-50 hover:text-red-500 md:mr-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-red-900/20', corpus && 'hidden md:inline-flex')}
+            />
           </>
         )}
         {adding.popover}
@@ -275,7 +269,7 @@ export function PracticeRowShell({
       ) : isOpen && (
         // Opacity only, 150 ms: a row opens tens of times a day, and a transform here would move the
         // reader's sticky toolbar and fixed popovers while it plays (gotchas 22, 26).
-        <div id={regionId} className="animate-in fade-in duration-150 pb-3 pt-1 md:pl-6 md:pr-2" style={regionStyle}>
+        <div id={regionId} className="animate-in fade-in duration-(--dur-pop) pb-3 pt-1 md:pl-6 md:pr-2" style={regionStyle}>
           {children}
         </div>
       )}

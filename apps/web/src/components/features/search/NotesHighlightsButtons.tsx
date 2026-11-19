@@ -1,7 +1,8 @@
 import type { Ref } from 'react';
 import { Highlighter, StickyNote } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
 
 export interface NotesHighlightsButtonsProps {
     notesCount: number;
@@ -33,21 +34,17 @@ export function NotesHighlightsButtons({
     onToggleNotes, onToggleHighlights, lockedReason, labelled = false,
 }: NotesHighlightsButtonsProps) {
     if (labelled) {
-        const word = cn(
-            'vlx-hover-tile inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600',
-            'hover:text-slate-900 aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
-            'dark:text-slate-300 dark:hover:text-white dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white',
-            'disabled:cursor-not-allowed disabled:opacity-40',
-            FOCUS_RING,
-        );
+        // `Button`'s quiet look with the reading row's open state, as `ReadingToolbar`'s tools.
+        const word = 'vlx-hover-tile min-w-11 gap-1.5 px-2.5 md:min-w-0 aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white';
         const count = (n: number) => n > 0 && <span className="tabular-nums text-slate-500 dark:text-slate-400">{n}</span>;
         // The count read apart from the word: «Note, 2», not «Note2».
         const named = (word: string, n: number) => (n > 0 ? `${word}, ${n}` : undefined);
         return (
             <>
-                <button
+                <Button
                     ref={notesButtonRef}
                     type="button"
+                    variant="quiet"
                     onClick={onToggleNotes}
                     aria-expanded={isNotesOpen}
                     aria-haspopup="dialog"
@@ -55,14 +52,15 @@ export function NotesHighlightsButtons({
                     className={word}
                     title={tip(isNotesOpen ? 'Chiudi le note' : 'Le note sull’articolo', lockedReason)}
                     disabled={Boolean(lockedReason)}
+                    icon={<StickyNote size={16} aria-hidden />}
                 >
-                    <StickyNote size={16} aria-hidden />
                     Note
                     {count(notesCount)}
-                </button>
-                <button
+                </Button>
+                <Button
                     ref={highlightsButtonRef}
                     type="button"
+                    variant="quiet"
                     onClick={onToggleHighlights}
                     aria-expanded={isHighlightsOpen}
                     aria-haspopup="dialog"
@@ -70,26 +68,26 @@ export function NotesHighlightsButtons({
                     className={word}
                     title={tip(isHighlightsOpen ? 'Chiudi le evidenziazioni' : 'Mostra, nascondi o esporta le evidenziazioni', lockedReason)}
                     disabled={Boolean(lockedReason)}
+                    icon={<Highlighter size={16} aria-hidden />}
                 >
-                    <Highlighter size={16} aria-hidden />
                     Evidenziazioni
                     {count(highlightsCount)}
-                </button>
+                </Button>
             </>
         );
     }
-    const size = 'inline-flex items-center justify-center min-h-[44px] min-w-[44px] p-2.5 md:min-h-0 md:min-w-0 md:p-1.5';
     const notesName = isNotesOpen ? 'Chiudi note' : 'Apri note';
     const highlightsName = isHighlightsOpen ? 'Chiudi evidenziazioni' : 'Gestisci evidenziazioni';
     return (
         <>
-            <button
+            <IconButton
                 ref={notesButtonRef}
+                size="sm"
                 onClick={onToggleNotes}
                 aria-expanded={isNotesOpen}
                 aria-haspopup="dialog"
                 aria-label={notesName}
-                className={cn(size, "rounded-md transition-colors relative",
+                className={cn("relative",
                     isNotesOpen
                         ? "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
                         : notesCount > 0
@@ -98,21 +96,23 @@ export function NotesHighlightsButtons({
                 )}
                 title={tip(notesName, lockedReason)}
                 disabled={Boolean(lockedReason)}
-            >
-                <StickyNote size={16} aria-hidden />
-                {notesCount > 0 && (
-                    <span aria-hidden className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 bg-amber-500 text-white text-[11px] leading-none rounded-full flex items-center justify-center font-bold">
-                        {notesCount}
-                    </span>
-                )}
-            </button>
-            <button
+                icon={<>
+                    <StickyNote aria-hidden />
+                    {notesCount > 0 && (
+                        <span aria-hidden className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 bg-amber-500 text-white text-[11px] leading-none rounded-full flex items-center justify-center font-bold">
+                            {notesCount}
+                        </span>
+                    )}
+                </>}
+            />
+            <IconButton
                 ref={highlightsButtonRef}
+                size="sm"
                 onClick={onToggleHighlights}
                 aria-expanded={isHighlightsOpen}
                 aria-haspopup="dialog"
                 aria-label={highlightsName}
-                className={cn(size, "rounded-md transition-colors relative",
+                className={cn("relative",
                     isHighlightsOpen
                         ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400"
                         : highlightsCount > 0
@@ -121,14 +121,15 @@ export function NotesHighlightsButtons({
                 )}
                 title={tip(highlightsName, lockedReason)}
                 disabled={Boolean(lockedReason)}
-            >
-                <Highlighter size={16} aria-hidden />
-                {highlightsCount > 0 && (
-                    <span aria-hidden className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 bg-primary-600 text-white text-[11px] leading-none rounded-full flex items-center justify-center font-bold">
-                        {highlightsCount}
-                    </span>
-                )}
-            </button>
+                icon={<>
+                    <Highlighter aria-hidden />
+                    {highlightsCount > 0 && (
+                        <span aria-hidden className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 bg-primary-600 text-white text-[11px] leading-none rounded-full flex items-center justify-center font-bold">
+                            {highlightsCount}
+                        </span>
+                    )}
+                </>}
+            />
         </>
     );
 }

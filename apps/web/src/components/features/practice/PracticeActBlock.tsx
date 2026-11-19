@@ -8,6 +8,8 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData, Norma } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
+import { Button } from '../../ui/Button';
+import { buttonClassName } from '../../ui/buttonStyles';
 import { useSimpleReading } from './simpleReading';
 import { removePracticeActWithUndo } from './practiceUndo';
 import { articleItemIds, removeFromDossierAndTable, useActItemIds } from './inDossier';
@@ -48,10 +50,9 @@ export interface PracticeActBlockProps {
  * The act's tools (R3): quiet buttons, neutral, the icon and (from `lg`) the word — no colour of their own, as the
  * article's actions; 36 px, on a computer only (a phone has them in «⋯»). The 44 px below `md` is for a narrow window.
  */
-const TOOL_BUTTON =
-  'vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40';
-const MENU_TRIGGER =
-  'vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2 text-slate-600 transition-colors hover:text-slate-900 md:h-9 md:min-h-0 md:min-w-0 dark:text-slate-300';
+const ACT_TOOL = 'vlx-hover-tile min-w-11 gap-1.5 px-2 md:min-w-0';
+/** The act's «⋯»: `IconButton`'s square on the same quiet look. */
+const ACT_MENU = cn(buttonClassName('quiet'), 'vlx-hover-tile min-w-11 px-0 md:min-w-9');
 
 /** A row's chip in the act's index: «2043», «All. A 1», «5 · testo al 29/12/2007». */
 function chipLabel(article: ArticleData): string {
@@ -290,7 +291,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
       data-act-id={act.id}
       // A section of the page (R3: one level of paper, the practice's): its title and a hairline. In the overview's grid
       // a panel (U2): a hairline box on the page's own ground, no shadow.
-      className={cn('practice-act', isPanel && 'rounded-xl border border-slate-200 px-3 pb-2 dark:border-slate-800', layout !== 'phone' && PRACTICE_VT)}
+      className={cn('practice-act', isPanel && 'rounded-[8px] border border-slate-200 px-3 pb-2 dark:border-slate-800', layout !== 'phone' && PRACTICE_VT)}
     >
       {/* The sticky-row convention: opaque — the page's own ground —, over the rows it heads (and over an open
           row's sticky toolbar, which slides up under it as the row ends). */}
@@ -309,6 +310,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           isIndex ? 'md:py-1' : cn('md:sticky md:top-0 md:py-2', Z_INDEX.stickyHead),
         )}
       >
+        {/* bare-button: the act's grip, dnd-kit's handle (its attributes and listeners), 44 px to grab. */}
         <button
           type="button"
           ref={setActivatorNodeRef}
@@ -317,7 +319,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           aria-label={`Sposta ${heading}`}
           // Lettura semplice (LC28): one act, nothing to reorder.
           // 44 px to grab on a computer too (LC86); its reach goes into the panel's margin, the grip where it was.
-          className={cn(plain ? 'hidden' : 'hidden md:flex', 'min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-300 hover:text-slate-500 md:-my-2 md:-ml-3 md:-mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
+          className={cn(plain ? 'hidden' : 'hidden md:flex', 'min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-slate-300 hover:text-slate-500 md:-my-2 md:-ml-3 md:-mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
@@ -371,47 +373,50 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           {/* The tools in the overview; on a phone and in the index they are entries of «⋯» (below), not drawn at all. */}
           {navInHead && navigation('shrink-0')}
           {toolsShown && <div className="flex items-center gap-1">
-            <button
+            <Button
               type="button"
+              variant="quiet"
               onClick={() => openStudy(current)}
               disabled={studyLocked}
               title={current && studyLocked ? `Modalità studio: ${READ_ONLY_REASON}` : 'Modalità studio'}
               aria-label="Modalità studio"
-              className={cn(TOOL_BUTTON, 'practice-act-study')}
+              icon={<BookOpen size={16} aria-hidden />}
+              className={cn(ACT_TOOL, 'practice-act-study')}
             >
-              <BookOpen size={16} aria-hidden />
               <span className="hidden lg:inline">Studio</span>
-            </button>
+            </Button>
             {act.norma.urn && (
               <>
-                <button
+                <Button
                   type="button"
+                  variant="quiet"
                   onClick={toggleStructure}
                   aria-label="Struttura della norma"
                   // It opens a space (the index): expanded, not pressed (R3b).
                   aria-expanded={structureOpen}
                   aria-controls={structureId}
-                  className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white')}
+                  icon={<GitBranch size={16} aria-hidden />}
+                  className={cn(ACT_TOOL, 'practice-act-structure aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white')}
                 >
-                  <GitBranch size={16} aria-hidden />
                   {/* Its name, loading or not (LC86): the tree's arrival shows in the space it opens. */}
                   <span className="hidden lg:inline">Struttura</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="quiet"
                   onClick={() => onViewPdf(act.norma.urn as string)}
                   aria-label="Esporta PDF della norma"
-                  className={TOOL_BUTTON}
+                  icon={<FileDown size={16} aria-hidden />}
+                  className={ACT_TOOL}
                 >
-                  <FileDown size={16} aria-hidden />
                   <span className="hidden lg:inline">PDF</span>
-                </button>
+                </Button>
               </>
             )}
           </div>}
           <MenuButton
             label={`Azioni su ${heading}`}
-            triggerClassName={MENU_TRIGGER}
+            triggerClassName={ACT_MENU}
             items={[
               ...(toolsShown ? [] : [
                 {
@@ -476,13 +481,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             </span>
           )}
           {act.articles.length === 0 && !loadingArticle && act.norma.urn && (
-            <button
-              type="button"
-              onClick={toggleStructure}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            >
-              <Plus size={13} aria-hidden /> Scegli un articolo dalla struttura
-            </button>
+            <Button type="button" variant="quiet" size="sm" onClick={toggleStructure} icon={<Plus size={13} aria-hidden />} className="gap-1.5 px-2">
+              Scegli un articolo dalla struttura
+            </Button>
           )}
         </div>
       )}
@@ -504,6 +505,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                     const key = practiceArticleKey(article);
                     return (
                       <li key={key} className="shrink-0">
+                        {/* bare-button: a chip of the act's index, the current one marked (`aria-current`). */}
                         <button
                           type="button"
                           onClick={() => revealPracticeRow(practiceId, act.id, key)}
@@ -534,13 +536,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             <div className="flex flex-col items-center gap-1 px-6 py-8 text-center text-slate-600 dark:text-slate-400">
               <p className="text-sm font-medium">Scegli un articolo dall'indice</p>
               {act.norma.urn && (
-                <button
-                  type="button"
-                  onClick={toggleStructure}
-                  className="mt-1 inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 text-xs font-medium text-primary-700 hover:bg-primary-50 md:min-h-0 md:py-1 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                >
-                  <Plus size={13} aria-hidden /> Apri la struttura
-                </button>
+                <Button type="button" variant="quiet" size="sm" onClick={toggleStructure} icon={<Plus size={13} aria-hidden />} className="mt-1 gap-1.5 px-2">
+                  Apri la struttura
+                </Button>
               )}
             </div>
           )}

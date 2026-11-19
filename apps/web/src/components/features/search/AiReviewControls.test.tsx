@@ -178,8 +178,8 @@ describe('AiReviewControls', () => {
       screen.getByRole('textbox'),
     ];
     for (const el of targets) {
-      expect(el.className, el.outerHTML.slice(0, 60)).toMatch(/(^| )min-h-\[44px\]( |$)/);
-      expect(el.className).not.toMatch(/md:min-h-0/);
+      expect(el.className, el.outerHTML.slice(0, 60)).toMatch(/(^| )min-h-(\[44px\]|11)( |$)/);
+      expect(el.className).not.toMatch(/md:min-h-(0|8|9)\b/);
     }
   });
 });

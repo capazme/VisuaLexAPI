@@ -2,22 +2,19 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type Ref } from
 import { MessageCircle, Pencil, Trash2 } from 'lucide-react';
 import type { Annotation, ArticleDiscussionPassageSummary } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { NoteEditBox } from './NoteEditBox';
 import { scrollToMiddle } from '../../../utils/scrollParent';
 
 /** The card's frame, as an application's gloss's (`GlossCard`): a comment of a word processor. */
 const CARD = cn(
-    'rounded-lg border border-slate-200 bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none dark:border-slate-700 dark:bg-slate-900',
+    'rounded-[8px] border border-slate-200 bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none dark:border-slate-700 dark:bg-slate-900',
     'focus-visible:ring-2 focus-visible:ring-primary-500',
 );
-// 44 px on a touch screen (a phone's sheet, a tablet's column); a computer's pointer has the compact row.
-const ACTION = cn(
-    'inline-flex min-h-[44px] items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors motion-reduce:transition-none',
-    '[@media(pointer:fine)]:min-h-8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-);
-const QUIET = 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100';
-const DANGER = 'text-slate-700 hover:bg-red-50 hover:text-red-700 dark:text-slate-300 dark:hover:bg-red-950/30 dark:hover:text-red-400';
+// The card's commands, as `GlossCard`'s: `Button`'s small quiet row, the gap and padding of a compact row.
+const ACTION_ROW = 'gap-1 px-2';
+const DANGER = 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400';
 
 /** The words a card is on, one line: enough to tell two cards apart where one was pushed down. */
 function Quote({ id, text, tone = 'note' }: { id: string; text: string; tone?: 'note' | 'thread' }) {
@@ -130,12 +127,12 @@ export function NoteMarginCard({
                 </div>
             )}
             <div className="-mx-1.5 mt-1 flex flex-wrap items-center gap-0.5">
-                <button ref={editRef} type="button" onClick={() => setDraft(text)} disabled={draft !== null} className={cn(ACTION, QUIET, 'disabled:opacity-50')}>
-                    <Pencil size={12} aria-hidden /> Modifica
-                </button>
-                <button type="button" onClick={onRemove} className={cn(ACTION, DANGER)}>
-                    <Trash2 size={12} aria-hidden /> Rimuovi
-                </button>
+                <Button ref={editRef} type="button" variant="quiet" size="sm" onClick={() => setDraft(text)} disabled={draft !== null} icon={<Pencil size={12} aria-hidden />} className={ACTION_ROW}>
+                    Modifica
+                </Button>
+                <Button type="button" variant="quiet" size="sm" onClick={onRemove} icon={<Trash2 size={12} aria-hidden />} className={cn(ACTION_ROW, DANGER)}>
+                    Rimuovi
+                </Button>
             </div>
         </article>
     );
@@ -262,9 +259,9 @@ export function ThreadCard({ thread, currentTextHash, onOpen, onEscape, ref, cla
                 <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Il testo è cambiato da quando è stata aperta</p>
             )}
             <div className="-mx-1.5 mt-1 flex items-center">
-                <button type="button" onClick={onOpen} className={cn(ACTION, QUIET)}>
-                    <MessageCircle size={12} aria-hidden /> Apri glossa
-                </button>
+                <Button type="button" variant="quiet" size="sm" onClick={onOpen} icon={<MessageCircle size={12} aria-hidden />} className={ACTION_ROW}>
+                    Apri glossa
+                </Button>
             </div>
         </article>
     );
