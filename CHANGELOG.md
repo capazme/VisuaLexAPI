@@ -12,6 +12,18 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.48.0] - 2026-11-19
+
+The Forum on the common controls of the interface alignment. Web only, no migration. MERL-T stays off.
+
+### Forum
+
+- The Forum uses the common controls (LC114, alignment 9 of 14).
+
+### Interface
+
+- The small segmented tabs are 44 px tall on a phone across the app (LC114).
+
 ## [1.47.0] - 2026-11-19
 
 The search and the reader on the common controls of the interface alignment. Web only, no migration. MERL-T
