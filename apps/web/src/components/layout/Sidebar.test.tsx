@@ -17,7 +17,7 @@ import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
 
-/** Work's entries (D-315, LC47; no «Atti» since LC53, the dossier's tab): Scadenziario, Ricerca, Dossier, then the two features with an AI model behind them,
+/** Work's entries (D-315, LC47; no «Atti» since LC53, the dossier's tab): Attività, Ricerca, Dossier, then the two features with an AI model behind them,
  *  «Analizza documento» and the Pseudonimizzatore. The planner's other two views are tabs of Work's page. */
 const OPUS_HREFS = ['/work/scadenziario', '/', '/pratiche', '/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche'];
 import type { ServiceHealthState } from '../../services/healthService';
@@ -178,12 +178,12 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Work: exactly Scadenziario, Ricerca, Dossier, then «Analizza documento» and the Pseudonimizzatore, in this order (LC47)', () => {
+  it('Work: exactly Attività, Ricerca, Dossier, then «Analizza documento» and the Pseudonimizzatore, in this order (LC47)', () => {
     renderSidebar('/');
     expect(hrefs()).toEqual(OPUS_HREFS);
     const opus = screen.getByRole('group', { name: 'Work' });
     const names = within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'));
-    expect(names).toEqual(['Scadenziario', 'Ricerca', 'Pratiche', 'Analizza documento, in sviluppo', 'Pseudonimizzatore, in arrivo', 'Grafo delle pratiche, in arrivo']);
+    expect(names).toEqual(['Attività', 'Ricerca', 'Pratiche', 'Analizza documento, in sviluppo', 'Pseudonimizzatore, in arrivo', 'Grafo delle pratiche, in arrivo']);
     // The two apart, in a group named for a screen reader, with no heading written over them.
     const tools = within(opus).getByRole('group', { name: "Strumenti sul documento" });
     expect(within(tools).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/documents', '/work/pseudonimizzatore', '/work/grafo-pratiche']);
@@ -205,17 +205,17 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     unsubscribe();
   });
 
-  it.each(['wide', 'drawer'] as const)('Work: the bar writes «Scadenze», whole at every text size, and still names it «Scadenziario» (%s, LC48)', (layout) => {
-    // The owner, 16 Nov 2026: «"Scadenze" nella barra»: «Scadenziario» beside the count was cut at the large text sizes.
+  it.each(['wide', 'drawer'] as const)('Work: the bar writes and names the tasks\' entry «Attività» (%s, LC130)', (layout) => {
+    // The owner, 19 Nov 2026: «al posto di scadenze io scriverei in tutta l'app […] attività».
     render(
       <MemoryRouter initialEntries={['/work/scadenziario']}>
         <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const entry = screen.getByRole('link', { name: /^Scadenziario/ });
+    const entry = screen.getByRole('link', { name: /^Attività/ });
     expect(entry.getAttribute('href')).toBe('/work/scadenziario');
-    expect(entry).toHaveTextContent(/Scadenze/);
-    expect(entry).not.toHaveTextContent(/Scadenziario/);
+    expect(entry).toHaveTextContent(/Attività/);
+    expect(entry).not.toHaveTextContent(/Scadenz/);
   });
 
   it.each(['wide', 'drawer'] as const)('Work: «Analizza documento» says «in sviluppo» and the Pseudonimizzatore «in arrivo» under the word (%s, LC47)', (layout) => {
@@ -273,7 +273,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
         <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const today = screen.getByRole('link', { name: 'Scadenziario' });
+    const today = screen.getByRole('link', { name: 'Attività' });
     expect(today).toHaveClass('bg-primary-50');
     expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(0);
   });
@@ -285,16 +285,16 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
         <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
-    const today = screen.getByRole('link', { name: 'Scadenziario' });
+    const today = screen.getByRole('link', { name: 'Attività' });
     expect(today).toHaveAttribute('aria-current', 'page');
     expect(today).toHaveClass('bg-primary-50');
     expect(document.getElementById('tour-sidebar')!.querySelectorAll('svg.vlx-book')).toHaveLength(0);
   });
 
-  it('keeps «Scadenziario» lit on the planner\'s other views and the trash, «Ricerca» on the search tools, in Work', () => {
+  it('keeps «Attività» lit on the planner\'s other views and the trash, «Ricerca» on the search tools, in Work', () => {
     for (const path of ['/work/prossimi', '/work/ingresso', '/work/cestino']) {
       renderSidebar(path);
-      const today = screen.getByRole('link', { name: 'Scadenziario' });
+      const today = screen.getByRole('link', { name: 'Attività' });
       // Lit for a page of its own, not its address: «true», so a screen reader says «current page» once, on the tab (#448).
       expect(today, path).toHaveAttribute('aria-current', 'true');
       expect(today, path).toHaveClass('bg-primary-50');
@@ -317,10 +317,10 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
 
   it('says «page» only on the entry\'s own address, «true» when it is lit for a page under it or of its own', () => {
     renderSidebar('/work/scadenziario');
-    expect(screen.getByRole('link', { name: 'Scadenziario' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Attività' })).toHaveAttribute('aria-current', 'page');
     cleanup();
     renderSidebar('/work/prossimi');
-    expect(screen.getByRole('link', { name: 'Scadenziario' })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('link', { name: 'Attività' })).toHaveAttribute('aria-current', 'true');
     cleanup();
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/learn/schede/42');
@@ -361,15 +361,15 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(within(document.getElementById('tour-sidebar')!).getAllByText('in arrivo')).toHaveLength(2);
   });
 
-  it('counts the overdue and today\'s tasks beside «Scadenziario», and says it in words (row 16)', () => {
+  it('counts the overdue and today\'s tasks beside «Attività», and says it in words (row 16)', () => {
     plannerStore.setState({ todayCount: 3 });
     try {
       renderSidebar('/work/scadenziario');
-      const today = screen.getByRole('link', { name: 'Scadenziario, 3 compiti per oggi o scaduti' });
+      const today = screen.getByRole('link', { name: 'Attività, 3 compiti per oggi o scaduti' });
       expect(today).toHaveAttribute('aria-current', 'page');
       expect(today).toHaveTextContent('3');
       cleanupAndRender('/work/scadenziario', () => plannerStore.setState({ todayCount: 0 }));
-      expect(screen.getByRole('link', { name: 'Scadenziario' })).not.toHaveTextContent(/\d/);
+      expect(screen.getByRole('link', { name: 'Attività' })).not.toHaveTextContent(/\d/);
     } finally {
       plannerStore.setState({ todayCount: null });
     }
@@ -1036,7 +1036,7 @@ describe('Sidebar — the words', () => {
     renderLayout('drawer', '/work/scadenziario');
     const tabs = screen.getByRole('group', { name: 'Sezioni' });
     expect(within(tabs).getAllByRole('button').map((b) => b.textContent)).toEqual(['Work', 'Learn', 'Forum', 'Labs']);
-    expect(within(tabs).getByRole('button', { name: 'Vai a Work: Scadenziario' })).toHaveAttribute('aria-current', 'true');
+    expect(within(tabs).getByRole('button', { name: 'Vai a Work: Attività' })).toHaveAttribute('aria-current', 'true');
     // 44 px in the drawer, a touch target.
     expect(within(tabs).getByRole('button', { name: 'Labs' })).toHaveClass('h-11');
     fireEvent.click(within(tabs).getByRole('button', { name: 'Learn' }));

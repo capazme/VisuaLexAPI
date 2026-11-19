@@ -75,7 +75,7 @@ describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () =>
     const dossier = screen.getAllByRole('link', { name: 'Pratiche' })[0];
     fireEvent.pointerEnter(dossier, { pointerType: 'mouse' });
     expect(prepared.paths).toEqual(['/pratiche']);
-    fireEvent.pointerDown(screen.getByRole('link', { name: /^Scadenziario/ }));
+    fireEvent.pointerDown(screen.getByRole('link', { name: /^Attività/ }));
     expect(prepared.paths).toEqual(['/pratiche', '/work/scadenziario']);
     fireEvent.focus(screen.getByRole('link', { name: 'Ricerca' }));
     expect(prepared.paths).toEqual(['/pratiche', '/work/scadenziario', '/']);
@@ -99,7 +99,7 @@ describe('Sidebar — the phone\'s drawer (LC98)', () => {
             serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }}
           />
           <Routes>
-            <Route path="/work/scadenziario" element={<h1 data-page-title="">Scadenze</h1>} />
+            <Route path="/work/scadenziario" element={<h1 data-page-title="">Attività</h1>} />
             {/* Another page, another element (as in the app): not the same h1 with new words. */}
             <Route path="/pratiche" element={<section><h1 data-page-title="">Le pratiche</h1></section>} />
           </Routes>

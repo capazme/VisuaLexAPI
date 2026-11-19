@@ -3,7 +3,7 @@ import { act, render, screen } from '@testing-library/react';
 import { Suspense, lazy, useEffect, useRef, type JSX } from 'react';
 import { Link, MemoryRouter, Route, Routes, useLocation, useOutlet } from 'react-router-dom';
 import { ViewSlide } from './ViewSlide';
-import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
+import { ISLAND_OPEN } from '../../lib/motion';
 
 const ORDER = ['list', 'detail', 'trash'];
 
@@ -55,9 +55,9 @@ describe('ViewSlide (LC98)', () => {
     const coming = calls.find((c) => c.el.contains(screen.getByText('Una pratica')))!;
     expect(coming.frames[0]).toEqual({ opacity: 0, transform: 'translateX(24px)' });
     expect(coming.timing).toEqual(ISLAND_OPEN);
-    const going = calls.find((c) => c.el.contains(screen.getByText('Pratiche')))!;
-    expect(going.timing).toEqual({ ...ISLAND_CLOSE, fill: 'forwards' });
-    act(() => going.anim.onfinish?.());
+    // The leaving view is gone at once (LC127): one view on screen, one movement.
+    expect(screen.queryByText('Pratiche')).toBeNull();
+    expect(calls).toHaveLength(1);
 
     calls.length = 0;
     rerender(<Page view="list"><Titled name="Pratiche" /></Page>);
@@ -74,14 +74,13 @@ describe('ViewSlide (LC98)', () => {
     expect(coming.timing).toEqual(ISLAND_OPEN);
   });
 
-  it('puts the focus on the coming view\'s title, never on the leaving one\'s, and not when the page first draws', () => {
+  it('puts the focus on the coming view\'s title, and not when the page first draws', () => {
     recordAnimations();
     const { rerender } = render(<Page view="list"><Titled name="Pratiche" /></Page>);
     expect(document.activeElement).toBe(document.body);
 
     rerender(<Page view="detail"><Titled name="Una pratica" /></Page>);
-    // The leaving view is still on screen, inert: its title comes first and is not taken.
-    expect(screen.getByText('Pratiche').closest('[inert]')).not.toBeNull();
+    expect(screen.queryByText('Pratiche')).toBeNull();
     expect(document.activeElement).toBe(screen.getByText('Una pratica'));
   });
 
