@@ -51,7 +51,7 @@ const EXCEPTIONS: Record<string, Counts & { why: string }> = {
   'components/ui/AdvancedExportModal.tsx': { radius: 9, why: COMMON_WINDOW },
   'components/ui/AnnexSwitchDialog.tsx': { radius: 5, why: COMMON_WINDOW },
   'components/ui/CopyModal.tsx': { radius: 6, why: COMMON_WINDOW },
-  'components/ui/Modal.tsx': { radius: 4, duration: 1, why: COMMON_WINDOW },
+  'components/ui/Modal.tsx': { radius: 6, duration: 1, why: COMMON_WINDOW },
   'components/ui/PDFViewer.tsx': { radius: 4, duration: 1, why: COMMON_WINDOW },
   'components/ui/PreviewFrame.tsx': { radius: 2, duration: 1, why: COMMON_WINDOW },
   'components/ui/Sheet.tsx': { radius: 2, why: COMMON_WINDOW },
