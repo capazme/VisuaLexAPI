@@ -1709,14 +1709,7 @@
   100% { translate: 0 0; scale: 1 1; }
 }
 
-/* The lesson's bar: the head runs ahead in stone, the ink catches up a moment later on a spring
-   (`--ease-catch`, a damped spring sampled as a `linear()` curve, a hair of overshoot), then the bar trembles by a
-   pixel (`ReviewSession`, Web Animations). */
-:root {
-  /* ζ 0.75, ω 9 over the transition's length: 2.8 % of overshoot, settled at the end. */
-  --ease-catch: linear(0, 0.054, 0.1792, 0.3334, 0.4894, 0.6308, 0.7498, 0.844, 0.9143, 0.9638, 0.9962, 1.0154, 1.0251, 1.0283, 1.0273, 1.0241, 1.0198, 1.0153, 1.0112, 1.0077, 1.0049, 1.0028, 1.0013, 1.0003, 0.9996, 1);
-}
-.vlx-lesson-head { background: var(--vlx-gymnasium-wash); }
+/* The lesson's bar: one ink, widening in one transition (`ReviewSession`, LC129). */
 .vlx-lesson-ink { background: var(--vlx-gymnasium-bar); }
 
 @media (prefers-reduced-motion: reduce) {

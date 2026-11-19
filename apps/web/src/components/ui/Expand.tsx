@@ -23,6 +23,8 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
   initialFocusRef?: RefObject<HTMLElement | null>;
   /** Closed, its content stays drawn, `hidden`: what it reads is read once, before the first opening (LC105). */
   keepMounted?: boolean;
+  /** Open, its height follows its content (default). Off where the content changes at a key (⌘K's band, LC129): it changes at once. */
+  followContent?: boolean;
   children: ReactNode;
 }
 
@@ -36,7 +38,7 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
  * field, whose keyboard would rise over the page on a phone (LC105). On closing it goes back to what opened it. Esc
  * inside closes it.
  */
-export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, className, children, onKeyDown, ...rest }: ExpandProps) {
+export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, followContent = true, className, children, onKeyDown, ...rest }: ExpandProps) {
   // Still drawn while it closes; derived during render where no animation will run (react-hooks/set-state-in-effect).
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
@@ -121,7 +123,7 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
   useEffect(() => {
     const outer = outerRef.current;
     const inner = innerRef.current;
-    if (!open || !outer || !inner || typeof ResizeObserver === 'undefined' || !canAnimate()) return undefined;
+    if (!open || !followContent || !outer || !inner || typeof ResizeObserver === 'undefined' || !canAnimate()) return undefined;
     let last = inner.offsetHeight;
     const observer = new ResizeObserver(() => {
       const next = inner.offsetHeight;
@@ -154,7 +156,7 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
     });
     observer.observe(inner);
     return () => observer.disconnect();
-  }, [open]);
+  }, [open, followContent]);
 
   if (!mounted && !keepMounted) return null;
 

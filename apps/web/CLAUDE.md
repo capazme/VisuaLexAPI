@@ -551,10 +551,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   section's home («Vai a Learn: Oggi», «Vai a Labs: Assistente», `goToLabel`, `homeName`), an arrow after a thin rule opens the menu; in
   the rail one button, the mark, opens it. Its motions are `sectionMenuMotion.ts`, Web Animations: the menu unrolls
   from the top in 260 ms (an `inset` clip with the same four lengths at both ends, a scale from 0.97), the arrow
-  turns, the entries come in 40 ms apart; the page changes on the click; one check slides to the entry chosen (180 ms) and the
-  menu closes by itself 200 ms later in 180 ms, while the name rolls to the new one and the button takes its width
-  (220 ms) — all counted from the first frame drawn after the choice, since T1's hold draws nothing until the new page
-  is there, and measured there, never in the commit (a forced layout, or a change of weight or attribute on the menu
+  turns, the entries come with it (LC129: no cascade); the page changes on the click and the menu rolls up at once, in
+  180 ms, with no wait (LC129: it waited 200 ms); the name on the button is the new one at once (LC129: `rollName` is
+  gone); one check slides to the entry chosen (180 ms) from the first frame drawn after the choice, since T1's hold
+  draws nothing until the new page is there, and measured there, never in the commit (a forced layout, or a change of weight or attribute on the menu
   at the click, cost the change 20–35 ms on the slow machine); under reduced motion nothing moves and the menu goes at
   once; in the drawer it is the drawer's width less 32 px, with entries of 56 px, and goes at once with the choice,
   the drawer closing over it). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
@@ -575,8 +575,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   switcher opens (`SECTION_HOME_CODE`), or the first change would play over the page it leaves (Opus, the Forum) or
   fade into «Caricamento…» (Gymnasium, Academia), the new page coming after the hold. The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
-  the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
-  Animations, opacity only, never on the sidebar's first draw). The section's entries are a `LayoutGroup` of their
+  the sidebar's new entries are there at once (LC129: their cascade, `useEntriesEntrance`, is gone). The section's entries are a `LayoutGroup` of their
   own, so the active dot does not slide from the old section's entries — nor, since, between «Ricerca» or «Analizza
   documento» and a section's entry: it appears there. A tap or a key during it brings it to its end (`skipTransition`;
   Enter, Space and Esc are taken, so they do not press the switcher again, and let go as soon as it is skipped); a
@@ -761,12 +760,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   the card's `shadow-lg` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
   Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
   included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
-  Animations the panel is drawn at once. While the box filters, a row filtered out fades and pops out of its list
-  (`AnimatePresence mode="popLayout"`, against its own scrolling column, which is `relative`) and the rows left slide to
-  their places (`layout`, `spring.snappy`); a row leaving is `disabled` for cmdk and `aria-hidden` (Enter never picks a
-  row no longer there); the letters the box matched are drawn in toga, semibold (`Matched`, over `matchRanges` in
+  Animations the panel is drawn at once. While the box filters, the list changes at once: no row slides, fades or pops
+  out, and the band does not follow its height (`Expand`'s `followContent={false}`) — LC129: nothing moves at a key; the letters the box matched are drawn in toga, semibold (`Matched`, over `matchRanges` in
   `paletteActs.ts`, one entry per UTF-16 unit; an abbreviation typed with its dots is one word). A new step slides in
-  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`). On a phone the
+  from the side it moved to; the chosen row's tint is on the row in the same frame, with no slide (LC129). On a phone the
   page under the panel holds still (the body's overflow, a backdrop that takes no touch scroll) and the panel is as tall
   as the visual viewport leaves (the keyboard; `100dvh` does not shrink on iOS), watched only while the menu is open on a phone. Under reduced motion everything only
   fades and nothing moves. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
@@ -951,8 +948,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   only, `HOVER_LIFT` lifts 1 px for a fine pointer and goes on nothing that is a row or a list item.
   **Motion** comes from `lib/motion.ts` (`ease`, `dur`, `spring.snappy` for panels and rows,
   `spring.gentle` for rare moments): no component types a spring or a curve, and a transition names what
-  changes. A CSS transition that needs a spring takes `--ease-catch` (`index.css`, a damped spring sampled as a
-  `linear()` curve; the lesson bar's ink). `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring, with no exception
+  changes. `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring, with no exception
   since the Gymnasium celebration's stamp is gone (G9). A row or a list item takes a colour change on hover, never a
   scale or a lift.
 
@@ -1814,10 +1810,9 @@ it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives t
 address, waits with `LearnLoading`: nothing for 300 ms, then «Caricamento…» (LC112: it came in some 210 ms, the words a flash). The shell's full screen
 (`focusMode`) is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
 header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
-where done are the cards out of the queue — a «Di nuovo» holds it still —; at each grade that moves it the head runs
-ahead in Pietra's stone (`vlx-lesson-head`, `--vlx-gymnasium-wash`, 150 ms), the ink — the action's ink since LC16,
-10:1 on its track (`vlx-lesson-ink`, `--vlx-gymnasium-bar`) — catches up 70 ms later on `--ease-catch` (300 ms) and the
-bar trembles by a pixel (Web Animations, `PLUCK`), 370 ms in all, all of it `motion-safe:` only; «Restano N»
+where done are the cards out of the queue — a «Di nuovo» holds it still —; at each grade that moves it the ink — the
+action's ink since LC16, 10:1 on its track (`vlx-lesson-ink`, `--vlx-gymnasium-bar`) — widens in one transition,
+`dur.pop`, `motion-safe:` only (LC129: the stone head, the spring that caught up with it and the tremble are gone); «Restano N»
 stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
 in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
 card changes; the scroll is keyed by step, so each card starts at its top), and `LessonBar` at the foot on every width (above the phone's safe edge, in the `pinnedBar` band inside
@@ -1889,9 +1884,7 @@ from 0.48–0.57 before). In that order:
    «Accendi le schede della comunità» as its button, which opens the settings at the community's subjects; a failed
    first read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps «Inizia il ripasso» (the session
    reads its own cards), a later failed read says it under the last answer. `todayState` and `nextDayLine` decide it,
-   pure, in `progress/today.ts`. It enters once, when its content is first drawn, with the sidebar's cascade
-   (`fadeInEntries` of `features/sections/useEntriesEntrance.ts`: its children fade in 20 ms apart, opacity only), never
-   under reduced motion.
+   pure, in `progress/today.ts`.
 2. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions as compact rows, one under the other,
    each with its mark (drawn, never pressed), «8 di 18», its points («20 XP», «+20 XP» in ink once earned, said as «vale 20 punti» /
    «20 punti guadagnati») — on a phone always under the title, whatever its length, so every row has one shape; at the
@@ -3046,7 +3039,7 @@ Duplicating any of these is a defect, not a shortcut.
 - `components/ui/MenuButton.tsx` — the one menu button (arrows, Home/End,
   Escape/Tab, focus return, click outside; clicks never reach the card). Two menus keep their own keyboard,
   for a reason: the sidebar's user menu (portalled, placed from the avatar) and the section switcher (S6: a menu
-  that stays a moment after the choice, rolls up, and can be turned back).
+  that rolls up at the choice and can be turned back).
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
 - `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
   `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
