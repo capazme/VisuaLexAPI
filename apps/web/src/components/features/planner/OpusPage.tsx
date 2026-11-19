@@ -10,17 +10,18 @@ import { SegmentedTabLinks } from '../../ui/SegmentedTabs';
 import { buttonClassName } from '../../ui/buttonStyles';
 import { plannerStore } from './plannerStore';
 import { setFootBarRoom } from '../../ui/notifications/footBar';
+import { TASK_BASE, TaskSectionContext, type TaskSection } from './taskSection';
 
 /** The planner's three views, tabs of the page since Work's bar lists only its five entries (D-315, LC8): the short
  *  word on a phone, where they are the bar at the foot, the full name from `md`, one name each (LC83). */
 const VIEWS = [
-  { to: '/work/scadenziario', label: 'Scadenziario', short: 'Scadenziario', icon: CalendarCheck },
-  { to: '/work/prossimi', label: 'Prossimi giorni', short: 'Prossimi', icon: CalendarDays },
-  { to: '/work/ingresso', label: "Lista d'ingresso", short: 'Ingresso', icon: Inbox },
+  { path: 'scadenziario', label: 'Scadenziario', short: 'Scadenziario', icon: CalendarCheck },
+  { path: 'prossimi', label: 'Prossimi giorni', short: 'Prossimi', icon: CalendarDays },
+  { path: 'ingresso', label: "Lista d'ingresso", short: 'Ingresso', icon: Inbox },
 ];
 
 /** The views in the tabs' order, the trash after them (its way back is the tabs): the order of their slide (LC98). */
-const VIEW_ORDER = [...VIEWS.map((view) => view.to.split('/')[2]), 'cestino'];
+const VIEW_ORDER = [...VIEWS.map((view) => view.path), 'cestino'];
 
 /** `Button variant="secondary"`'s look (LC110). Below `lg` `IconButton`'s square with the icon, the words for a screen
  *  reader (LC38): at 768 px the title, the tabs and both options in words do not fit one row (LC83). From `lg` the
@@ -38,10 +39,15 @@ const HEADER_BUTTON = cn(buttonClassName('secondary'), 'max-lg:min-w-11 max-lg:p
 export function OpusPage() {
   const { pathname } = useLocation();
   const outlet = useOutlet();
+  // Learn has the same page at `/learn/attivita` (LC130), with its own tasks: the «studio» ones (`taskSection.ts`).
+  const section: TaskSection = pathname === TASK_BASE.learn || pathname.startsWith(`${TASK_BASE.learn}/`) ? 'learn' : 'work';
+  const base = TASK_BASE[section];
+  // The view's segment under the section's base: «scadenziario», «cestino», a tool that is coming.
+  const viewPath = pathname.slice(base.length + 1).split('/')[0] ?? '';
   // The trash's link belongs to the three views; the tabs to them and to the trash, as its way back (#448). Neither on
   // the tools that are coming.
-  const inView = VIEWS.some((view) => pathname.startsWith(view.to));
-  const inTrash = pathname.startsWith('/work/cestino');
+  const inView = VIEWS.some((view) => view.path === viewPath);
+  const inTrash = viewPath === 'cestino';
   const inboxCount = plannerStore((s) => s.inboxCount);
   const tabs = useRef<HTMLDivElement>(null);
   const tabsShown = inView || inTrash;
@@ -77,8 +83,8 @@ export function OpusPage() {
     <PageFrame
       // «Attività» over the three views (LC130); the trash and the tools that are coming keep their own name (L-37).
       title={inView ? 'Attività' : pageName(pathname) ?? 'Attività'}
-      kicker="opus"
-      section="opus"
+      kicker={section === 'learn' ? 'gymnasium' : 'opus'}
+      section={section === 'learn' ? 'gymnasium' : 'opus'}
       className="h-full"
       // On a phone the options are icons beside the title (LC33, after Todoist: the title, then the list).
       actionBeside
@@ -95,7 +101,7 @@ export function OpusPage() {
           )}
         >
           <SegmentedTabLinks
-            label="Viste di Work"
+            label={section === 'learn' ? 'Viste di Learn' : 'Viste di Work'}
             size="sm"
             footBar
             onNavigate={keepPlace}
@@ -103,7 +109,7 @@ export function OpusPage() {
             // 13 px from md, as the section tabs; 12 under the icons of the bar at the foot (the consultant, LC111).
             tabClassName="whitespace-nowrap md:px-4 md:text-[13px]"
             links={VIEWS.map((view) => ({
-              to: view.to,
+              to: `${base}/${view.path}`,
               icon: <view.icon size={20} strokeWidth={1.75} />,
               label: (
                 <span className="inline-flex items-baseline">
@@ -111,7 +117,7 @@ export function OpusPage() {
                   <span className="md:hidden">{view.short}</span>
                   <span className="hidden md:inline">{view.label}</span>
                   {/* The inbox's count, the one view with no group to carry it (LC83). */}
-                  {view.to === '/work/ingresso' && pathname.startsWith(view.to) && inboxCount !== null && inboxCount > 0 && (
+                  {view.path === 'ingresso' && viewPath === 'ingresso' && inboxCount !== null && inboxCount > 0 && (
                     <span data-tab-count className="ml-1.5 font-normal tabular-nums opacity-75">
                       <span className="sr-only">, </span>
                       {inboxCount}
@@ -125,7 +131,7 @@ export function OpusPage() {
         </div>
       )}
       action={inView && (<>
-        <Link to="/work/cestino" aria-label="Cestino dei compiti" className={HEADER_BUTTON}>
+        <Link to={`${base}/cestino`} aria-label="Cestino dei compiti" className={HEADER_BUTTON}>
           <Trash2 size={15} aria-hidden />
           <span aria-hidden className="max-lg:hidden">Cestino</span>
         </Link>
@@ -133,9 +139,9 @@ export function OpusPage() {
     >
       {/* At least a screen tall: a view that mounts empty while it loads never shortens the page under the reader. It
           slides in from the side of its tab (LC98). */}
-      <ViewSlide view={pathname.split('/')[2] ?? ''} order={VIEW_ORDER}>
+      <ViewSlide view={viewPath} order={VIEW_ORDER}>
         <div className={cn('min-h-[calc(100dvh-8rem)]', (inView || inTrash) && 'max-md:pb-24')}>
-          {outlet}
+          <TaskSectionContext.Provider value={section}>{outlet}</TaskSectionContext.Provider>
         </div>
       </ViewSlide>
     </PageFrame>

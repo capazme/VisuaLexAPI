@@ -7,9 +7,12 @@ import { Button } from '../../ui/Button';
 import { draftProblem, emptyDraft, inputFromDraft, type TaskDraft } from './taskDraft';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
+import { newTaskOrigin, type TaskSection } from './taskSection';
 
 interface Props {
   defaults: Partial<TaskDraft>;
+  /** Where «c» was pressed (LC130): a task with no dossier is that section's. */
+  section: TaskSection;
   onClose: () => void;
   onCreated?: (task: Task) => void;
 }
@@ -19,7 +22,7 @@ interface Props {
  * waits for the server; a refusal keeps what was typed and says why, in the server's words. An existing task opens
  * in its sheet (`TaskSheet`), which saves each field as it changes.
  */
-export function TaskDialog({ defaults, onClose, onCreated }: Props) {
+export function TaskDialog({ defaults, section, onClose, onCreated }: Props) {
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(defaults));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,7 +42,7 @@ export function TaskDialog({ defaults, onClose, onCreated }: Props) {
     setError(null);
     try {
       const kind = dossiers.find((d) => d.id === draft.dossierId)?.kind;
-      const created = await taskService.create(inputFromDraft(draft, { withDossier: true, origin: kind === 'studio' ? 'studio' : 'lavoro' }));
+      const created = await taskService.create(inputFromDraft(draft, { withDossier: true, origin: newTaskOrigin(kind, section) }));
       plannerStore.getState().changed();
       // The host says where it went when it knows the page's view; else the plain notice.
       if (onCreated) onCreated(created);

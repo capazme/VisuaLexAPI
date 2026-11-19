@@ -3,6 +3,7 @@ import { taskService } from '../../../services/taskService';
 import type { Task, TaskView, TaskViewAnswer } from '../../../types/tasks';
 import type { Optimistic } from './taskActions';
 import { plannerStore } from './plannerStore';
+import { inSection, type TaskSection } from './taskSection';
 
 export type TaskViewState =
   | { status: 'loading'; answer: TaskViewAnswer | null }
@@ -16,8 +17,10 @@ export type TaskViewState =
  * until an answer read after it landed arrives — a read that started before, or a failed one that keeps the last
  * answer, would show it again, not done — and comes back at once when the write is refused. «Oggi» also gives the bar
  * its count, so the two never disagree. A new day (`plannerStore.today`) or the tab coming back into view reads again.
+ * `section` keeps the tasks of Work's or Learn's list (LC130): the server answers both, and this is the one place that
+ * splits them; without it (a dossier's tasks, a sheet's family) every task is kept.
  */
-export function useTaskView(view: TaskView, dossierId?: string) {
+export function useTaskView(view: TaskView, dossierId?: string, section?: TaskSection | null) {
   const version = plannerStore((s) => s.version);
   const [reads, setReads] = useState(0);
   const scope = `${view}#${dossierId ?? ''}`;
@@ -36,7 +39,7 @@ export function useTaskView(view: TaskView, dossierId?: string) {
         if (!live) return;
         setAnswer({ key, scope, data, readAt: version, failed: false });
         plannerStore.getState().setToday(data.today);
-        if (view === 'today') plannerStore.getState().setTodayCount(data.tasks.length);
+        if (view === 'today') plannerStore.getState().setTodayCount(data.tasks);
       },
       (error: { status?: number }) => {
         if (!live) return;
@@ -88,21 +91,22 @@ export function useTaskView(view: TaskView, dossierId?: string) {
 
   const visible = useMemo<TaskViewAnswer | null>(() => {
     if (!answer.data) return null;
+    const data = section ? { ...answer.data, tasks: answer.data.tasks.filter((task) => inSection(task, section)) } : answer.data;
     const gone = new Set([...hidden].filter(([, at]) => at === null || answer.readAt < at).map(([id]) => id));
-    if (gone.size === 0) return answer.data;
+    if (gone.size === 0) return data;
     // A hidden task takes the subtasks the server closes or trashes with it.
     let grew = true;
     while (grew) {
       grew = false;
-      for (const task of answer.data.tasks) {
+      for (const task of data.tasks) {
         if (!gone.has(task.id) && task.parentId && gone.has(task.parentId)) {
           gone.add(task.id);
           grew = true;
         }
       }
     }
-    return { ...answer.data, tasks: answer.data.tasks.filter((task: Task) => !gone.has(task.id)) };
-  }, [answer.data, answer.readAt, hidden]);
+    return { ...data, tasks: data.tasks.filter((task: Task) => !gone.has(task.id)) };
+  }, [answer.data, answer.readAt, hidden, section]);
 
   let state: TaskViewState;
   if (answer.key !== key) state = { status: 'loading', answer: visible };

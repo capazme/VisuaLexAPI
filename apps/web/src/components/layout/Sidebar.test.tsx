@@ -219,6 +219,26 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(entry).not.toHaveTextContent(/Scadenz/);
   });
 
+  it.each(['wide', 'drawer'] as const)('Learn: its own «Attività», with Work\'s icon and the «studio» tasks\' count (%s, LC130)', (layout) => {
+    plannerStore.setState({ todayCount: { work: 3, learn: 2 } });
+    try {
+      render(
+        <MemoryRouter initialEntries={['/learn/attivita/prossimi']}>
+          <Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} />
+        </MemoryRouter>,
+      );
+      const entry = screen.getByRole('link', { name: 'Attività, 2 compiti per oggi o scaduti' });
+      expect(entry.getAttribute('href')).toBe('/learn/attivita/scadenziario');
+      // Active on every view of Learn's planner («page» on its own address, as Work's).
+      expect(entry).toHaveAttribute('aria-current', 'true');
+      expect(entry.querySelector('svg')?.getAttribute('class')).toMatch(/lucide-calendar-check/);
+      // Work's count stays Work's.
+      expect(screen.queryByText('3')).toBeNull();
+    } finally {
+      plannerStore.setState({ todayCount: null });
+    }
+  });
+
   it.each(['wide', 'drawer'] as const)('Work: «Analizza documento» says «in sviluppo» and the Pseudonimizzatore «in arrivo» under the word (%s, LC47)', (layout) => {
     render(
       <MemoryRouter initialEntries={['/work/scadenziario']}>
@@ -363,13 +383,13 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   });
 
   it('counts the overdue and today\'s tasks beside «Attività», and says it in words (row 16)', () => {
-    plannerStore.setState({ todayCount: 3 });
+    plannerStore.setState({ todayCount: { work: 3, learn: 0 } });
     try {
       renderSidebar('/work/scadenziario');
       const today = screen.getByRole('link', { name: 'Attività, 3 compiti per oggi o scaduti' });
       expect(today).toHaveAttribute('aria-current', 'page');
       expect(today).toHaveTextContent('3');
-      cleanupAndRender('/work/scadenziario', () => plannerStore.setState({ todayCount: 0 }));
+      cleanupAndRender('/work/scadenziario', () => plannerStore.setState({ todayCount: { work: 0, learn: 0 } }));
       expect(screen.getByRole('link', { name: 'Attività' })).not.toHaveTextContent(/\d/);
     } finally {
       plannerStore.setState({ todayCount: null });
@@ -378,14 +398,14 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
 
   it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
     renderSidebar('/learn/schede');
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/pratiche', '/learn/schede']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/learn/attivita/scadenziario', '/pratiche', '/learn/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
     // One group reads «Learn» (LC4: the section's, its first heading's entries straight inside it), «Contribuisci» within.
     const section = screen.getByRole('group', { name: 'Learn' });
-    expect(within(section).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Pratiche', 'Le mie schede']);
+    expect(within(section).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Attività', 'Pratiche', 'Le mie schede']);
     expect(section).toContainElement(screen.getByRole('group', { name: 'Contribuisci' }));
     cleanupAndRender('/learn/schede', () => { account.isValidator = true; });
-    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/pratiche', '/learn/schede', '/learn/valida']);
+    expect(hrefs()).toEqual(['/', '/documents', '/rassegne', '/learn/ripasso', '/learn/progressi', '/learn/attivita/scadenziario', '/pratiche', '/learn/schede', '/learn/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
     expect(within(contribute).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Le mie schede', 'Da validare']);
     // The tours still find the dossiers.

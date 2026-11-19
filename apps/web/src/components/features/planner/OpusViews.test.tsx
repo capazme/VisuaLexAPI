@@ -85,7 +85,7 @@ describe('«Oggi»', () => {
     expect(within(overdue).getByText('Urgente')).toBeInTheDocument();
     expect(within(overdue).getByRole('link', { name: /Ricorso Rossi/ })).toHaveAttribute('href', '/pratiche?dossier=d1');
     // The count is still overdue plus today: every task the view lists.
-    expect(plannerStore.getState().todayCount).toBe(3);
+    expect(plannerStore.getState().todayCount).toEqual({ work: 3, learn: 0 });
     expect(service.list).toHaveBeenCalledWith('today', undefined);
   });
 

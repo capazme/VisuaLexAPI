@@ -1,6 +1,7 @@
 import { addDaysToIsoDate } from '../../../utils/dateUtils';
 import type { RecurrenceFrom, RecurrenceRule, Task, TaskInput, TaskOrigin, TaskPriority, TaskView } from '../../../types/tasks';
 import { UPCOMING_DAYS } from './taskDates';
+import { inSection, type TaskSection } from './taskSection';
 
 /** A task as its form holds it: every field a string the inputs can show, '' for none. */
 export interface TaskDraft {
@@ -99,8 +100,10 @@ export function inputFromDraft(draft: TaskDraft, options: { withDossier: boolean
   };
 }
 
-/** Whether a task, just written, is one the view lists: if not, the page says where it went. */
-export function belongsTo(task: Task, view: TaskView, today: string, dossierId?: string): boolean {
+/** Whether a task, just written, is one the view lists: if not, the page says where it went. `section`: the view is
+ *  Work's or Learn's (LC130), which lists only its own tasks. */
+export function belongsTo(task: Task, view: TaskView, today: string, dossierId?: string, section?: TaskSection | null): boolean {
+  if (section && !inSection(task, section)) return false;
   if (task.completedAt || task.deletedAt) return view === 'trash' && task.deletedAt !== null;
   switch (view) {
     case 'today':

@@ -138,9 +138,10 @@ export function TaskSheetFields({ task, today, onSave, onCompleteForever }: Prop
   const parentDossier = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.title ?? 'Pratica' : "Lista d'ingresso";
 
   const moveTo = (dossierId: string) => {
-    // A task moved to another dossier takes that dossier's kind as its origin (a dossier di studio: «studio»).
-    const kind = dossiers.find((d) => d.id === dossierId)?.kind;
-    const origin = task.origin === 'forum' ? undefined : kind === 'studio' ? 'studio' : 'lavoro';
+    // A task moved to another dossier takes that dossier's kind as its origin (a dossier di studio: «studio»); moved
+    // to «Lista d'ingresso» it keeps its own, so it stays in its section's list (LC130).
+    const kind = dossierId ? dossiers.find((d) => d.id === dossierId)?.kind : undefined;
+    const origin = task.origin === 'forum' || !kind ? undefined : kind === 'studio' ? 'studio' : 'lavoro';
     onSave({ dossierId: dossierId || null, ...(origin ? { origin } : {}) }, { dossierId: dossierId || null, ...(origin ? { origin } : {}) });
   };
 

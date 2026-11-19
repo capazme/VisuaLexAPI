@@ -5,6 +5,7 @@ import { Button } from '../../ui/Button';
 import { CARD_RADIUS, CONTROL_BORDER, FIELD_HELP, FIELD_LABEL } from '../../ui/controlStyles';
 import { cn } from '../../../lib/utils';
 import { failureMessage, plannerStore } from './plannerStore';
+import { useAppStore } from '../../../store/useAppStore';
 import { NotTodoistCsvError, planTodoistImport, runTodoistImport, type ImportNote, type ImportPlan } from './todoistCsv';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -82,6 +83,8 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
   const [running, setRunning] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  // The dossier's kind is the imported tasks' origin (LC130): a dossier di studio's go to Learn's list.
+  const kind = useAppStore((s) => s.dossiers.find((d) => d.id === dossierId)?.kind);
 
   const chooseFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -119,7 +122,7 @@ export function TodoistImport({ id, open, onClose, dossierId, today }: { id: str
     setOutcome(null);
     // The runner writes each row into this map as it is created; a new map in state draws the counts.
     const rows = new Map(progress.created);
-    const { added, error } = await runTodoistImport(plan, dossierId, rows, taskService.create, () => writeStored(progress.key, { rows: [...rows] }));
+    const { added, error } = await runTodoistImport(plan, dossierId, rows, (input) => taskService.create(kind ? { ...input, origin: kind } : input), () => writeStored(progress.key, { rows: [...rows] }));
     // Done: the ids go, the day stays (to say the file was imported); the map in memory keeps this view from importing it again.
     const importedAt = error ? progress.importedAt : new Date().toISOString();
     if (!error) writeStored(progress.key, { importedAt: importedAt! });

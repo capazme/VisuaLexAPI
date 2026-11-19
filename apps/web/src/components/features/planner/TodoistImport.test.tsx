@@ -7,6 +7,7 @@ import { taskService } from '../../../services/taskService';
 import type { Task } from '../../../types/tasks';
 import example from './__fixtures__/todoist-esempio.csv?raw';
 import { TodoistImport } from './TodoistImport';
+import { appStore } from '../../../store/useAppStore';
 
 const TODAY = '2026-11-17';
 
@@ -54,6 +55,23 @@ describe('TodoistImport', () => {
     const stored = sessionStorage.getItem('visualex.opus.todoist-import')!;
     expect(Object.values(JSON.parse(stored))).toEqual([{ importedAt: expect.any(String) }]);
     expect(stored).not.toMatch(/Rileggere|Pratica\.csv/);
+  });
+
+  it("gives the tasks imported into a pratica di studio the origin «studio», so they are Learn's (LC130)", async () => {
+    appStore.setState({ dossiers: [{ id: 'd2', title: 'Esame di diritto civile', createdAt: '', items: [], kind: 'studio' }] });
+    const create = vi.mocked(taskService.create);
+    let calls = 0;
+    create.mockImplementation(async (input) => ({ id: `t${++calls}`, title: input.title }) as Task);
+    try {
+      render(<TodoistImport id="imp" open onClose={() => {}} dossierId="d2" today={TODAY} />);
+      chooseFile(example);
+      fireEvent.click(await screen.findByRole('button', { name: 'Importa 13 compiti' }));
+      expect(await screen.findByText(/Import completato: 13 compiti entrati/)).toBeInTheDocument();
+      expect(create.mock.calls.map(([input]) => input.origin)).toEqual(Array(13).fill('studio'));
+      expect(create.mock.calls[0][0]).toMatchObject({ dossierId: 'd2' });
+    } finally {
+      appStore.setState({ dossiers: [] });
+    }
   });
 
   it('says a file was already imported in this dossier, before «Importa N»', async () => {

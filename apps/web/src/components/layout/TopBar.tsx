@@ -24,9 +24,11 @@ function usePageHeading(scroller: HTMLElement | null, resetKey: string): string 
   return heading;
 }
 
-/** The first segment of an address that names a list: `/pratiche/42` → `/pratiche`, `/work/atti/7` → `/work/atti`. */
+/** The segments of an address that name a list: `/pratiche/42` → `/pratiche`, `/work/atti/7` → `/work/atti`. */
 function listOf(pathname: string): string {
   const parts = pathname.split('/').filter(Boolean);
+  // Learn's planner is Work's one level down (LC130): `/learn/attivita/ingresso` is a list, as `/work/ingresso`.
+  if (parts[0] === 'learn' && parts[1] === 'attivita') return `/${parts.slice(0, 3).join('/')}`;
   return parts[0] === 'work' || parts[0] === 'learn' || parts[0] === 'labs' ? `/${parts.slice(0, 2).join('/')}` : `/${parts[0] ?? ''}`;
 }
 

@@ -115,10 +115,10 @@ describe('«c», the quick add from anywhere', () => {
   it('reads the count for the bar, and again after a write', async () => {
     service.list.mockResolvedValue({ today: TODAY, tasks: [task('a'), task('b')], truncated: false });
     host();
-    await waitFor(() => expect(plannerStore.getState().todayCount).toBe(2));
+    await waitFor(() => expect(plannerStore.getState().todayCount).toEqual({ work: 2, learn: 0 }));
     service.list.mockResolvedValue({ today: TODAY, tasks: [task('a')], truncated: false });
     act(() => plannerStore.getState().changed());
-    await waitFor(() => expect(plannerStore.getState().todayCount).toBe(1));
+    await waitFor(() => expect(plannerStore.getState().todayCount).toEqual({ work: 1, learn: 0 }));
     expect(service.list).toHaveBeenCalledWith('today');
   });
 });
