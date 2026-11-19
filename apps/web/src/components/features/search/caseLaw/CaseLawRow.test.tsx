@@ -110,7 +110,7 @@ describe('CaseLawRow — the cut text', () => {
 
   it('makes the button a 44 px target on a phone', () => {
     show(<CaseLawRow label="A">{'parola '.repeat(60)}</CaseLawRow>);
-    expect(screen.getByRole('button', { name: 'Mostra tutto' })).toHaveClass('min-h-11', 'md:min-h-8');
+    expect(screen.getByRole('button', { name: 'Mostra tutto' })).toHaveClass('min-h-11', 'md:min-h-9');
   });
 
   // LC113: the text sits in an `Expand` that stays open, so «Mostra tutto» and «Mostra meno» move its height on the

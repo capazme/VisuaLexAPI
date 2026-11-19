@@ -137,7 +137,7 @@ export function Scrivania() {
         <section id="tour-quick-norms" className="mt-14 max-md:mt-10" aria-labelledby="scrivania-frequenti">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="scrivania-frequenti" className="font-serif text-2xl font-medium text-slate-900 max-md:text-xl dark:text-slate-50">Ricerche frequenti</h2>
-            <Button type="button" variant="quiet" size="sm" onClick={() => openSettings('norme-rapide')} icon={<Plus aria-hidden="true" size={14} />} className="gap-1.5 px-2 text-sm">
+            <Button type="button" variant="quiet" onClick={() => openSettings('norme-rapide')} icon={<Plus aria-hidden="true" size={14} />} className="gap-1.5 px-2 text-sm">
               Gestisci
             </Button>
           </div>

@@ -99,6 +99,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// LC113 (the consultant on #660): the views' tabs are 44 px on a phone and 32 in a track of 36 from md, as Learn's (#657).
+describe('the views\' tabs (LC113)', () => {
+  it('are 44 px on a phone, 32 from md', () => {
+    renderPage();
+    for (const tab of screen.getAllByRole('tab')) expect(tab).toHaveClass('min-h-11', 'md:min-h-8');
+  });
+});
+
 describe('the filter of «Fonti» (LC88)', () => {
   it('finds an article by its rubric: the other rows hide, an act left with none closes, «N di M» says it', () => {
     renderPage();
@@ -224,6 +232,7 @@ describe('«Seleziona» on «Fonti» (LC88)', () => {
     expect(bar).toHaveAttribute('hidden');
     fireEvent.click(select);
     expect(bar).not.toHaveAttribute('hidden');
+    expect(screen.getByRole('region', { name: 'Barra della selezione' })).toBe(bar);
     expect(bar).toContainElement(screen.getByText('0 selezionati'));
     tick(rowOf(L24, '5'));
     const move = screen.getByRole('button', { name: /Sposta in/ });

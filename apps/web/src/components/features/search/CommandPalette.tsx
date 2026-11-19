@@ -664,7 +664,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     if (!ours) return;
     // A choice made: the focus goes where it led, not back to the pill (Papiniano, #599: it fell to the body).
     if (!chose) {
-      if (opener && opener !== document.body && opener.isConnected) opener.focus({ preventScroll: true });
+      // Opened by ⌘K from the page (the body had the focus), it goes back to the search pill it grew from (#559).
+      const pill = place.source?.matches('button') ? place.source : place.source?.querySelector<HTMLElement>('button') ?? null;
+      const back = opener && opener !== document.body && opener.isConnected ? opener : pill?.isConnected ? pill : null;
+      if (back) back.focus({ preventScroll: true });
       // No choice and no opener to go back to: never moved to the page (LC94), only out of the band as it folds.
       else if (active instanceof HTMLElement && bandRef.current?.contains(active)) active.blur();
       return;
@@ -968,13 +971,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         <Command.Group
           id="command-palette-quick-norms"
           heading="Preferiti"
-          // The heading is as tall as «Gestisci» (44 px on a phone), which sits in it and covers no row.
-          className={cn('relative', GROUP_WITH_HEADING, '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:min-h-[44px] [&_[cmdk-group-heading]]:items-end md:[&_[cmdk-group-heading]]:min-h-0')}
+          // The heading is 44 px at every width, taller than «Gestisci» (44 on a phone, 36 from md), which sits in it and covers no row.
+          className={cn('relative', GROUP_WITH_HEADING, '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:min-h-[44px] [&_[cmdk-group-heading]]:items-end')}
         >
           <Button
             type="button"
             variant="link"
-            size="sm"
             onClick={handleOpenQuickNormsManager}
             onKeyDown={keepKeys}
             className="absolute right-3 top-0 md:top-1"
@@ -1194,7 +1196,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           <div className="w-40">
             <Select
               label="Fonte"
-              size="sm"
               value={filters.source}
               onChange={(event) => setFilters(previous => ({ ...previous, source: event.target.value as SearchFilters['source'] }))}
             >

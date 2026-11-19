@@ -134,7 +134,7 @@ function PassageBounds({ originalText, onMove }: { originalText?: string; onMove
         <div className="pr-1.5">
             <div className="flex flex-wrap items-center gap-x-3">
                 {onMove && (
-                    <Button type="button" variant="link" size="sm" onClick={onMove} icon={<MoveHorizontal size={14} aria-hidden />}>
+                    <Button type="button" variant="link" onClick={onMove} icon={<MoveHorizontal size={14} aria-hidden />}>
                         Sposta l'evidenziazione
                     </Button>
                 )}
@@ -142,7 +142,6 @@ function PassageBounds({ originalText, onMove }: { originalText?: string; onMove
                     <Button
                         type="button"
                         variant="link"
-                        size="sm"
                         aria-expanded={showOriginal}
                         aria-controls={showOriginal ? originalId : undefined}
                         onClick={() => setShowOriginal((v) => !v)}

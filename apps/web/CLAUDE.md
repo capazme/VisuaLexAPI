@@ -2428,7 +2428,7 @@ through `windowFocusRequest`, a one-shot signal the window takes atomically; a t
 
 **The search and the reader on the common controls** (LC113, omologazione 8 of 14): `components/features/search/`
 (with `caseLaw/`) and `practice/` draw `Button`, `IconButton`, `Input` and `Select`: the glosses' and margin notes' commands
-(`Button` small quiet), the reading toolbar's tools (`Button` quiet with `vlx-hover-tile`; the highlighter's and the
+(`Button` quiet, 36 px from md: a text command is never `sm`, which its border makes 34), the reading toolbar's tools (`Button` quiet with `vlx-hover-tile`; the highlighter's and the
 note's tools take the bar's look by `triggerClassName`), ⌘K's fields (the box stays cmdk's and keeps the focus at the
 opening), the find window, «Apri accanto» and «Azioni» of a row in «Fonti» (36 px from `md`, 44 on a phone). The case
 law's section opens as an `Expand` under its heading (Esc closes it); a row's text sits in an open `Expand`, so «Mostra

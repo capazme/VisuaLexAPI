@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, LocateFixed, PenLine, Plus, Send, X } from 'lucide-react';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../types';
@@ -14,7 +13,6 @@ import { Select } from '../../ui/Select';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
 import { Input } from '../../ui/Input';
-import { dur, ease } from '../../../lib/motion';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
 import type { Materia } from '../../../types/studia';
 
@@ -438,7 +436,6 @@ export function ArticleDiscussionPanel({
           />
           {/* Optional: the Forum's Community filters by it (the server keeps it only when sent). */}
           <Select
-            size="sm"
             aria-label="Materia (facoltativa)"
             value={materia}
             onChange={event => setMateria(event.target.value as Materia | '')}
@@ -447,10 +444,10 @@ export function ArticleDiscussionPanel({
             {(Object.keys(MATERIA_LABEL) as Materia[]).map(key => <option key={key} value={key}>{MATERIA_LABEL[key]}</option>)}
           </Select>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="quiet" size="sm" onClick={cancelComposer}>
+            <Button type="button" variant="quiet" onClick={cancelComposer}>
               Annulla
             </Button>
-            <Button type="submit" size="sm" icon={<Send size={13} aria-hidden />}>
+            <Button type="submit" icon={<Send size={13} aria-hidden />}>
               Pubblica
             </Button>
           </div>
@@ -469,7 +466,7 @@ export function ArticleDiscussionPanel({
         <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-[8px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
           <span>Impossibile caricare le glosse sui passaggi. I segni potrebbero non mostrarle.</span>
           {onRetryPassageLoad && (
-            <Button type="button" variant="link" size="sm" onClick={onRetryPassageLoad} className="font-semibold text-amber-900 decoration-amber-400 dark:text-amber-200">
+            <Button type="button" variant="link" onClick={onRetryPassageLoad} className="font-semibold text-amber-900 decoration-amber-400 dark:text-amber-200">
               Riprova
             </Button>
           )}
@@ -623,12 +620,12 @@ export function ArticleDiscussionPanel({
                       ))}
                     </div>
                     <div className={cn('mt-3 flex items-center gap-4 md:gap-2', isMargin && 'flex-wrap gap-y-2')}>
-                      <Button type="button" variant="link" size="sm" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)}>
+                      <Button type="button" variant="link" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)}>
                         Rispondi
                       </Button>
                       <ReportButton label="Segnala la glossa" inline={isMargin} onReport={() => void reportThread(thread.id)} />
                       {isLocated && onGoToPassage && (
-                        <Button type="button" variant="link" size="sm" onClick={() => onGoToPassage(thread.id)} icon={<LocateFixed size={12} aria-hidden />} className="ml-auto gap-1">
+                        <Button type="button" variant="link" onClick={() => onGoToPassage(thread.id)} icon={<LocateFixed size={12} aria-hidden />} className="ml-auto gap-1">
                           Vai al passo
                         </Button>
                       )}
@@ -680,7 +677,6 @@ export function ArticleDiscussionPanel({
                 key={value}
                 type="button"
                 variant="quiet"
-                size="sm"
                 aria-pressed={sort === value}
                 onClick={() => setSort(value)}
                 className="px-1.5 font-normal text-slate-500 aria-pressed:font-semibold aria-pressed:text-slate-900 dark:text-slate-400 dark:aria-pressed:text-white"
@@ -732,16 +728,20 @@ export function ArticleDiscussionPanel({
   return createPortal(
     // A side view, not a box over the text (Luca, 15-11: «sarebbe meglio averlo in visualizzazione laterale»): the
     // window's right edge, its whole height, in from the right; the text stays where it is, in sight.
-    <motion.section
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: dur.pop, ease: ease.out }}
+    // In from the right in CSS, on the motion tokens (`--dur-pop`, `--ease-out`): the keyframes end on the panel's own
+    // style, so nothing is left to write at the end. Framer's entrance gave the opacity back to 0 for a frame once it
+    // finished (Papiniano, #660).
+    <section
       ref={panelRef}
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="article-discussions-title"
-      className={cn('fixed inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-slate-200 bg-card shadow-lg outline-none sm:w-[24rem] dark:border-slate-800', Z_INDEX.structure)}
+      className={cn(
+        'fixed inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-slate-200 bg-card shadow-lg outline-none sm:w-[24rem] dark:border-slate-800',
+        'animate-in fade-in slide-in-from-right-6 duration-(--dur-pop) ease-(--ease-out)',
+        Z_INDEX.structure,
+      )}
     >
       <div className="flex-1 overflow-y-auto p-5 sm:p-6">
       {/* The title and its close on one line; the order and «Nuova glossa» under them. */}
@@ -755,13 +755,13 @@ export function ArticleDiscussionPanel({
         </div>
         <div className="flex items-center justify-between gap-2">
           <div className="w-36">
-            <Select size="sm" aria-label="Ordine delle glosse" value={sort} onChange={event => setSort(event.target.value as typeof sort)}>
+            <Select aria-label="Ordine delle glosse" value={sort} onChange={event => setSort(event.target.value as typeof sort)}>
               <option value="recent">Recenti</option>
               <option value="active">Attive</option>
               <option value="popular">Più votate</option>
             </Select>
           </div>
-          <Button type="button" size="sm" onClick={() => setComposerOpen(value => !value)} icon={<Plus size={14} aria-hidden />}>
+          <Button type="button" onClick={() => setComposerOpen(value => !value)} icon={<Plus size={14} aria-hidden />}>
             Nuova glossa
           </Button>
         </div>
@@ -776,7 +776,7 @@ export function ArticleDiscussionPanel({
         </div>
       )}
       </div>
-    </motion.section>,
+    </section>,
     document.body,
   );
 }

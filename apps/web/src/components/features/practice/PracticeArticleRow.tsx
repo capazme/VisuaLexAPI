@@ -117,7 +117,7 @@ export function PracticeArticleRow({
           <p className="mb-2 flex flex-wrap items-center gap-2 text-sm">
             <NotInDossier />
             {dossier.add && (
-              <Button type="button" variant="quiet" size="sm" onClick={dossier.add} className="px-2 text-sm">
+              <Button type="button" variant="quiet" onClick={dossier.add} className="px-2 text-sm">
                 Aggiungi alla pratica
               </Button>
             )}
@@ -130,7 +130,6 @@ export function PracticeArticleRow({
             <Button
               type="button"
               variant="quiet"
-              size="sm"
               aria-pressed={dossier.important}
               onClick={dossier.toggleImportant}
               icon={<Star size={14} aria-hidden className={dossier.important ? 'fill-amber-400 text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'} />}

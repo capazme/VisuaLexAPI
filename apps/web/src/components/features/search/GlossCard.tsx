@@ -47,7 +47,7 @@ const STATE_TONE: Record<AiReviewState, string> = {
     validated: 'text-emerald-700 dark:text-emerald-400',
 };
 
-// The card's commands: `Button`'s small quiet row (32 px from md, 44 on a phone), the gap and padding of a compact row.
+// The card's commands: `Button`'s quiet row (36 px from md, 44 on a phone; never `sm`, 34 with its border), a compact gap.
 const ACTION_ROW = 'gap-1 px-2';
 
 /**
@@ -169,12 +169,12 @@ export function GlossCard({
             {(edited || gloss.rangeEdited) && (
                 <div className="mt-1 flex flex-wrap gap-x-3">
                     {edited && (
-                        <Button type="button" variant="link" size="sm" aria-expanded={showOriginal} aria-controls={showOriginal ? originalId : undefined} onClick={() => setShowOriginal((v) => !v)}>
+                        <Button type="button" variant="link" aria-expanded={showOriginal} aria-controls={showOriginal ? originalId : undefined} onClick={() => setShowOriginal((v) => !v)}>
                             {showOriginal ? "Nascondi la versione dell'IA" : "Vedi la versione dell'IA"}
                         </Button>
                     )}
                     {gloss.rangeEdited && (
-                        <Button type="button" variant="link" size="sm" aria-expanded={showPassage} aria-controls={showPassage ? passageId : undefined} onClick={() => setShowPassage((v) => !v)}>
+                        <Button type="button" variant="link" aria-expanded={showPassage} aria-controls={showPassage ? passageId : undefined} onClick={() => setShowPassage((v) => !v)}>
                             {showPassage ? "Nascondi il passaggio dell'IA" : "Vedi il passaggio dell'IA"}
                         </Button>
                     )}
@@ -196,7 +196,6 @@ export function GlossCard({
                 <Button
                     type="button"
                     variant="quiet"
-                    size="sm"
                     aria-pressed={validated}
                     aria-disabled={busy || undefined}
                     onClick={() => { if (!busy) actions.validate(gloss.id, !validated); }}
@@ -214,7 +213,6 @@ export function GlossCard({
                 <Button
                     type="button"
                     variant="quiet"
-                    size="sm"
                     aria-pressed={flagged}
                     aria-disabled={busy || undefined}
                     onClick={() => { if (!busy) actions.flag(gloss.id, !flagged); }}
@@ -229,18 +227,17 @@ export function GlossCard({
                 >
                     Da rivedere
                 </Button>
-                <Button ref={editRef} type="button" variant="quiet" size="sm" onClick={() => setDraft(text)} disabled={draft !== null} icon={<Pencil size={12} aria-hidden />} className={ACTION_ROW}>
+                <Button ref={editRef} type="button" variant="quiet" onClick={() => setDraft(text)} disabled={draft !== null} icon={<Pencil size={12} aria-hidden />} className={ACTION_ROW}>
                     Modifica
                 </Button>
                 {actions.move && (
-                    <Button type="button" variant="quiet" size="sm" onClick={onMove ?? (() => actions.move!(gloss.id))} icon={<MoveHorizontal size={13} aria-hidden />} className={ACTION_ROW}>
+                    <Button type="button" variant="quiet" onClick={onMove ?? (() => actions.move!(gloss.id))} icon={<MoveHorizontal size={13} aria-hidden />} className={ACTION_ROW}>
                         Sposta
                     </Button>
                 )}
                 <Button
                     type="button"
                     variant="quiet"
-                    size="sm"
                     onClick={onRemove ?? (() => actions.remove(gloss.id))}
                     icon={<Trash2 size={12} aria-hidden />}
                     className={cn(ACTION_ROW, 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400')}

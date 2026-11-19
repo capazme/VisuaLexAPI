@@ -182,7 +182,7 @@ export function PracticeRowShell({
         {beside && (folded ? (
           <span className="flex flex-shrink-0 items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
             Aperto accanto ·
-            <Button type="button" variant="link" size="sm" onClick={beside.onClose} aria-label={`Chiudi la finestra su ${removeName}`}>
+            <Button type="button" variant="link" onClick={beside.onClose} aria-label={`Chiudi la finestra su ${removeName}`}>
               Chiudi la finestra
             </Button>
           </span>

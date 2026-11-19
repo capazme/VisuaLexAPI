@@ -98,15 +98,15 @@ export function NoteEditBox({
                     onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); keep(); } }}
                 >
                     <p role="alert" className="mr-auto text-xs font-medium text-slate-700 dark:text-slate-200">Scartare la modifica?</p>
-                    <Button ref={keepRef} type="button" variant="quiet" size="sm" onClick={keep}>Continua</Button>
-                    <Button type="button" variant="quiet" size="sm" onClick={discard} className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300">
+                    <Button ref={keepRef} type="button" variant="quiet" onClick={keep}>Continua</Button>
+                    <Button type="button" variant="quiet" onClick={discard} className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300">
                         Scarta
                     </Button>
                 </div>
             ) : (
                 <div className="mt-1 flex items-center justify-end gap-1">
-                    <Button type="button" variant="quiet" size="sm" onClick={cancel}>Annulla</Button>
-                    <Button type="button" size="sm" onClick={onCommit}>Salva</Button>
+                    <Button type="button" variant="quiet" onClick={cancel}>Annulla</Button>
+                    <Button type="button" onClick={onCommit}>Salva</Button>
                 </div>
             )}
         </div>

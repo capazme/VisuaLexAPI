@@ -126,7 +126,7 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
             );
           })}
           {counts.length > CHIPS_SHOWN && (
-            <Button type="button" variant="link" size="sm" aria-expanded={allYears} onClick={() => setAllYears((v) => !v)} className="px-2">
+            <Button type="button" variant="link" aria-expanded={allYears} onClick={() => setAllYears((v) => !v)} className="px-2">
               {allYears ? 'Meno anni' : `Tutti gli anni (${counts.length})`}
             </Button>
           )}
@@ -134,7 +134,7 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
       )}
 
       {isNarrowing(filters) && (
-        <Button type="button" variant="link" size="sm" onClick={() => onChange({ ...NO_FILTERS, order })}>
+        <Button type="button" variant="link" onClick={() => onChange({ ...NO_FILTERS, order })}>
           Azzera i filtri
         </Button>
       )}

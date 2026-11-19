@@ -45,9 +45,9 @@ describe('AskMerltEntry', () => {
       );
     });
 
-    it('is 44 px to tap on a phone, 32 from md (M1; LC113, the common small link)', () => {
+    it('is 44 px to tap on a phone, 36 from md (M1; LC113, the common link)', () => {
       render(<AskMerltEntry {...BASE} qaAskable />);
-      expect(screen.getByRole('button', { name: /chiedi su questo articolo/i })).toHaveClass('min-h-11', 'md:min-h-8');
+      expect(screen.getByRole('button', { name: /chiedi su questo articolo/i })).toHaveClass('min-h-11', 'md:min-h-9');
     });
 
     it('navigates to bare /labs/grafo (no ?urn=) when the article has no urn', () => {

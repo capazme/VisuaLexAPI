@@ -100,7 +100,7 @@ export function FontiToolbar({
         {filtering ? `${shown} di ${total}` : ''}
       </p>
       {/* Kept drawn while closed (hidden), so «Seleziona» always names the bar it opens. */}
-      <Expand id={barId} open={selecting} onClose={() => onSelecting(false)} initialFocusRef={toggleRef} keepMounted>
+      <Expand id={barId} open={selecting} onClose={() => onSelecting(false)} initialFocusRef={toggleRef} keepMounted role="region" aria-label="Barra della selezione">
         <Card className="flex flex-wrap items-center gap-2 p-2">
           <span role="status" className="mr-auto px-1 text-sm text-slate-700 dark:text-slate-300">
             {selectedCount === 1 ? '1 selezionato' : `${selectedCount} selezionati`}

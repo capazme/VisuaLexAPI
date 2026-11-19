@@ -124,7 +124,7 @@ export function AnnexSuggestion({
           </div>
 
           {/* Action Button */}
-          <Button type="button" size="sm" onClick={handleSwitch} loading={isLoading} icon={isLoading ? undefined : <ArrowRight size={14} aria-hidden />} className="flex-row-reverse text-xs font-bold">
+          <Button type="button" onClick={handleSwitch} loading={isLoading} icon={isLoading ? undefined : <ArrowRight size={14} aria-hidden />} className="flex-row-reverse text-xs font-bold">
             {isLoading ? 'Carico...' : 'Vai'}
           </Button>
         </motion.div>

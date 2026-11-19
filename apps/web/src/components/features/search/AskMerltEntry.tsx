@@ -59,7 +59,6 @@ export function AskMerltEntry({
                 <Button
                     type="button"
                     variant="link"
-                    size="sm"
                     icon={<MessageCircleQuestion size={14} aria-hidden />}
                     onClick={() =>
                         navigate(

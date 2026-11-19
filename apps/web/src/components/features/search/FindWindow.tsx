@@ -335,7 +335,6 @@ function FindWindowBody({ session, onClose }: { session: Session; onClose: () =>
               key={value}
               type="button"
               variant="quiet"
-              size="sm"
               aria-pressed={scope === value}
               onClick={() => setScope(value)}
               className={cn(

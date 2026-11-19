@@ -482,7 +482,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             </span>
           )}
           {act.articles.length === 0 && !loadingArticle && act.norma.urn && (
-            <Button type="button" variant="quiet" size="sm" onClick={toggleStructure} icon={<Plus size={13} aria-hidden />} className="gap-1.5 px-2">
+            <Button type="button" variant="quiet" onClick={toggleStructure} icon={<Plus size={13} aria-hidden />} className="gap-1.5 px-2">
               Scegli un articolo dalla struttura
             </Button>
           )}
@@ -537,7 +537,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
             <div className="flex flex-col items-center gap-1 px-6 py-8 text-center text-slate-600 dark:text-slate-400">
               <p className="text-sm font-medium">Scegli un articolo dall'indice</p>
               {act.norma.urn && (
-                <Button type="button" variant="quiet" size="sm" onClick={toggleStructure} icon={<Plus size={13} aria-hidden />} className="mt-1 gap-1.5 px-2">
+                <Button type="button" variant="quiet" onClick={toggleStructure} icon={<Plus size={13} aria-hidden />} className="mt-1 gap-1.5 px-2">
                   Apri la struttura
                 </Button>
               )}

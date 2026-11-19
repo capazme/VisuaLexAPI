@@ -30,7 +30,6 @@ export function VoteButton({ voted, count, label, onVote, own = false }: { voted
     <Button
       type="button"
       variant="quiet"
-      size="sm"
       onClick={onVote}
       aria-label={`${label}, ${count} ${count === 1 ? 'voto' : 'voti'}`}
       aria-pressed={voted}
@@ -77,7 +76,7 @@ export function ReportButton({ onReport, label, inline = false }: { onReport: ()
   const question = 'La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto.';
   return (
     <>
-      <Button ref={trigger} type="button" variant="quiet" size="sm" onClick={(event) => { setAskFrom(event.currentTarget); setAsking(true); }} aria-label={label} aria-expanded={inline ? asking : undefined} icon={<AlertTriangle size={12} aria-hidden />} className="gap-1 px-2 text-slate-500 hover:bg-transparent hover:text-red-600 dark:text-slate-400 dark:hover:bg-transparent dark:hover:text-red-400">
+      <Button ref={trigger} type="button" variant="quiet" onClick={(event) => { setAskFrom(event.currentTarget); setAsking(true); }} aria-label={label} aria-expanded={inline ? asking : undefined} icon={<AlertTriangle size={12} aria-hidden />} className="gap-1 px-2 text-slate-500 hover:bg-transparent hover:text-red-600 dark:text-slate-400 dark:hover:bg-transparent dark:hover:text-red-400">
         Segnala
       </Button>
       {/* `inline` (the article's margin, L-73): the question under the row, in the page, not a dialog over it. The

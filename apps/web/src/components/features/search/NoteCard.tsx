@@ -63,7 +63,7 @@ export function NoteCard({ note, isEditing, editingText, onStartEdit, onChangeEd
 
             <div className={cn('flex items-center gap-1', onGoTo ? 'mt-1' : 'mt-1 md:mt-0')}>
                 {onGoTo && (
-                    <Button type="button" variant="link" size="sm" onClick={onGoTo} icon={<LocateFixed size={12} aria-hidden />} className="gap-1">
+                    <Button type="button" variant="link" onClick={onGoTo} icon={<LocateFixed size={12} aria-hidden />} className="gap-1">
                         Vai al passo
                     </Button>
                 )}

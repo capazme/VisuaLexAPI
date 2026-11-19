@@ -85,7 +85,7 @@ function ClampedText({ children }: { children: ReactNode }) {
         </p>
       </Expand>
       {overflows && (
-        <Button type="button" variant="link" size="sm" aria-expanded={expanded} aria-controls={textId} onClick={() => setExpanded((v) => !v)}>
+        <Button type="button" variant="link" aria-expanded={expanded} aria-controls={textId} onClick={() => setExpanded((v) => !v)}>
           {expanded ? 'Mostra meno' : 'Mostra tutto'}
         </Button>
       )}
@@ -151,7 +151,6 @@ export function CaseLawRow({
           <Button
             type="button"
             variant="quiet"
-            size="sm"
             onClick={(e) => adding.open(e.currentTarget)}
             aria-label={estremi ? `Aggiungi alla pratica ${estremi}` : undefined}
             icon={<FolderPlus size={14} aria-hidden />}

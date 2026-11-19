@@ -12,7 +12,7 @@ const CARD = cn(
     'rounded-[8px] border border-slate-200 bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none dark:border-slate-700 dark:bg-slate-900',
     'focus-visible:ring-2 focus-visible:ring-primary-500',
 );
-// The card's commands, as `GlossCard`'s: `Button`'s small quiet row, the gap and padding of a compact row.
+// The card's commands, as `GlossCard`'s: `Button`'s quiet row at 36 px from md, a compact gap.
 const ACTION_ROW = 'gap-1 px-2';
 const DANGER = 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400';
 
@@ -127,10 +127,10 @@ export function NoteMarginCard({
                 </div>
             )}
             <div className="-mx-1.5 mt-1 flex flex-wrap items-center gap-0.5">
-                <Button ref={editRef} type="button" variant="quiet" size="sm" onClick={() => setDraft(text)} disabled={draft !== null} icon={<Pencil size={12} aria-hidden />} className={ACTION_ROW}>
+                <Button ref={editRef} type="button" variant="quiet" onClick={() => setDraft(text)} disabled={draft !== null} icon={<Pencil size={12} aria-hidden />} className={ACTION_ROW}>
                     Modifica
                 </Button>
-                <Button type="button" variant="quiet" size="sm" onClick={onRemove} icon={<Trash2 size={12} aria-hidden />} className={cn(ACTION_ROW, DANGER)}>
+                <Button type="button" variant="quiet" onClick={onRemove} icon={<Trash2 size={12} aria-hidden />} className={cn(ACTION_ROW, DANGER)}>
                     Rimuovi
                 </Button>
             </div>
@@ -259,7 +259,7 @@ export function ThreadCard({ thread, currentTextHash, onOpen, onEscape, ref, cla
                 <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Il testo è cambiato da quando è stata aperta</p>
             )}
             <div className="-mx-1.5 mt-1 flex items-center">
-                <Button type="button" variant="quiet" size="sm" onClick={onOpen} icon={<MessageCircle size={12} aria-hidden />} className={ACTION_ROW}>
+                <Button type="button" variant="quiet" onClick={onOpen} icon={<MessageCircle size={12} aria-hidden />} className={ACTION_ROW}>
                     Apri glossa
                 </Button>
             </div>
