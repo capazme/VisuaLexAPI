@@ -278,35 +278,13 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
   });
 
-  it.each([
-    ['past the right edge', { left: 200, right: 450 }, 250, '-138px'],
-    ['past the left edge', { left: -40, right: 210 }, 250, '48px'],
-    // Absolute in a narrow container, the positioning element can be narrower than the box drawn in it (a 390 px
-    // window: the box at 149–398 while its container stopped short): the box is what is measured (#351).
-    ['past the right edge, its positioning element narrower than its box', { left: 200, right: 450 }, 150, '-138px'],
-  ])('the selection\'s popup is kept 8 px inside a narrow window, %s', async (_, at, positionerWidth, nudge) => {
-    const width = window.innerWidth;
-    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
-    // The box drawn measures 250 px: the positioning element's first child; the element itself `positionerWidth`.
-    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      const self = this.classList.contains('-translate-x-1/2');
-      const positioner = self ? this : this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
-      const shift = parseFloat(positioner?.style.marginLeft || '0');
-      const wide = self ? positionerWidth : 250;
-      const box = positioner
-        ? { left: at.left + shift, right: at.left + shift + wide, top: 0, bottom: 0, width: wide, height: 50 }
-        : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
-      return { ...box, x: box.left, y: box.top, toJSON: () => ({}) } as DOMRect;
-    });
-    try {
-      const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
-      await selectText(container, 3, 10);
-      const popup = (await screen.findByTitle('Evidenzia (H)')).closest<HTMLElement>('.-translate-x-1\\/2')!;
-      expect(popup.style.marginLeft).toBe(nudge);
-    } finally {
-      spy.mockRestore();
-      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
-    }
+  // L-73 (LC142): the selection's actions open in the page, under the paragraph the selection ends in, not over it.
+  it('the selection\'s actions open under the paragraph, in the text, with no dialog', async () => {
+    const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
+    await selectText(container, 3, 10);
+    const space = await screen.findByRole('region', { name: 'Testo selezionato' });
+    expect(space.closest('[data-reader-slot]')?.previousElementSibling?.classList.contains('vlx-dec-para')).toBe(true);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('anchors a note on the selection, with the composer on the words', async () => {

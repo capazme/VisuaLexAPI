@@ -4,12 +4,14 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_ICON_ON_DARK, highlightColorName } from '../../../utils/highlightColors';
 import { useAppStore } from '../../../store/useAppStore';
-import { getSelectionAnchor } from '../../../utils/selectionOffset';
+import { getSelectionAnchor, inReaderSlot } from '../../../utils/selectionOffset';
 import { getInkAnchor } from '../../../utils/inkSelection';
 import type { Ink } from '../../../utils/highlighterRules';
 import { registerInkTarget, type NoteKind } from '../../../utils/inkTargets';
 import { useInkOnRelease } from '../../../hooks/useInkOnRelease';
 import { useHighlighterInk } from '../../../hooks/useHighlighterInk';
+import { Button } from '../../ui/Button';
+import { BlockSpace } from './BlockSpace';
 
 interface SelectionPopupProps {
   /** Where selections are listened for (mouseup) and where the popup is positioned. */
@@ -43,6 +45,11 @@ interface SelectionPopupProps {
   // article, not by version): only "Copia" is offered, and the shortcuts of the
   // others are off too.
   copyOnly?: boolean;
+  /**
+   * The actions open under the paragraph the selection ends in, in the text (`BlockSpace`, LC142, L-73), with their
+   * words. Off, the dark bar over the selection: Study Mode's, itself still over the page (F2).
+   */
+  inPage?: boolean;
 }
 
 interface PopupState {
@@ -57,6 +64,8 @@ interface PopupState {
   ink: { text: string; startOffset: number };
   /** What the reader sees (line breaks included) — for copy and search only. */
   displayText: string;
+  /** In the page: the block the selection ends in, the space's place. */
+  block: HTMLElement | null;
 }
 
 export function SelectionPopup({
@@ -70,8 +79,9 @@ export function SelectionPopup({
   onDiscuss,
   onCreateCard,
   copyOnly = false,
+  inPage = false,
 }: SelectionPopupProps) {
-  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, ink: { text: '', startOffset: -1 }, displayText: '' });
+  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, ink: { text: '', startOffset: -1 }, displayText: '', block: null });
   // The highlighter's ink, chosen in the reading bar (H1, A4): a colour, or «Nessun colore», which takes highlights away.
   const ink = useHighlighterInk();
   // The highlighter on (A4): every selection takes the ink as it is released, and this bar does not appear. Not on a
@@ -173,9 +183,11 @@ export function SelectionPopup({
     };
   }, [containerRef, inking, ink]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((event: Event) => {
     // A tool takes the selection itself (`useInkOnRelease`).
     if (tooling) return;
+    // A press in the space open in the text (its buttons, a note's words) is not a selection of the text.
+    if (event.target instanceof Node && inReaderSlot(event.target)) return;
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -232,16 +244,17 @@ export function SelectionPopup({
         startOffset: anchor.startOffset,
         ink: inkAnchor,
         displayText: rawSelected.trim(),
+        block: inPage ? blockOf(range.endContainer, textRootRef?.current ?? containerRef.current) : null,
       });
     }, 10);
-  }, [containerRef, textRootRef, hidePopup, tooling]);
+  }, [containerRef, textRootRef, hidePopup, tooling, inPage]);
 
   // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it moves: the
   // position's clamp counts in the container, not the window, and a phone's edge once cut the popup (D7b). A style
   // written on the element, not state: nothing else draws again.
   useLayoutEffect(() => {
     const el = popupRef.current;
-    if (!popup.visible || !el) return;
+    if (!popup.visible || !el || inPage) return;
     el.style.marginLeft = '0px';
     // The box drawn. The positioning element is `w-max` (absolute in a narrow container it shrank to the room left
     // while the box inside kept its width, and its centring took half the shrunk width: 149–398 in a 390 px window);
@@ -252,7 +265,7 @@ export function SelectionPopup({
     if (box.left < margin) nudge = margin - box.left;
     else if (box.right > window.innerWidth - margin) nudge = window.innerWidth - margin - box.right;
     el.style.marginLeft = `${nudge}px`;
-  }, [popup.visible, popup.x, popup.y]);
+  }, [popup.visible, popup.x, popup.y, inPage]);
 
   // Handle mousedown outside popup to hide it
   useEffect(() => {
@@ -368,6 +381,69 @@ export function SelectionPopup({
       }
     }
   };
+
+  if (inPage) {
+    const close = () => {
+      hidePopup();
+      window.getSelection()?.removeAllRanges();
+    };
+    return (
+      <BlockSpace
+        // The same selection released again (a press on its own words) is the same space.
+        value={popup.visible ? `${popup.startOffset}:${popup.text.length}` : null}
+        rootRef={textRootRef ?? containerRef}
+        block={() => (popup.block?.isConnected ? popup.block : null)}
+        onClose={close}
+        title={() => 'Testo selezionato'}
+        line={() => <span className="line-clamp-2">&ldquo;{popup.displayText || popup.text}&rdquo;</span>}
+      >
+        {() => (
+          <div ref={popupRef} className="flex flex-wrap gap-1">
+            {!copyOnly && (
+              <>
+                <Button
+                  variant="quiet"
+                  size="sm"
+                  onClick={() => handleAction('highlight')}
+                  title={ink === 'none' ? 'Togli l’evidenziazione (H)' : 'Evidenzia (H)'}
+                  aria-keyshortcuts="h"
+                  icon={ink === 'none' ? <Eraser size={16} aria-hidden /> : <Highlighter size={16} aria-hidden />}
+                >
+                  {ink === 'none' ? 'Togli l’evidenziazione' : `Evidenzia in ${highlightColorName(ink)}`}
+                </Button>
+                <Button variant="quiet" size="sm" onClick={() => handleAction('note')} title="Aggiungi nota (N)" aria-keyshortcuts="n" icon={<StickyNote size={16} aria-hidden />}>
+                  Aggiungi nota
+                </Button>
+                {onDiscuss && (
+                  <Button variant="quiet" size="sm" onClick={() => handleAction('discuss')} icon={<MessageCircle size={16} aria-hidden />}>
+                    Discuti con i colleghi
+                  </Button>
+                )}
+                {onCreateCard && (
+                  <Button variant="quiet" size="sm" onClick={() => handleAction('card')} icon={<GraduationCap size={16} aria-hidden />}>
+                    Crea scheda
+                  </Button>
+                )}
+              </>
+            )}
+            <Button variant="quiet" size="sm" onClick={() => handleAction('copy')} title="Copia (Cmd+C)" icon={<Copy size={16} aria-hidden />}>
+              Copia
+            </Button>
+            {onSearch && (
+              <Button variant="quiet" size="sm" onClick={() => handleAction('search')} icon={<Search size={16} aria-hidden />}>
+                Cerca
+              </Button>
+            )}
+            {onReportCitation && !copyOnly && (
+              <Button variant="quiet" size="sm" onClick={() => handleAction('report')} icon={<Flag size={16} aria-hidden />}>
+                Segnala come citazione
+              </Button>
+            )}
+          </div>
+        )}
+      </BlockSpace>
+    );
+  }
 
   if (!popup.visible) return null;
 
@@ -489,4 +565,18 @@ export function SelectionPopup({
       </div>
     </div>
   );
+}
+
+/**
+ * The block a selection ends in, the space's place: an article's comma or item, a decision's paragraph; in a text drawn
+ * flat, the root's child that holds it.
+ * shortcut: a flat text is one child, so its space opens at the end of the text; upgrade if flat texts grow long.
+ */
+function blockOf(node: Node, root: HTMLElement | null): HTMLElement | null {
+  const el = node instanceof HTMLElement ? node : node.parentElement;
+  const block = el?.closest<HTMLElement>('.vlx-b, .vlx-dec-para');
+  if (block) return block;
+  let at: HTMLElement | null = el ?? null;
+  while (at && at.parentElement && at.parentElement !== root) at = at.parentElement;
+  return at && at !== root && at.parentElement === root ? at : null;
 }
