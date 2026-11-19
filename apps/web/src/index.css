@@ -676,11 +676,14 @@
 }
 
 /* A list reads as part of the comma that introduces it. */
-.vlx-art .vlx-comma + .vlx-item {
+.vlx-art .vlx-comma + .vlx-item,
+.vlx-art .vlx-comma + [data-reader-slot] + .vlx-item {
   margin-top: -0.3em;
 }
 
-.vlx-art .vlx-item + .vlx-comma {
+/* A space open in the text (`BlockSpace`) sits between two blocks: it changes neither gap. */
+.vlx-art .vlx-item + .vlx-comma,
+.vlx-art .vlx-item + [data-reader-slot] + .vlx-comma {
   margin-top: 0.6em;
 }
 

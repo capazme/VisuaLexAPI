@@ -28,6 +28,8 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
   followContent?: boolean;
   /** Its two ways' times: a repeated action's by default (`REPEAT_OPEN`, `REPEAT_CLOSE`); ⌘K's band its island's. Given, they are the fades' under reduced motion too (LC133). */
   timing?: { open: KeyframeAnimationOptions; close: KeyframeAnimationOptions };
+  /** How it is brought into view as it opens, at its natural height: by default only if it would leave the view (`nearest`). A selection's space keeps the selected words in view (LC142). */
+  reveal?: (space: HTMLElement) => void;
   children: ReactNode;
 }
 
@@ -42,7 +44,7 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
  * field, whose keyboard would rise over the page on a phone (LC105). On closing it goes back to what opened it. Esc
  * inside closes it.
  */
-export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, followContent = true, timing: given, className, children, onKeyDown, ...rest }: ExpandProps) {
+export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, followContent = true, timing: given, reveal: revealGiven, className, children, onKeyDown, ...rest }: ExpandProps) {
   // Still drawn while it closes; derived during render where no animation will run (react-hooks/set-state-in-effect).
   const ways = given ?? REPEAT;
   const [mounted, setMounted] = useState(open);
@@ -79,7 +81,11 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
     // Brought into view from its start, clear of what sticks above it (its `scroll-margin-top`, the scroller's padding),
     // while it still has its natural height: a page scrolled down would leave its title under a sticky heading. Only if
     // it would leave the view (`nearest`), and at once (LC132: the browser's smooth scroll took 450–500 ms each time).
-    const reveal = () => outer?.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+    const reveal = () => {
+      if (!outer) return;
+      if (revealGiven) revealGiven(outer);
+      else outer.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+    };
     if (initial || !outer || !inner || !canAnimate()) {
       if (open && !initial) reveal();
       return;

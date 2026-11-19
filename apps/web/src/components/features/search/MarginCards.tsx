@@ -6,6 +6,7 @@ import { Button } from '../../ui/Button';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { NoteEditBox } from './NoteEditBox';
 import { scrollToMiddle } from '../../../utils/scrollParent';
+import { quoteForLabel } from '../../../utils/articleAnnotations';
 
 /** The card's frame, as an application's gloss's (`GlossCard`): a comment of a word processor. */
 const CARD = cn(
@@ -130,7 +131,7 @@ export function NoteMarginCard({
                 <Button ref={editRef} type="button" variant="quiet" onClick={() => setDraft(text)} disabled={draft !== null} icon={<Pencil size={12} aria-hidden />} className={ACTION_ROW}>
                     Modifica
                 </Button>
-                <Button type="button" variant="quiet" onClick={onRemove} icon={<Trash2 size={12} aria-hidden />} className={cn(ACTION_ROW, DANGER)}>
+                <Button type="button" variant="quiet" onClick={onRemove} aria-label={`Rimuovi la nota ${quoteForLabel(text)}`} icon={<Trash2 size={12} aria-hidden />} className={cn(ACTION_ROW, DANGER)}>
                     Rimuovi
                 </Button>
             </div>

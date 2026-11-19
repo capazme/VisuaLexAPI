@@ -71,7 +71,7 @@ describe('DecisionReadingSurface — what an application proposed on its dossier
       return found;
     });
     fireEvent.click(sign);
-    const dialog = await screen.findByRole('dialog', { name: /Annotazioni/ });
+    const dialog = await screen.findByRole('region', { name: /Annotazioni/ });
     fireEvent.click(within(dialog).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
     await waitFor(() => expect(assistantService.setProposalState).toHaveBeenCalledWith('d1', 's1', 'p1', 'validated', undefined));
   });

@@ -73,7 +73,7 @@ describe('GlossCard — an application\'s gloss, as a word processor\'s comment 
     render(<GlossCard gloss={gloss()} actions={a} />);
     fireEvent.click(screen.getByRole('button', { name: 'Sposta' }));
     expect(a.move).toHaveBeenCalledWith('g1');
-    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Rimuovi la (glossa|nota)/ }));
     expect(a.remove).toHaveBeenCalledWith('g1');
   });
 
