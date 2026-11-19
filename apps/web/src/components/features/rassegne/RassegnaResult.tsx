@@ -69,7 +69,7 @@ export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function Rassegna
         {marked(passo.testo, spans, whole ? 0 : start)}
       </p>
       {cut && (
-        <Button variant="link" size="sm" aria-expanded={whole} aria-controls={textId} onClick={() => setWhole((v) => !v)}>
+        <Button variant="link" aria-expanded={whole} aria-controls={textId} onClick={() => setWhole((v) => !v)}>
           {whole ? 'Mostra meno' : 'Leggi tutto il passo'}
         </Button>
       )}
@@ -77,7 +77,7 @@ export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function Rassegna
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-slate-600 dark:text-slate-400">Articoli citati:</span>
           {articles.map(({ label, params }, i) => (params ? (
-            <Button key={`${passo.articoli[i].urn}`} variant="secondary" size="sm" onClick={() => onOpenArticle(params)}>
+            <Button key={`${passo.articoli[i].urn}`} variant="secondary" onClick={() => onOpenArticle(params)}>
               {label}
             </Button>
           ) : (

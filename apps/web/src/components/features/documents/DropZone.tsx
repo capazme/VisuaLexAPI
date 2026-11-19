@@ -119,6 +119,7 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
           {!still && landings > 0 && (
             <motion.span
               key={landings}
+              data-drop-wave=""
               className="absolute inset-0 rounded-[8px] border-2 border-primary-500/60"
               initial={{ opacity: 0.7, scale: 1 }}
               animate={{ opacity: 0, scale: 0.94 }}

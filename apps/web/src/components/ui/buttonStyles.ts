@@ -52,8 +52,10 @@ const variantStyles: Record<ButtonVariant, string> = {
 // 36 px on a desktop, 44 px on a phone (the touch target); `min-h` so a long label wraps instead of clipping.
 // The line height rides on the size (`text-sm/5`): tailwind-merge drops a separate `leading-*` written
 // before a font size.
+// The small one pads 4 px, not 6: its 20 px line, the padding and the 1 px border come to 30, inside its 32 px; with 6 px
+// they came to 34 and pushed past it (LC117, Papiniano on #670; seen on #660).
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: cn(CONTROL_HEIGHT.sm, 'px-3 text-xs/5'),
+  sm: cn(CONTROL_HEIGHT.sm, 'px-3 py-1 text-xs/5'),
   md: cn(CONTROL_HEIGHT.md, 'px-4 text-sm/5'),
   lg: cn(CONTROL_HEIGHT.lg, 'px-5 text-base/5'),
 };

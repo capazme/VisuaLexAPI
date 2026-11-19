@@ -34,7 +34,7 @@ export function PasteBox({ busy, onAnalyse }: { busy: boolean; onAnalyse: (text:
         className="min-h-28 flex-1 px-3 py-2 font-serif"
       />
       <div className="flex justify-end">
-        <Button type="submit" variant="primary" size="sm" disabled={!value.trim() || busy}>
+        <Button type="submit" variant="primary" disabled={!value.trim() || busy}>
           Analizza il testo
         </Button>
       </div>

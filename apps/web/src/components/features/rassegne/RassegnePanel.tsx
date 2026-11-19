@@ -122,7 +122,7 @@ function YearSection({ urn, archivio, q, report, anno, count, initial, besideId,
           </ul>
           {failed && <p className={NOTICE}>{UNAVAILABLE}</p>}
           {next && !loading && (
-            <Button variant="link" size="sm" onClick={() => load(next)}>
+            <Button variant="link" onClick={() => load(next)}>
               Altri passi
             </Button>
           )}
@@ -263,7 +263,7 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
       <h4>
         {/* bare-button: the accordion's heading, a whole row. */}
         <button type="button" aria-expanded={open} aria-controls={spaceId} onClick={toggle}
-          className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
+          className="flex min-h-11 w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-8">
           <span className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</span>
           <span className="flex items-center gap-2 text-xs font-normal text-slate-500 dark:text-slate-400">
             <span>{`${passi(presence.data.total)}, ${years(presence.data.anni)}`}</span>
@@ -276,7 +276,7 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
           {other ? (
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-slate-700 dark:text-slate-200">Rassegne su <span className="font-semibold">{other.label}</span></p>
-              <Button ref={backRef} variant="link" size="sm" onClick={backToArticle}>
+              <Button ref={backRef} variant="link" onClick={backToArticle}>
                 Torna all’articolo
               </Button>
             </div>
@@ -328,7 +328,7 @@ function PanelBody({ view, urn, otherLabel, order, archivio, onArchivio, besideI
       {both && (
         <div className="mb-2 flex gap-2" role="group" aria-label="Filtra per archivio">
           {([undefined, 'civile', 'penale'] as const).map((value) => (
-            <Button key={value ?? 'tutte'} variant={archivio === value ? 'secondary' : 'quiet'} size="sm" aria-pressed={archivio === value} onClick={() => onArchivio(value)}>
+            <Button key={value ?? 'tutte'} variant={archivio === value ? 'secondary' : 'quiet'} aria-pressed={archivio === value} onClick={() => onArchivio(value)}>
               {value === undefined ? 'Tutte' : value === 'civile' ? 'Civile' : 'Penale'}
             </Button>
           ))}

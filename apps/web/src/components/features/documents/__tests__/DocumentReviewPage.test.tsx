@@ -419,14 +419,22 @@ describe('DocumentReviewPage — motion', () => {
     expect(animate).not.toHaveBeenCalled();
   });
 
-  it('under reduced motion, jumps to the citation and does not pulse it', async () => {
-    reduceMotion(true);
-    const { container } = render(<DocumentReviewPage />);
-    await choose(container, PARERE);
-    const list = screen.getByRole('complementary', { name: 'Citazioni' });
-    await userEvent.click(within(list).getByText('art. 1455').closest('button')!);
-    expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: 'auto' });
-    expect(animate).not.toHaveBeenCalled();
+  // LC117: the ring is measured, not assumed. `animate` is installed, so «not called» says the ring did not run.
+  it.each([[false, 1], [true, 0]])('under reduced motion %s, pulses the citation reached %i times', async (reduce, rings) => {
+    reduceMotion(reduce);
+    const original = HTMLElement.prototype.animate;
+    HTMLElement.prototype.animate = animate as unknown as HTMLElement['animate'];
+    try {
+      const { container } = render(<DocumentReviewPage />);
+      await choose(container, PARERE);
+      const list = screen.getByRole('complementary', { name: 'Citazioni' });
+      await userEvent.click(within(list).getByText('art. 1455').closest('button')!);
+      expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: reduce ? 'auto' : 'smooth' });
+      const ringCalls = animate.mock.calls.filter(([frames]) => JSON.stringify(frames).includes('boxShadow'));
+      expect(ringCalls).toHaveLength(rings);
+    } finally {
+      HTMLElement.prototype.animate = original;
+    }
   });
 
   it('lets the text column be scrolled from the keyboard', async () => {

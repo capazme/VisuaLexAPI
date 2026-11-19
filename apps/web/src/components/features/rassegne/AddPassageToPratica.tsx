@@ -32,7 +32,7 @@ export function AddPassageToPratica({ passo, className }: { passo: RassegnePasso
 
   return (
     <>
-      <Button variant="link" size="sm" aria-haspopup="dialog" onClick={(e) => setAnchor(e.currentTarget)} className={className}>
+      <Button variant="link" aria-haspopup="dialog" onClick={(e) => setAnchor(e.currentTarget)} className={className}>
         Aggiungi alla pratica
       </Button>
       <AddToDossierPopover isOpen={anchor !== undefined} anchorEl={anchor ?? null} onClose={() => setAnchor(undefined)} onAdded={added} />

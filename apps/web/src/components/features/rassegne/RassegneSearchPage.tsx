@@ -225,7 +225,7 @@ function SearchPage({ chosen }: { chosen: string | null }) {
           {view.kind === 'error' && (
             <div className="flex flex-wrap items-center gap-3">
               <p className={NOTICE}>{lastError === 429 ? TOO_MANY : UNAVAILABLE}</p>
-              <Button variant="secondary" size="sm" loading={view.busy} onClick={retry}>Riprova</Button>
+              <Button variant="secondary" loading={view.busy} onClick={retry}>Riprova</Button>
             </div>
           )}
           {ready && ready.total === 0 && <p className={NOTICE}>Nessun passo contiene tutte queste parole.</p>}
