@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from '../../../ui/Button';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -6,7 +7,7 @@ import { corsiService } from '../../../../services/corsiService';
 import type { CorsoInLista } from '../../../../types/corsi';
 import { AcceptTextDialog } from '../AcceptTextDialog';
 import { MATERIA_LABEL } from '../studiaLabels';
-import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, MUTED_TEXT, TILE, subjectHue } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, TILE, subjectHue } from '../progress/tokens';
 import { CourseStateChip } from './CourseChips';
 import { CoursesGate } from './CoursesGate';
 import { CoursesEmpty } from './CoursesEmpty';
@@ -102,9 +103,9 @@ function DeclarationNotice({ firstCourse, onOpen }: { firstCourse: boolean; onOp
           ? 'Prima che il tuo assistente possa creare un percorso, dichiara di avere il diritto di usare il materiale da cui lo crei.'
           : 'La dichiarazione sul materiale di studio è cambiata: accettala di nuovo perché il tuo assistente possa creare altri percorsi.'}
       </p>
-      <button type="button" onClick={onOpen} className={cn(INK_BUTTON, 'justify-self-start')}>
+      <Button type="button" size="lg" onClick={onOpen} className="justify-self-start">
         Leggi e accetta
-      </button>
+      </Button>
     </section>
   );
 }

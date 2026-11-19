@@ -6,13 +6,14 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
 import type { AncoraScheda, Materia, Progressi } from '../../../types/studia';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
 import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
 import { stopMessage } from './reviewStop';
 import { Toast } from '../../ui/Toast';
 import { DossierItemReader } from '../dossier/DossierItemReader';
 import { formatInterval } from './formatInterval';
 import { GradeBar, LessonBar } from './GradeBar';
-import { LESSON_PRIMARY } from './lessonStyles';
 import { ReviewCard } from './ReviewCard';
 import { Sheet } from '../../ui/Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
@@ -21,7 +22,7 @@ import { XpGain } from './progress/XpGain';
 import { SessionEndProgress } from './progress/SessionEndProgress';
 import { cardsLeft, instituteCardsLeft } from './progress/today';
 import { usePercorso } from './progress/usePercorso';
-import { FOCUS_RING, QUIET_BUTTON, TILE } from './progress/tokens';
+import { TILE } from './progress/tokens';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
 import { useGradeNote } from './useGradeNote';
@@ -77,12 +78,12 @@ function LessonProgress({ done, total }: { done: number; total: number }) {
         : { 'aria-hidden': true })}
       className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
     >
-      <div aria-hidden className="vlx-lesson-head absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:duration-150 motion-safe:ease-out" style={width} />
+      <div aria-hidden className="vlx-lesson-head absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:duration-(--dur-pop) motion-safe:ease-out" style={width} />
       <div
         data-testid="lesson-progress-fill"
         className={cn(
           // The section's ink (G8, Pietra since LC16): `vlx-lesson-ink` in `index.css`.
-          'vlx-lesson-ink absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:delay-[70ms] motion-safe:duration-300 motion-safe:ease-(--ease-catch)',
+          'vlx-lesson-ink absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:delay-[70ms] motion-safe:duration-(--dur-scene) motion-safe:ease-(--ease-catch)',
         )}
         style={width}
       />
@@ -121,14 +122,7 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="min-w-0 break-words text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Chiudi l’articolo"
-          className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200', FOCUS_RING)}
-        >
-          <X size={18} aria-hidden />
-        </button>
+        <IconButton size="lg" onClick={onClose} aria-label="Chiudi l’articolo" icon={<X size={18} aria-hidden />} className="shrink-0" />
       </div>
       {reader}
     </aside>
@@ -207,13 +201,13 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
           </p>
           <SessionEndProgress data={day} />
           <div className="grid w-full justify-items-center gap-1 md:w-auto">
-            <button type="button" onClick={more ? onContinue : onHome} className={cn(LESSON_PRIMARY, 'md:min-w-64')}>
+            <Button type="button" size="lg" onClick={more ? onContinue : onHome} className="w-full md:w-auto md:min-w-64">
               {more ? 'Continua' : 'Torna a Oggi'}
-            </button>
+            </Button>
             {more && (
-              <button type="button" onClick={onHome} className={cn(QUIET_BUTTON, 'mx-0 justify-self-center text-center')}>
+              <Button type="button" variant="link" onClick={onHome} className="justify-self-center">
                 Torna a Oggi
-              </button>
+              </Button>
             )}
           </div>
         </section>
@@ -337,9 +331,9 @@ function ReviewSessionBody() {
           </div>
         </div>
         <LessonBar>
-          <button type="button" onClick={() => void reload()} className={LESSON_PRIMARY}>
+          <Button type="button" size="lg" onClick={() => void reload()} className="w-full">
             Riprova
-          </button>
+          </Button>
         </LessonBar>
       </>
     );
@@ -349,11 +343,11 @@ function ReviewSessionBody() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className={cn(COLUMN, 'px-4 py-6')}>
             <p className="sr-only">Carico le schede…</p>
-            <div aria-hidden className="h-56 rounded-2xl border border-slate-200 bg-card motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
+            <div aria-hidden className="h-56 rounded-[8px] border border-slate-200 bg-card motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
           </div>
         </div>
         <LessonBar>
-          <div aria-hidden className="h-12 rounded-xl bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          <div aria-hidden className="h-12 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
         </LessonBar>
       </>
     );
@@ -411,21 +405,11 @@ function ReviewSessionBody() {
       </p>
       <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className={cn(COLUMN, 'relative flex items-center gap-3')}>
-          <button
-            ref={setStopButton}
-            type="button"
-            onClick={leave}
-            aria-label={showCard ? 'Interrompi' : 'Chiudi'}
-            className={cn(
-              'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
-              FOCUS_RING,
-            )}
-          >
-            <X size={20} aria-hidden />
+          <Button ref={setStopButton} type="button" variant="quiet" size="lg" onClick={leave} aria-label={showCard ? 'Interrompi' : 'Chiudi'} icon={<X size={20} aria-hidden />} className="min-w-11 shrink-0 px-2 text-sm">
             <span aria-hidden className="hidden md:inline">
               {showCard ? 'Interrompi' : 'Chiudi'}
             </span>
-          </button>
+          </Button>
           <LessonProgress done={total - remaining} total={total} />
           {showCard && <p className="sr-only">{remaining === 1 ? 'Resta 1' : `Restano ${remaining}`}</p>}
           {/* «+20 XP» sits over the bar's end, inside the header's row and out of the flow: the bar never shrinks for it,

@@ -367,6 +367,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               tabs={(Object.keys(TIPO_LABEL) as TipoScheda[]).map((id) => ({ id, label: TIPO_LABEL[id] }))}
               value={tipo}
               onChange={setTipo}
+              // As tall as the fields beside it (LC112): 36 px on a computer, 44 below md.
+              size="sm"
               tabClassName="flex-1 px-3"
             />
           ) : (
@@ -438,6 +440,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
                   >
                     <span>{anchor.riferimento}</span>
                     {!anchor.fixed && (
+                      // bare-button: the cross inside an anchor's chip, round as the chip.
                       <button
                         type="button"
                         onClick={() => removeAnchor(anchor.key)}
@@ -475,7 +478,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
                     e.preventDefault();
                     addPending();
                   } else if (e.key === 'Escape') {
-                    // Closes the field, not the dialog around it.
+                    // Closes the field, not the dialog or the page's space around it (`Expand` leaves a handled Esc).
+                    e.preventDefault();
                     e.nativeEvent.stopPropagation();
                     closeAdding();
                   }
@@ -508,7 +512,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
         </div>
 
         {formError && (
-          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
+          <p role="alert" className="rounded-[8px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
             {formError}
           </p>
         )}

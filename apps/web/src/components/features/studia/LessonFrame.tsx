@@ -1,10 +1,10 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { FOCUS_RING } from './progress/tokens';
+import { IconButton } from '../../ui/IconButton';
 
 const TABBABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -86,18 +86,24 @@ export function LessonLoading({ children }: { children?: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <button
-          type="button"
-          onClick={() => navigate(home)}
-          aria-label="Chiudi"
-          className={cn('inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
-        >
-          <X size={20} aria-hidden />
-        </button>
+        <IconButton size="lg" onClick={() => navigate(home)} aria-label="Chiudi" icon={<X size={20} aria-hidden />} />
         <div aria-hidden className="h-3 flex-1 rounded-full bg-slate-200 dark:bg-slate-800" />
       </div>
       {children && <div className="mx-auto w-full max-w-3xl px-4 py-6">{children}</div>}
       <p className="sr-only">{home === '/learn/ripasso' ? 'Carico il ripasso…' : 'Carico il modulo…'}</p>
     </div>
   );
+}
+
+/** Under this, a wait says nothing (LC112): Learn opened by its address came in some 210 ms, «Caricamento…» a flash. */
+const LEARN_WAIT_SAID_MS = 300;
+
+/** What Learn shows while its page's code loads: nothing for 300 ms, then «Caricamento…». */
+export function LearnLoading() {
+  const [said, setSaid] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSaid(true), LEARN_WAIT_SAID_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return said ? <div className="p-6 text-sm text-slate-500">Caricamento…</div> : null;
 }

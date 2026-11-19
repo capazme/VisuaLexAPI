@@ -158,7 +158,8 @@ describe('Pietra\'s colours', () => {
     const switches = [
       join('features', 'merlt', 'ops', 'OpsConfigPanel.tsx'),
       join('components', 'features', 'settings', 'SettingsPage.tsx'),
-      join('components', 'features', 'studia', 'StudyPreferences.tsx'),
+      // LC112: Learn's switches are the common one; its knob is checked here.
+      join('components', 'ui', 'Switch.tsx'),
       join('components', 'features', 'compare', 'CompareBody.tsx'),
       join('components', 'features', 'documents', 'DocumentReviewPage.tsx'),
     ];

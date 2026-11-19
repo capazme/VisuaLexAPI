@@ -60,7 +60,7 @@ export function LevelBar({ livello, className }: { livello: XpLivello; className
         aria-valuetext={`${livello.nelLivello} punti di ${livello.perIlProssimo} per il livello ${livello.livello + 1}`}
         className="block h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
       >
-        <span aria-hidden className={cn('block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
+        <span aria-hidden className={cn('block h-full rounded-full transition-[width] duration-(--dur-scene) ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
       </span>
       <p className={cn('text-sm', MUTED_TEXT)}>
         <span aria-hidden>{`Ancora ${formatCount(left)} XP per il livello ${formatCount(livello.livello + 1)}`}</span>

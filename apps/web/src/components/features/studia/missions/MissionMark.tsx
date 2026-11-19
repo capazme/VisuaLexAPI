@@ -135,7 +135,7 @@ export function MissionRow({ mission, bar = false, aside, children, ink, layout 
         </div>
         {bar && progress && (
           <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <span className={cn('block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
+            <span className={cn('block h-full rounded-full transition-[width] duration-(--dur-scene) ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
           </span>
         )}
         {mission.note && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{mission.note}</p>}

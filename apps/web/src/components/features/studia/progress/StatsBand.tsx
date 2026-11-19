@@ -112,7 +112,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
           {!aside && <StatesLine stati={data.stati} />}
           <Link
             to="/learn/progressi"
-            className={cn('-mx-1 inline-flex min-h-[44px] items-center gap-1.5 justify-self-start rounded-lg px-1 text-sm font-semibold underline-offset-4 hover:underline', INK_TEXT, FOCUS_RING)}
+            className={cn('-mx-1 inline-flex min-h-[44px] items-center gap-1.5 justify-self-start rounded-md px-1 text-sm font-semibold underline-offset-4 hover:underline', INK_TEXT, FOCUS_RING)}
           >
             Tutti i progressi
             <ArrowRight size={15} aria-hidden />
@@ -122,12 +122,12 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
         // The final size, so nothing jumps when the read answers.
         <div aria-hidden className="grid gap-5">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-            <div className="h-10 w-40 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-            <div className={cn('h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800', aside && ASIDE_WEEK)} />
+            <div className="h-10 w-40 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+            <div className={cn('h-14 w-full rounded-md bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800', aside && ASIDE_WEEK)} />
           </div>
-          <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-          {!aside && <div className="h-10 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />}
-          <div className="h-11 w-36 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          <div className="h-[4.5rem] rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          {!aside && <div className="h-10 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />}
+          <div className="h-11 w-36 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
         </div>
       ) : (
         <p className={cn('text-sm', MUTED_TEXT)}>I numeri tornano appena riesco a leggerli.</p>

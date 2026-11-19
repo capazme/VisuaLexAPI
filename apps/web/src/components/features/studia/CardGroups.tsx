@@ -40,7 +40,7 @@ function CardTile({ card, selected }: { card: Scheda; selected: boolean }) {
         to={`/learn/schede/${encodeURIComponent(card.id)}`}
         aria-current={selected ? 'true' : undefined}
         className={cn(
-          'flex h-full min-h-[44px] flex-col gap-2 rounded-xl border p-3.5 transition-colors',
+          'flex h-full min-h-[44px] flex-col gap-2 rounded-[8px] border p-3.5 transition-colors',
           FOCUS_RING,
           selected
             ? cn('border-2 bg-primary-50 dark:bg-primary-900/30', INK_BORDER)
@@ -92,12 +92,13 @@ export function CardGroups({ groups, selectedId, folded, onToggleFold, grid = fa
                 return (
                   <div key={key} className="border-t border-slate-200 dark:border-slate-800">
                     <h3>
+                      {/* bare-button: an institute's heading row, folding its cards. */}
                       <button
                         type="button"
                         aria-expanded={!isFolded}
                         onClick={() => onToggleFold(key)}
                         className={cn(
-                          'flex min-h-[44px] w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/60',
+                          'flex min-h-[44px] w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/60',
                           FOCUS_RING,
                           'focus-visible:ring-inset focus-visible:ring-offset-0',
                         )}

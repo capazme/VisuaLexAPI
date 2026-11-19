@@ -1,11 +1,12 @@
 import { useId, useState } from 'react';
+import { Button } from '../../../ui/Button';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { Materia } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { dueLabel, instituteSessionPath, orderInstitutes, stopStates } from './today';
-import { CARD_STATES, FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, QUIET_BUTTON } from './tokens';
+import { CARD_STATES, FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT } from './tokens';
 import type { PercorsoState } from './usePercorso';
 
 /** The stagger of the stops' entrance (Gymnasium spec §7), as the subjects': once per mount. */
@@ -37,9 +38,9 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
       return (
         <div className="grid gap-1">
           <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Non riesco a leggere gli istituti di questa materia.</p>
-          <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
+          <Button type="button" variant="link" onClick={onRetry} className="justify-self-start">
             Riprova<span className="sr-only"> gli istituti di {label}</span>
-          </button>
+          </Button>
         </div>
       );
     }
@@ -47,7 +48,7 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
       <div className="grid gap-2">
         <p className="sr-only">Carico gli istituti…</p>
         {Array.from({ length: 3 }, (_, index) => (
-          <div key={index} aria-hidden className="ml-6 h-[76px] rounded-xl bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800/60" />
+          <div key={index} aria-hidden className="ml-6 h-[76px] rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800/60" />
         ))}
       </div>
     );
@@ -64,9 +65,9 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
       {percorso.status === 'error' && (
         <div className="grid gap-1">
           <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Non riesco ad aggiornare gli istituti: restano quelli letti prima.</p>
-          <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
+          <Button type="button" variant="link" onClick={onRetry} className="justify-self-start">
             Riprova<span className="sr-only"> gli istituti di {label}</span>
-          </button>
+          </Button>
         </div>
       )}
       <ol
@@ -93,13 +94,14 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
                 aria-hidden
                 className={cn('relative mt-4 h-2.5 w-2.5 justify-self-center rounded-full border-2 bg-card dark:bg-slate-900', INK_BORDER, started && INK_BG)}
               />
+              {/* bare-button: a stop of the road, the whole row its target. */}
               <button
                 type="button"
                 aria-label={`Ripassa ${stop.istituto}: ${dueLabel(stop.dovute).toLowerCase()}`}
                 aria-describedby={states}
                 onClick={() => navigate(instituteSessionPath(materia, stop.istituto))}
                 className={cn(
-                  'grid min-h-[44px] w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 rounded-xl px-2 py-2 text-left transition-[background-color,scale] hover:bg-primary-50 active:scale-[0.99] dark:hover:bg-primary-900/30',
+                  'grid min-h-[44px] w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 rounded-md px-2 py-2 text-left transition-[background-color,scale] hover:bg-primary-50 active:scale-[0.99] dark:hover:bg-primary-900/30',
                   FOCUS_RING,
                 )}
               >
@@ -127,9 +129,9 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
         })}
       </ol>
       {stops.length > INSTITUTES_SHOWN && (
-        <button type="button" aria-expanded={all} onClick={() => setAll((open) => !open)} className={cn(QUIET_BUTTON, 'ml-6')}>
+        <Button type="button" variant="link" aria-expanded={all} onClick={() => setAll((open) => !open)} className="ml-6 justify-self-start">
           {all ? `Mostra solo i primi ${INSTITUTES_SHOWN}` : `Mostra tutti gli istituti (${stops.length})`}
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useRef, type RefObject } from 'react';
+import { Button } from '../../../ui/Button';
 import { Link } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi, TappaIstituto } from '../../../../types/studia';
@@ -6,7 +7,7 @@ import { estimateLabel } from '../studiaLabels';
 import { formatDayLong } from '../progress/layout';
 import { goalMissionDone } from './missions';
 import { nextDayLine, subjectsPhrase, todaySentence, todayState, todaySubjects } from '../progress/today';
-import { FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, SECONDARY_BUTTON, TILE } from '../progress/tokens';
+import { FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from '../progress/tokens';
 import { Illustration, type IllustrationName } from '../../../ui/Illustration';
 
 export interface DayBlockProps {
@@ -38,20 +39,11 @@ export interface DayBlockProps {
   goalRef?: RefObject<HTMLDivElement | null>;
 }
 
-/** The page's one primary button (G8): wide, 48 px, full width on a phone; a key that presses into its ink edge. */
-const PRIMARY = cn(
-  'min-h-12 w-full rounded-xl px-10 text-base font-semibold md:w-auto md:min-w-64',
-  'shadow-[0_4px_0_var(--color-primary-950)] transition-[translate,box-shadow] active:translate-y-[3px] active:shadow-[0_1px_0_var(--color-primary-950)] motion-reduce:transition-none',
-  'dark:shadow-[0_4px_0_var(--color-primary-500)] dark:active:shadow-[0_1px_0_var(--color-primary-500)]',
-  INK_BG,
-  ON_INK,
-  FOCUS_RING,
-);
+/** The page's one primary button (G8): the common `Button`, wide, full width on a phone (LC112: no key of its own). */
+const PRIMARY = 'mt-1 w-full px-10 md:w-auto md:min-w-64';
 
 /** The block's large line: EB Garamond, 30 px on a phone and 36 px from `md`. */
 const LARGE = cn('max-w-prose font-serif text-3xl font-medium leading-tight tracking-tight md:text-4xl', INK_TEXT);
-
-const RETRY = cn('min-h-[44px] rounded px-1 font-sans text-base font-medium underline', FOCUS_RING);
 
 /**
  * The small line on top: the server's day, «giovedì 22 ottobre» — the page's title says «Oggi» already (G8) —; narrowed
@@ -131,7 +123,7 @@ export function DayBlock({
           <p className="sr-only">Carico i tuoi progressi…</p>
           <div aria-hidden className="h-[75px] w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse min-[390px]:h-[38px] md:h-11 dark:bg-slate-800" />
           <div aria-hidden className="h-10 w-56 max-w-full rounded bg-slate-100 motion-safe:animate-pulse md:h-5 dark:bg-slate-800" />
-          <div aria-hidden className="mt-1 h-12 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-64 dark:bg-slate-800" />
+          <div aria-hidden className="mt-1 h-11 w-full rounded-md bg-slate-100 motion-safe:animate-pulse md:w-64 dark:bg-slate-800" />
         </>
       )}
 
@@ -139,14 +131,14 @@ export function DayBlock({
         <>
           <p role="alert" className={LARGE}>
             Non riesco a leggere i tuoi progressi.{' '}
-            <button type="button" onClick={onRetry} className={RETRY}>
+            <Button type="button" variant="link" onClick={onRetry} className="font-sans text-base">
               Riprova
-            </button>
+            </Button>
           </p>
           <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Puoi ripassare lo stesso: il ripasso legge le sue schede.</p>
-          <button type="button" onClick={onStart} className={cn(PRIMARY, 'mt-1')}>
+          <Button type="button" size="lg" onClick={onStart} className={PRIMARY}>
             Inizia il ripasso
-          </button>
+          </Button>
         </>
       )}
 
@@ -161,9 +153,9 @@ export function DayBlock({
             </Link>{' '}
             e scegli «+ Nuova scheda» sotto il testo, oppure accendi le schede della comunità: le missioni partono dalla prima scheda.
           </p>
-          <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings('comunita')} className={cn(PRIMARY, 'mt-1')}>
+          <Button type="button" size="lg" aria-controls={settingsPanel} onClick={() => onOpenSettings('comunita')} className={PRIMARY}>
             Accendi le schede della comunità
-          </button>
+          </Button>
         </>
       )}
 
@@ -180,27 +172,27 @@ export function DayBlock({
           {(actionFailed || dayFailed) && (
             <p role="alert" className="max-w-prose text-sm text-red-700 dark:text-red-400">
               Non riesco a leggere i tuoi progressi.{' '}
-              <button type="button" onClick={onRetry} className={cn(RETRY, 'text-sm')}>
+              <Button type="button" variant="link" onClick={onRetry}>
                 Riprova
-              </button>
+              </Button>
             </p>
           )}
 
           {state === 'todo' && (
-            <button type="button" onClick={onStart} className={cn(PRIMARY, 'mt-1')}>
+            <Button type="button" size="lg" onClick={onStart} className={PRIMARY}>
               {met ? 'Continua il ripasso' : 'Inizia il ripasso'}
-            </button>
+            </Button>
           )}
           {state === 'done' && filtered && (
-            <button type="button" onClick={onAllSubjects} className={cn(SECONDARY_BUTTON, 'mt-1 w-full px-6 md:w-auto')}>
+            <Button type="button" variant="secondary" onClick={onAllSubjects} className="mt-1 w-full px-6 md:w-auto">
               Ripassa tutte le materie
-            </button>
+            </Button>
           )}
           {/* Done for the day with new cards still waiting: more of them is a setting, the new cards a day. */}
           {state === 'done' && !filtered && action.stati.nuove > 0 && (
-            <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings()} className={cn(SECONDARY_BUTTON, 'mt-1 w-full px-6 md:w-auto')}>
+            <Button type="button" variant="secondary" aria-controls={settingsPanel} onClick={() => onOpenSettings()} className="mt-1 w-full px-6 md:w-auto">
               Impara altre schede nuove
-            </button>
+            </Button>
           )}
         </>
       )}
