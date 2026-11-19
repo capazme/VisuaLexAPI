@@ -12,6 +12,15 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.47.0] - 2026-11-19
+
+The search and the reader on the common controls of the interface alignment. Web only, no migration. MERL-T
+stays off.
+
+### Search and reading
+
+- The search and the reader use the common controls (LC113, alignment 8 of 14).
+
 ## [1.46.0] - 2026-11-19
 
 Learn on the common controls of the interface alignment, with the new card written inside the page. Web only,
