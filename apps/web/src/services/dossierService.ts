@@ -1,5 +1,6 @@
 import { apiClient } from './api';
 import type { DossierKind, StudyImportReport } from '../types';
+import type { SnapshotItem } from '../components/features/dossier/dossierVersionsDiff';
 
 // API types matching backend response format
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
@@ -88,6 +89,8 @@ export interface DossierSnapshotApi {
   createdAt: string;
   fingerprint?: string | null;
   unchanged?: boolean;
+  /** The listing carries it; the POST's answer does not. */
+  content?: { items?: SnapshotItem[] };
 }
 
 /**

@@ -167,7 +167,7 @@ describe('DossierDetailView — the page by act', () => {
       return names;
     };
     expect(items('Aggiungi')).toEqual(['Articoli da una norma', 'Nota', 'Cerca un articolo']);
-    expect(items('Esporta')).toEqual(['PDF', 'Copia link di condivisione', 'JSON', 'Salva snapshot']);
+    expect(items('Esporta')).toEqual(['PDF', 'Copia link di condivisione', 'JSON', 'Salva snapshot', 'Confronta versioni']);
     expect(items('Altre azioni')).toEqual(['Modifica', 'Aggiungi ai preferiti', 'Elimina la pratica']);
   });
 
