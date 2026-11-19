@@ -95,6 +95,42 @@ describe('PracticeColumn (spec §3)', () => {
     vi.unstubAllGlobals();
   });
 
+  it('decides again when the row\'s real size is known: its space opened, its text arrived late; never once the user scrolls (LC133)', () => {
+    const observed: Array<() => void> = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { observed.push(callback); }
+      observe() {}
+      disconnect() { observed.length = 0; }
+    });
+    const { practiceId, l24Id } = setUp();
+    render(column(practiceId));
+    // At the reveal the row is closed at the bottom edge: its heading alone (500–544) and no text yet.
+    let textBottom = 544;
+    const box = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const own = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.hasAttribute('data-practice-row')) return box(500, 544);
+      const text = this.closest('[data-practice-row]')?.querySelector('[aria-expanded][aria-controls]')?.getAttribute('aria-controls');
+      if (text && this.id === text) return box(544, textBottom);
+      return own.call(this);
+    });
+    vi.stubGlobal('innerHeight', 600);
+    act(() => { s().revealPracticeArticle(practiceId, l24Id, '7'); });
+    expect(scrollArgs.every((arg) => (arg as ScrollIntoViewOptions).block === 'nearest')).toBe(true);
+    // The text arrives, 90 ms after the space opened: 544 → 1200, the row taller than the window. It comes to the top.
+    scrollArgs = [];
+    textBottom = 1200;
+    act(() => observed.forEach((callback) => callback()));
+    expect(scrollArgs).toEqual([{ block: 'start', behavior: 'auto' }]);
+    // The user scrolls: the row is theirs, a later change moves nothing.
+    scrollArgs = [];
+    fireEvent.wheel(window);
+    textBottom = 1500;
+    act(() => observed.forEach((callback) => callback()));
+    expect(scrollArgs).toEqual([]);
+    vi.unstubAllGlobals();
+  });
+
   it('a reveal already waiting when the column mounts is taken too', () => {
     const { practiceId, ccId } = setUp();
     s().revealPracticeArticle(practiceId, ccId, '2043');
