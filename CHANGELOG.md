@@ -12,6 +12,15 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.46.0] - 2026-11-19
+
+Learn on the common controls of the interface alignment, with the new card written inside the page. Web only,
+no migration. MERL-T stays off.
+
+### Learn
+
+- Learn on the common controls; «Nuova scheda» opens inside the page instead of over it (LC112, alignment 7 of 14).
+
 ## [1.45.0] - 2026-11-19
 
 Opus (Work) on the common controls of the interface alignment, with its finishing touches. Web only, no
