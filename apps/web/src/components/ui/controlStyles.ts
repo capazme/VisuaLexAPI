@@ -26,8 +26,13 @@ export const FIELD_LABEL = 'mb-1 block text-xs font-semibold tracking-wide text-
 export const FIELD_HELP = 'text-xs text-ink-600 dark:text-ink-300';
 export const FIELD_ERROR = 'text-xs font-medium text-red-600 dark:text-red-400';
 
-/** A field's ground, the one a field is known by: `Input`'s, `Select`'s and the quick add's box (LC111). */
-export const FIELD_SURFACE = 'bg-card';
+/**
+ * A field's ground, the one a field is known by: `Input`'s, `Select`'s, `Textarea`'s and the quick add's box (LC111). In
+ * the light the card's paper. In the dark a veil of black over what lies under it (LC116, the consultant: on the card's
+ * own grey a field was known by its border alone): on a card it comes to about the sign-in's old `ink-950` fields, on the
+ * page (which is itself about `ink-950`) a step below it. An opaque ground cannot do both: none lies between the two.
+ */
+export const FIELD_SURFACE = 'bg-card dark:bg-black/40';
 
 /**
  * A field's box, `Input`'s and `Select`'s: the paper of a card, the shared outline, a toga edge on focus. Colours only

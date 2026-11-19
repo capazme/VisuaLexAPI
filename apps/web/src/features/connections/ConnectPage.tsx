@@ -134,7 +134,7 @@ export function ConnectPage() {
                 {/* bare-input: a permission to grant is a checkbox (its role and its label read as one), not a switch. */}
                 <input
                   type="checkbox"
-                  className="mt-0.5"
+                  className="mt-0.5 dark:[color-scheme:dark]"
                   checked={allowDelete}
                   onChange={(event) => setAllowDelete(event.target.checked)}
                   disabled={state.status === 'deciding'}
