@@ -23,7 +23,7 @@ import { WeekStrip } from './WeekStrip';
 import { TaskListSkeleton, TaskViewEmpty, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { Arrive } from '../../ui/Arrive';
 import { useTaskView } from './useTaskView';
-import { useTaskSection } from './taskSection';
+import { inSection, useTaskSection } from './taskSection';
 import { plannerStore } from './plannerStore';
 
 interface FrameProps {
@@ -107,7 +107,12 @@ const NEXT_ROW = cn(
  */
 function TodayEmpty() {
   const dossiers = useAppStore((s) => s.dossiers);
-  const recent = [...dossiers].sort((a, b) => dossierRecency(b) - dossierRecency(a)).slice(0, 3);
+  // In Learn the pratiche di studio, in Work the others (LC130): the ones whose new tasks this list shows.
+  const section = useTaskSection();
+  const recent = [...dossiers]
+    .filter((d) => !section || inSection({ origin: d.kind ?? 'lavoro' }, section))
+    .sort((a, b) => dossierRecency(b) - dossierRecency(a))
+    .slice(0, 3);
   return (
     <div className="space-y-6">
       <p className="text-slate-700 dark:text-slate-300">Nessun compito per oggi</p>

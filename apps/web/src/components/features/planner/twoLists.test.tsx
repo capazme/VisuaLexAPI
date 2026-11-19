@@ -104,6 +104,13 @@ describe('Work and Learn, two lists of tasks', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('an empty Scadenziario in Learn offers the pratiche di studio to take up, not the work ones', async () => {
+    service.list.mockResolvedValue(answer([]));
+    renderPlanner('/learn/attivita/scadenziario');
+    const resume = await screen.findByRole('region', { name: 'Riprendi' });
+    expect(within(resume).getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('Esame di diritto civile')]);
+  });
+
   it.each([
     ['/learn/attivita/scadenziario', 'studio'],
     ['/work/scadenziario', 'lavoro'],
