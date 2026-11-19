@@ -5,6 +5,7 @@ import { Button } from '../Button';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
 import { cn } from '../../../lib/utils';
+import { CARD_RADIUS } from '../controlStyles';
 import { isTopmostDialog, openDialog } from '../dialogStack';
 import { IslandSurface } from '../IslandSurface';
 import { originOf, useReducedMotionLive } from '../islandMotion';
@@ -321,8 +322,8 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emp
           // Its buttons answer (they have risen into sight).
           data-ready={ready || undefined}
           className="pointer-events-auto w-full max-w-sm"
-          surfaceClassName="rounded-2xl border border-ink-200 bg-white shadow-lg dark:border-ink-700 dark:bg-ink-900"
-          contentClassName="relative rounded-2xl p-5"
+          surfaceClassName={cn('border border-ink-200 bg-white shadow-lg dark:border-ink-700 dark:bg-ink-900', CARD_RADIUS)}
+          contentClassName={cn('relative p-5', CARD_RADIUS)}
         >
           <h2 id={`${id}-title`} className="text-base font-semibold text-ink-900 dark:text-ink-50">
             {title}

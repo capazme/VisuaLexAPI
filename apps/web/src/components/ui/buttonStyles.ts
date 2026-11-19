@@ -69,9 +69,9 @@ export function buttonClassName(variant: ButtonVariant | ButtonAlias = 'primary'
     'inline-flex items-center justify-center gap-2 py-1.5 text-center font-medium',
     CONTROL_RADIUS,
     TRANSITION,
-    // The press answers in 120 ms (Y1) on `--ease-out`, and with it the button's colours (`TRANSITION`'s 150
-    // elsewhere): one duration for every property it lists.
-    'duration-[120ms]',
+    // The press answers in 120 ms (Y1, `--dur-press`) on `--ease-out`, and with it the button's colours (`TRANSITION`'s
+    // 150 elsewhere): one duration for every property it lists.
+    'duration-(--dur-press)',
     FOCUS_RING,
     DISABLED,
     ACTIVE,

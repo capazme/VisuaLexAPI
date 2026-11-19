@@ -27,13 +27,13 @@ export function Switch({ checked, onCheckedChange, className, ...props }: Switch
         aria-hidden
         data-switch-track=""
         className={cn(
-          'relative block h-6 w-11 rounded-full transition-colors duration-150 ease-out group-focus-visible:ring-2 group-focus-visible:ring-toga-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background',
+          'relative block h-6 w-11 rounded-full transition-colors duration-(--dur-press) ease-out group-focus-visible:ring-2 group-focus-visible:ring-toga-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background',
           checked ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600',
         )}
       >
         <span
           className={cn(
-            'absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-150 ease-out',
+            'absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-(--dur-press) ease-out',
             checked && 'translate-x-5 dark:bg-ink-950',
           )}
         />

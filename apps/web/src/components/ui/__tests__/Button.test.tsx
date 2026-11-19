@@ -56,7 +56,7 @@ describe('Button', () => {
     render(<Button>Premi</Button>);
     const { className } = screen.getByRole('button', { name: 'Premi' });
     expect(className).toContain('active:scale-[0.97]');
-    expect(className).toContain('duration-[120ms]');
+    expect(className).toContain('duration-(--dur-press)');
     expect(className).not.toContain('duration-150');
     expect(className).toContain('ease-out');
   });

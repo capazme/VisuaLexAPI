@@ -12,6 +12,7 @@ import { formatCitationLabel } from '../../utils/citationMatcher';
 import type { NerFeedbackType, NerCorrectReference } from '../../services/merltService';
 import { CitationNerFeedback } from '../../features/merlt/ner/CitationNerFeedback';
 import { cn } from '../../lib/utils';
+import { CONTROL_RADIUS } from './controlStyles';
 import { PreviewFrame } from './PreviewFrame';
 
 interface CitationPreviewPopupProps {
@@ -92,7 +93,7 @@ export function CitationPreviewPopup({
             onClick={handleOpen}
             disabled={isLoading}
             className={cn(
-              "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              "w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors", CONTROL_RADIUS,
               "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 hover:bg-primary-700 text-white",
               "disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed",
               "dark:disabled:bg-slate-700 dark:disabled:text-slate-500"

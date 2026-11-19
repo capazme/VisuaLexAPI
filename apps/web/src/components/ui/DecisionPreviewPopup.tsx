@@ -10,6 +10,8 @@ import type { DecisionReference, FetchDecisionAnswer } from '../../types/decisio
 import { previewKeyPassage, previewLines } from '../../utils/decisionPreview';
 import { KEY_PASSAGE_LABELS } from '../../utils/decisionRender';
 import { formatDecisionHeading, formatDecisionShort, notFoundMessage } from '../../utils/decisionLinks';
+import { cn } from '../../lib/utils';
+import { CONTROL_RADIUS } from './controlStyles';
 import { PreviewFrame } from './PreviewFrame';
 
 interface DecisionPreviewPopupProps {
@@ -84,7 +86,7 @@ export function DecisionPreviewPopup({
       footer={
         <button
           onClick={handleOpen}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white"
+          className={cn('w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white', CONTROL_RADIUS)}
         >
           <ExternalLink size={14} />
           Apri accanto

@@ -5,6 +5,7 @@ import { useVersionCheck } from '../../hooks/useVersionCheck';
 import { Modal } from './Modal';
 import { cn } from '../../lib/utils';
 import { spring } from '../../lib/motion';
+import { CARD_RADIUS, CONTROL_RADIUS } from './controlStyles';
 import { ACTIVE, FOCUS_RING, TRANSITION } from '../../constants/interactions';
 import { newsSince, parseNote, type Inline, type VersionNews } from '../../content/novita/releaseNotes';
 import { focusPage } from '../../utils/focusPage';
@@ -80,7 +81,7 @@ export function ChangelogNotification({ inBar = false }: { inBar?: boolean } = {
             exit={away}
             transition={spring.snappy}
             className={cn(
-              'fixed z-[60] flex items-center gap-3 py-2 pl-4 pr-2 rounded-xl border w-max max-w-[calc(100vw-2rem)] md:max-w-md',
+              'fixed z-[60] flex items-center gap-3 py-2 pl-4 pr-2 border w-max max-w-[calc(100vw-2rem)] md:max-w-md', CARD_RADIUS,
               'left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-8',
               FOOT_STACK_BOTTOM,
               'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800',
@@ -90,7 +91,7 @@ export function ChangelogNotification({ inBar = false }: { inBar?: boolean } = {
             onFocus={rememberFocus}
           >
             <div
-              className="shrink-0 size-9 rounded-lg bg-toga-50 dark:bg-toga-900/30 flex items-center justify-center"
+              className={cn('shrink-0 size-9 bg-toga-50 dark:bg-toga-900/30 flex items-center justify-center', CONTROL_RADIUS)}
               aria-hidden="true"
             >
               <Newspaper size={18} className="text-toga-600 dark:text-toga-300" />
@@ -105,7 +106,7 @@ export function ChangelogNotification({ inBar = false }: { inBar?: boolean } = {
               type="button"
               onClick={() => setShowChangelog(true)}
               className={cn(
-                'shrink-0 min-h-11 px-4 rounded-lg text-sm font-medium',
+                'shrink-0 min-h-11 px-4 text-sm font-medium', CONTROL_RADIUS,
                 'bg-toga-600 text-white hover:bg-toga-700',
                 'dark:bg-toga-400 dark:text-ink-950 dark:hover:bg-toga-300',
                 TRANSITION,
@@ -120,7 +121,7 @@ export function ChangelogNotification({ inBar = false }: { inBar?: boolean } = {
               type="button"
               onClick={dismiss}
               className={cn(
-                'shrink-0 inline-flex size-11 items-center justify-center rounded-lg',
+                'shrink-0 inline-flex size-11 items-center justify-center', CONTROL_RADIUS,
                 'text-slate-500 hover:text-slate-800 hover:bg-slate-100',
                 'dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800',
                 TRANSITION,
