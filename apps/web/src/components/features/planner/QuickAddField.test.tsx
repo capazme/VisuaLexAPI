@@ -198,11 +198,25 @@ describe('QuickAddField — the line read', () => {
     // In the flow: not a layer over the list below (L-73).
     expect(list.className).not.toMatch(/\b(absolute|fixed)\b/);
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Verdi', 'Verdi appello']);
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    // The first row is chosen from the start (as in ⌘K): one step down is the second.
+    await user.keyboard('{ArrowDown}{Enter}');
     expect(create).not.toHaveBeenCalled();
     expect(title()).toHaveValue('Atto #Verdi appello ');
     expect(screen.getByRole('button', { name: /^Pratica «Verdi appello»/ })).toBeInTheDocument();
     expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('chooses the first suggestion with Enter when none was picked, and sends nothing (LC130)', async () => {
+    render(<QuickAddField view="inbox" today={TODAY} defaults={{}} />);
+    const user = userEvent.setup();
+    await user.type(title(), 'Atto #Ver');
+    const options = screen.getAllByRole('option');
+    expect(options.map((o) => o.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+    expect(title()).toHaveAttribute('aria-activedescendant', options[0].id);
+    await user.keyboard('{Enter}');
+    expect(create).not.toHaveBeenCalled();
+    expect(title()).toHaveValue('Atto #Verdi ');
+    expect(screen.getByRole('button', { name: /^Pratica «Verdi»/ })).toBeInTheDocument();
   });
 
   it('closes the suggestions with Esc, keeping the title', async () => {

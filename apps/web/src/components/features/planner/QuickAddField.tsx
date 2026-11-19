@@ -89,6 +89,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
   const queryKey = line.dossierQuery ? `${line.dossierQuery.start}:${line.dossierQuery.query}` : null;
   const listOpen = line.dossierQuery !== null && queryKey !== closedQuery;
   const suggestions: DossierName[] = listOpen ? suggestDossiers(line.dossierQuery!.query, dossiers) : [];
+  // The row Enter takes: the first while none is chosen, as in ⌘K, so «#Ros» and Enter choose the pratica (LC130).
+  const current = suggestions.length === 0 ? -1 : active < 0 || active >= suggestions.length ? 0 : active;
   const dossierTitle = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.title : undefined;
   const dossierKind = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.kind : undefined;
   // Work's or Learn's page (LC130): a task with no dossier is the section's; on a dossier's page, the dossier's kind.
@@ -128,10 +130,10 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
       event.preventDefault();
       if (suggestions.length === 0) return;
       const step = event.key === 'ArrowDown' ? 1 : -1;
-      setActive((at) => (at < 0 && step < 0 ? suggestions.length - 1 : (at + step + suggestions.length) % suggestions.length));
-    } else if (event.key === 'Enter' && suggestions[active]) {
+      setActive((current + step + suggestions.length) % suggestions.length);
+    } else if (event.key === 'Enter' && suggestions[current]) {
       event.preventDefault();
-      choose(suggestions[active]);
+      choose(suggestions[current]);
     } else if (event.key === 'Escape') {
       // This Esc closes the list; the next one empties the title.
       event.preventDefault();
@@ -201,7 +203,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
             aria-autocomplete="list"
             aria-expanded={suggestions.length > 0}
             aria-controls={suggestions.length > 0 ? `${id}-dossiers` : undefined}
-            aria-activedescendant={suggestions[active] ? `${id}-dossier-${active}` : undefined}
+            aria-activedescendant={suggestions[current] ? `${id}-dossier-${current}` : undefined}
             autoComplete="off"
             className={cn(CONTROL_RADIUS, 'min-h-[44px] min-w-[min(12em,100%)] flex-1 bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-500 dark:placeholder:text-slate-400', FIELD_TEXT)}
           />
@@ -256,13 +258,13 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
                 key={dossier.id}
                 id={`${id}-dossier-${index}`}
                 role="option"
-                aria-selected={index === active}
+                aria-selected={index === current}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(dossier)}
                 onMouseEnter={() => setActive(index)}
                 className={cn(
                   'flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm text-slate-800 dark:text-slate-100',
-                  index === active && 'bg-slate-100 dark:bg-slate-800',
+                  index === current && 'bg-slate-100 dark:bg-slate-800',
                 )}
               >
                 <Folder size={15} aria-hidden className="shrink-0 text-slate-500" />

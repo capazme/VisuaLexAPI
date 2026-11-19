@@ -143,6 +143,21 @@ describe('Work and Learn, two lists of tasks', () => {
     await waitFor(() => expect(plannerStore.getState().notice?.message).toBe('Compito aggiunto: non è in questa vista'));
   });
 
+  it('in Learn, «#» and Enter choose a work dossier, and the task is that dossier\'s', async () => {
+    service.list.mockResolvedValue(answer([]));
+    service.create.mockResolvedValue(task('n', { plannedDate: TODAY, dossierId: 'd1' }));
+    renderPlanner('/learn/attivita/scadenziario');
+    await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull());
+    const field = screen.getByLabelText('Nuovo compito');
+    fireEvent.change(field, { target: { value: 'Memoria #Ros', selectionStart: 12 } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(service.create).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi il compito' }));
+    await waitFor(() => expect(service.create).toHaveBeenCalled());
+    expect(service.create.mock.calls[0][0]).toMatchObject({ dossierId: 'd1', origin: 'lavoro' });
+    await waitFor(() => expect(plannerStore.getState().notice?.message).toBe('Compito aggiunto: non è in questa vista'));
+  });
+
   it('«c» in Learn creates a study task', async () => {
     service.list.mockResolvedValue(answer([]));
     service.create.mockResolvedValue(task('n', { plannedDate: TODAY, origin: 'studio' }));
