@@ -21,6 +21,8 @@ Five motion touch-ups after the common timings, and the arrows in Fonti. Web onl
 - Five touch-ups to the motion after the common timings; the Learn page is preloaded like the other main pages
   (LC133).
 - The arrows in Fonti move as the rest of the app (LC133).
+- Where the browser has no idle callback (Safari), the search band is drawn after a second instead of 200 ms, so a
+  cold boot is not slowed (LC135).
 
 ## [1.57.0] - 2026-11-19
 
