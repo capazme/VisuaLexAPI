@@ -12,6 +12,20 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.59.0] - 2026-11-19
+
+The chronology of the facts in a work dossier, and no notifications timer left running after a test. Web only, no
+migration. MERL-T stays off.
+
+### Work
+
+- «Cronologia» in a work dossier: the facts in date order, each row opens it in the dossier, and one button
+  flips the order (LC137, P4).
+
+### Tests
+
+- No notifications timer outlives a test (LC136).
+
 ## [1.58.0] - 2026-11-19
 
 Five motion touch-ups after the common timings, and the arrows in Fonti. Web only, no migration. MERL-T stays off.
