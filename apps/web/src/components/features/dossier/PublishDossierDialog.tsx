@@ -346,10 +346,10 @@ export function PublishDossierForm({ dossier, otherDossiers, onClose, onPublishe
 
         {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>
             Annulla
           </Button>
-          <Button disabled={!canPublish} loading={busy} onClick={() => void submit()}>
+          <Button type="button" disabled={!canPublish} loading={busy} onClick={() => void submit()}>
             {updating ? 'Aggiorna' : 'Pubblica'}
           </Button>
         </div>

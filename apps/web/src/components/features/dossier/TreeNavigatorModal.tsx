@@ -191,7 +191,7 @@ function TreeNavigatorForm({ onClose, onImport, initialAct, headingId }: Omit<Pr
             </div>
           </div>
 
-          <Button onClick={fetchTree} loading={loading} className="w-full" icon={<Search size={16} aria-hidden />}>
+          <Button type="button" onClick={fetchTree} loading={loading} className="w-full" icon={<Search size={16} aria-hidden />}>
             {loading ? 'Caricamento…' : 'Cerca articoli'}
           </Button>
 
@@ -213,7 +213,7 @@ function TreeNavigatorForm({ onClose, onImport, initialAct, headingId }: Omit<Pr
                 <span className="text-sm text-slate-600 dark:text-slate-400">
                   {tree.length} articoli trovati • {selectedArticles.size} selezionati
                 </span>
-                <Button variant="link" onClick={toggleSelectAll}>
+                <Button type="button" variant="link" onClick={toggleSelectAll}>
                   {allSelected ? 'Deseleziona tutti' : 'Seleziona tutti'}
                 </Button>
               </div>
@@ -224,10 +224,11 @@ function TreeNavigatorForm({ onClose, onImport, initialAct, headingId }: Omit<Pr
                   return (
                     // bare-button: a row of the list, the whole width a checkbox's target (`aria-pressed`), not a button's look.
                     <button
+                      type="button"
                       key={idx}
                       onClick={() => toggleArticle(articleNum)}
                       aria-pressed={selected}
-                      className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:bg-slate-50 dark:focus-visible:bg-slate-800"
+                      className="w-full h-9 px-3 text-left flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:bg-slate-50 dark:focus-visible:bg-slate-800"
                     >
                       {selected ? (
                         <CheckSquare size={16} className="text-primary-500" />
@@ -244,10 +245,10 @@ function TreeNavigatorForm({ onClose, onImport, initialAct, headingId }: Omit<Pr
         </div>
 
         <div className="flex justify-end gap-3 px-4 pb-4 md:px-5 md:pb-5">
-          <Button variant="quiet" onClick={onClose}>
+          <Button type="button" variant="quiet" onClick={onClose}>
             Annulla
           </Button>
-          <Button onClick={runImport} disabled={selectedArticles.size === 0}>
+          <Button type="button" onClick={runImport} disabled={selectedArticles.size === 0}>
             Importa {selectedArticles.size > 0 ? `(${selectedArticles.size})` : ''}
           </Button>
         </div>

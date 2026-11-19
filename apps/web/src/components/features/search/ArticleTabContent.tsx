@@ -198,6 +198,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     });
 
     const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
+    const dossierSpaceId = useId();
     const [isPeekOpen, setIsPeekOpen] = useState(false);
     // State (not ref) so the popover re-reads the anchor when the button
     // actually mounts. Using ref.current in render triggers the
@@ -943,6 +944,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     ? () => addToThisDossier(hostDossier.id, { norma: norma_data }, showToast)
                     : () => setDossierPopoverOpen(true)}
                 dossierLabel={hostDossier ? 'Aggiungi a questa pratica' : undefined}
+                dossierExpanded={hostDossier ? undefined : dossierPopoverOpen}
+                dossierControls={hostDossier ? undefined : dossierSpaceId}
                 hideDossier={dossierCommandInRow || inHostDossier}
                 onShareLink={handleShareLink}
                 onCopyLink={handleCopyLink}
@@ -959,6 +962,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
             {/* «Aggiungi alla pratica» opens under the toolbar, where the reader is reading (LC125, L-73). */}
             <AddToDossierPopover
+                id={dossierSpaceId}
                 isOpen={dossierPopoverOpen}
                 onClose={() => setDossierPopoverOpen(false)}
                 norma={norma_data}

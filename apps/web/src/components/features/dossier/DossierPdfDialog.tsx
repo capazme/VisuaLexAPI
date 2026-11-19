@@ -122,10 +122,11 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
           {progress ? `Preparo il PDF…${progress.total > 0 ? ` ${progress.done} di ${progress.total}` : ''}` : ''}
         </p>
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>
             Annulla
           </Button>
           <Button
+            type="button"
             variant="primary"
             icon={<Download size={16} aria-hidden />}
             disabled={busy}

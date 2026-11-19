@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArticleData, DossierItem, NormaVisitata, Proposal } from '../../../../types';
@@ -144,5 +144,36 @@ describe('ArticleTabContent: one command to add to a practice (LC61)', () => {
     unmount();
     render(<MemoryRouter><ArticleTabContent data={data} /></MemoryRouter>);
     expect(bar().length).toBeGreaterThan(0);
+  });
+});
+
+describe('ArticleTabContent: «Alla pratica» opens a space under the bar (LC125, L-73)', () => {
+  it('says whether its space is open and which it is, as the other commands do', () => {
+    appStore.setState({ dossiers: [{ id: 'dos-1', title: 'Ricorso Rossi', createdAt: '', items: [] }] });
+    render(<MemoryRouter><ArticleTabContent data={data} /></MemoryRouter>);
+    const commands = screen.getAllByRole('button', { name: 'Alla pratica' });
+    for (const command of commands) expect(command).toHaveAttribute('aria-expanded', 'false');
+    const command = commands[commands.length - 1];
+    command.focus();
+    fireEvent.click(command);
+    const space = screen.getByRole('region', { name: 'Aggiungi alla pratica' });
+    for (const each of commands) {
+      expect(each).toHaveAttribute('aria-expanded', 'true');
+      expect(each).toHaveAttribute('aria-controls', space.id);
+    }
+    expect(screen.queryByRole('dialog', { name: 'Aggiungi alla pratica' })).toBeNull();
+    expect(space).toHaveFocus();
+    fireEvent.keyDown(space, { key: 'Escape' });
+    expect(command).toHaveAttribute('aria-expanded', 'false');
+    expect(command).toHaveFocus();
+  });
+
+  it('in the hosting dossier it adds at once, and says nothing of a space', () => {
+    appStore.setState({ dossiers: [{ id: 'dos-1', title: 'Ricorso Rossi', createdAt: '', items: [] }] });
+    lettura(undefined);
+    for (const command of screen.getAllByRole('button', { name: 'Aggiungi a questa pratica' })) {
+      expect(command).not.toHaveAttribute('aria-expanded');
+      expect(command).not.toHaveAttribute('aria-controls');
+    }
   });
 });
