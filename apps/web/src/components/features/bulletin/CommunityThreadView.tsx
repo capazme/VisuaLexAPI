@@ -97,10 +97,11 @@ function EditItem({ title, body, label, onSave, onCancel }: {
 }
 
 /** «Modifica» and «Elimina», the author's own commands on what they wrote (LC114); never on another's. */
-function OwnCommands({ what, onEdit, onDelete }: { what: string; onEdit: () => void; onDelete: (from: HTMLElement) => void }) {
+function OwnCommands({ id, what, onEdit, onDelete }: { id: string; what: string; onEdit: () => void; onDelete: (from: HTMLElement) => void }) {
   return (
     <>
-      <Button type="button" variant="link" onClick={onEdit} aria-label={`Modifica ${what}`} className="text-xs">Modifica</Button>
+      {/* `data-edit`: the edit closed, the focus comes back here (the button is drawn again, not kept). */}
+      <Button type="button" variant="link" onClick={onEdit} aria-label={`Modifica ${what}`} data-edit={id} className="text-xs">Modifica</Button>
       <Button type="button" variant="link" onClick={(event) => onDelete(event.currentTarget)} aria-label={`Elimina ${what}`} className="text-xs">Elimina</Button>
     </>
   );
@@ -128,7 +129,20 @@ export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
   const [commenting, setCommenting] = useState<string | null>(null);
   // The item being edited in its place (the discussion's id, or a reply's or a comment's).
   const [editing, setEditing] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<{ kind: 'thread' | 'comment'; id: string; what: string; from: HTMLElement } | null>(null);
+  // What «Elimina» asked about, kept while the question goes back into its button; `asking` opens and closes it.
+  const [asked, setAsked] = useState<{ kind: 'thread' | 'comment'; id: string; what: string; from: HTMLElement } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const ask = (target: NonNullable<typeof asked>) => { setAsked(target); setAsking(true); };
+  // An edit closed (saved, «Annulla», Esc): the focus back on its «Modifica», drawn again in its place.
+  const edited = useRef<string | null>(null);
+  useEffect(() => {
+    if (editing) edited.current = editing;
+    else if (edited.current) {
+      const id = edited.current;
+      edited.current = null;
+      document.querySelector<HTMLElement>(`[data-edit="${CSS.escape(id)}"]`)?.focus({ preventScroll: true });
+    }
+  }, [editing, thread]);
   const heading = useRef<HTMLHeadingElement>(null);
   const focused = useRef(false);
 
@@ -221,10 +235,10 @@ export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
     return ok;
   });
 
-  const remove = async (target: typeof deleting) => {
+  const remove = async (target: typeof asked) => {
     if (!target) return;
     const { kind, id } = target;
-    setDeleting(null);
+    setAsking(false);
     setError(null);
     setNotice(null);
     try {
@@ -270,7 +284,7 @@ export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
           <ReportButton label="Segnala la discussione" onReport={() => void report(() => articleDiscussionService.report(thread.id, 'segnalazione'))} />
         )}
         {thread.isOwner && !thread.deleted && editing !== thread.id && (
-          <OwnCommands what="la discussione" onEdit={() => setEditing(thread.id)} onDelete={(from) => setDeleting({ kind: 'thread', id: thread.id, what: 'la discussione', from })} />
+          <OwnCommands id={thread.id} what="la discussione" onEdit={() => setEditing(thread.id)} onDelete={(from) => ask({ kind: 'thread', id: thread.id, what: 'la discussione', from })} />
         )}
       </div>
 
@@ -312,7 +326,7 @@ export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
                       <ReportButton label={`Segnala la risposta di ${reply.user.username}`} onReport={() => void report(() => articleDiscussionService.reportComment(reply.id, 'segnalazione'))} />
                     )}
                     {reply.isOwner && (
-                      <OwnCommands what="la tua risposta" onEdit={() => setEditing(reply.id)} onDelete={(from) => setDeleting({ kind: 'comment', id: reply.id, what: 'la tua risposta', from })} />
+                      <OwnCommands id={reply.id} what="la tua risposta" onEdit={() => setEditing(reply.id)} onDelete={(from) => ask({ kind: 'comment', id: reply.id, what: 'la tua risposta', from })} />
                     )}
                     {canAccept(reply) && (
                       <Button
@@ -343,7 +357,7 @@ export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
                         {visible(comment) && editing !== comment.id && (
                           <div className="mt-1 flex flex-wrap items-center gap-4 md:gap-3">
                             {comment.isOwner
-                              ? <OwnCommands what="il tuo commento" onEdit={() => setEditing(comment.id)} onDelete={(from) => setDeleting({ kind: 'comment', id: comment.id, what: 'il tuo commento', from })} />
+                              ? <OwnCommands id={comment.id} what="il tuo commento" onEdit={() => setEditing(comment.id)} onDelete={(from) => ask({ kind: 'comment', id: comment.id, what: 'il tuo commento', from })} />
                               : <ReportButton label={`Segnala il commento di ${comment.user.username}`} onReport={() => void report(() => articleDiscussionService.reportComment(comment.id, 'segnalazione'))} />}
                           </div>
                         )}
@@ -373,14 +387,14 @@ export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
         : <ReplyForm onSend={body => act(() => articleDiscussionService.comment(thread.id, body, undefined), 'Impossibile pubblicare la risposta.')} />}
 
       <WireConfirm
-        open={deleting !== null}
-        origin={deleting?.from ?? null}
+        open={asking}
+        origin={asked?.from ?? null}
         variant="danger"
-        title={deleting ? `Eliminare ${deleting.what}?` : 'Eliminare?'}
+        title={asked ? `Eliminare ${asked.what}?` : 'Eliminare?'}
         message="Se altri hanno risposto, resta il posto con «Cancellata dall’autore» e le loro risposte restano; altrimenti sparisce. Il testo non si recupera."
         confirmLabel="Elimina"
-        onConfirm={() => remove(deleting)}
-        onCancel={() => setDeleting(null)}
+        onConfirm={() => remove(asked)}
+        onCancel={() => setAsking(false)}
       />
     </article>
   );

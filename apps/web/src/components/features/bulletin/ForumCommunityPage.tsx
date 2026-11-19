@@ -70,6 +70,11 @@ export function ForumCommunityPage() {
       userVoted: thread.userVoted,
       replyCount: thread.replyCount,
       acceptedCommentId: thread.acceptedCommentId,
+      // An edit or an emptying by its author (LC114): the row says what the discussion says now. The whole text as the
+      // excerpt: the row clamps it to two lines.
+      title: thread.title,
+      deleted: thread.deleted,
+      excerpt: thread.deleted ? '' : thread.body,
     } : item));
   }, []);
 

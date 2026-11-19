@@ -177,10 +177,11 @@ export function ForumExploreView({
 
   return (
     <>
-      {/* Filters: one row from md; on a phone the search across the page and under it the order, the category and the
-          refresh, wrapping while they do not fit (M1). */}
-      <div id="tour-forum-filters" className="flex flex-col gap-3 md:flex-row">
-        <form onSubmit={onSearchSubmit} className="min-w-0 flex-1">
+      {/* Filters: one row where the search keeps at least 14rem beside them, else the order, the category and the refresh
+          wrap under it; on a phone the search across the page, and under it the order, then the category and the
+          refresh while they do not fit beside it (M1). */}
+      <div id="tour-forum-filters" className="flex flex-wrap gap-3">
+        <form onSubmit={onSearchSubmit} className="min-w-[14rem] flex-[1_1_14rem]">
           <Input
             type="text"
             icon={<Search size={16} aria-hidden />}
@@ -190,7 +191,7 @@ export function ForumExploreView({
             aria-label="Cerca nei dossier pubblici"
           />
         </form>
-        <div className="flex flex-wrap items-center gap-3 md:flex-nowrap">
+        <div className="flex grow flex-wrap items-center gap-3 md:grow-0 md:flex-nowrap">
           <SegmentedTabs
             label="Ordina i dossier pubblici"
             tabs={SORT_CHOICES}

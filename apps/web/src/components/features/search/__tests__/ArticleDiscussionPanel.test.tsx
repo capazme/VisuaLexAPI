@@ -700,5 +700,13 @@ describe('ArticleDiscussionPanel', () => {
       fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Segnala' }));
       await waitFor(() => expect(articleDiscussionService.report).toHaveBeenCalledWith('thread-1', 'segnalazione'));
     });
+
+    // LC114: one's own gloss has neither «Segnala» nor a vote, only its count.
+    it('offers no «Segnala» and no vote on one\'s own gloss', async () => {
+      await openThread({ ...dummyThread, isOwner: true });
+      expect(screen.getByRole('button', { name: 'Rispondi' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Segnala la glossa' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Vota glossa/ })).toBeNull();
+    });
   });
 });

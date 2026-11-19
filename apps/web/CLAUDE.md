@@ -3284,9 +3284,9 @@ meant to stay split; add new features as new files, not inside the shells:
   that word waits for an expert's validation. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
   equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
-  `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
-  from `md` and, on a phone, the search across with the order, the category («Tutte») and the 44 px refresh under it,
-  wrapping while they do not fit, M1. Since LC114 (omologazione 9 of 14) the order is a choice in a row, as «Ordina» in
+  `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are
+  one row while the search keeps 14rem beside the rest (else the rest wraps under it) and, on a phone, the search
+  across with the order, then the category («Tutte») and the 44 px refresh under it, M1. Since LC114 (omologazione 9 of 14) the order is a choice in a row, as «Ordina» in
   Pratiche (`ui/SegmentedTabs size="sm"`, no panel: a `radiogroup` named «Ordina i dossier pubblici», «Recenti ·
   Popolari · Aggiunti»), the category the common `ui/Select` («Filtra per categoria»), the search `ui/Input`; the menus
   made by hand over the content and their veil are gone. The tabs and «Ricevuti · Inviati» are `SegmentedTabs

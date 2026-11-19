@@ -516,8 +516,8 @@ describe('ForumCommunityPage: the open discussion', () => {
     expect(within(list).getByText('Un\'altra discussione')).toBeInTheDocument();
   });
 
-  it('deletes a discussion others answered: emptied, it stays and is read again', async () => {
-    service.feed.mockResolvedValue(page([]));
+  it('deletes a discussion others answered: emptied, it stays and is read again, its feed row too', async () => {
+    service.feed.mockResolvedValue(page([item({ isOwner: true })]));
     service.get.mockResolvedValue(thread({ isOwner: true, replies: [reply({ id: 'r1' })] }));
     service.deleteThread.mockResolvedValue({ outcome: 'emptied' });
     renderAt('/forum/community/t1');
@@ -528,6 +528,28 @@ describe('ForumCommunityPage: the open discussion', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/forum/community/t1');
     expect(screen.getByText('Serve un inadempimento grave.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Elimina la discussione' })).toBeNull();
+    fireEvent.click(screen.getByRole('link', { name: 'Torna alle discussioni' }));
+    const list = await screen.findByRole('list', { name: 'Discussioni' });
+    expect(within(list).getByText('Discussione cancellata dall’autore')).toBeInTheDocument();
+    expect(within(list).queryByText('Quando l’inadempimento…')).toBeNull();
+  });
+
+  it('brings the focus back to «Elimina» after «Annulla», and to «Modifica» once the edit closes', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread({ isOwner: true }));
+    renderAt('/forum/community/t1');
+    const remove = await screen.findByRole('button', { name: 'Elimina la discussione' });
+    fireEvent.click(remove);
+    const question = await screen.findByRole('alertdialog');
+    expect(question).toHaveTextContent('Eliminare la discussione?');
+    fireEvent.click(within(question).getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(remove).toHaveFocus());
+    expect(service.deleteThread).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Modifica la discussione' }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Testo' }), { key: 'Escape' });
+    expect(screen.queryByRole('form', { name: 'Modifica la discussione' })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Modifica la discussione' })).toHaveFocus());
   });
 
   it('deletes one\'s own reply and reads the discussion again', async () => {
