@@ -87,13 +87,17 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
       data-testid="top-bar"
       data-palette-bar=""
       className={cn(
-        'relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:flex dark:border-slate-800',
+        'relative hidden h-[52px] shrink-0 items-center gap-3 border-b border-slate-200 px-6 lg:grid dark:border-slate-800',
+        // LC141: three columns, the path · the search · the controls. The search may shrink (`minmax(0,22rem)`) and a
+        // side column never goes below what it holds (the path clips to 0, the controls do not), so the controls can
+        // never sit under the search, «Novità» or not, whatever the sidebar's width; centred while the sides are even.
+        'grid-cols-[1fr_minmax(0,22rem)_1fr]',
         // L-75: while the search's field is in the bar (its slot not empty), the field takes the path's place.
         '[&:has([data-palette-slot]:not(:empty))>[data-bar-path]]:invisible',
       )}
     >
-      {/* The path keeps clear of the centred search (LC40): half the bar less half the pill and a gap. */}
-      <nav aria-label="Percorso" data-bar-path="" className="min-w-0 flex-1 pr-[calc(11rem+1rem)] [max-width:calc(50%)]">
+      {/* The path in the first column, clipped to it (`overflow-hidden`: its least width is 0, LC141). */}
+      <nav aria-label="Percorso" data-bar-path="" className="min-w-0 overflow-hidden">
         <ol className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] text-slate-600 dark:text-slate-400">
           <li className="shrink-0">
             <Link to={section.home} className={cn('rounded-sm hover:text-slate-900 dark:hover:text-slate-100', FOCUS_RING)}>
@@ -120,7 +124,7 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
       </nav>
       {/* LC40 (Luca: «in alto devo avere centrale la barra di ricerca … effetto espansione Dynamic Island»): the search in
           the bar's middle, on every page; the menu grows out of it (`CommandPalette`). */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+      <div data-bar-search="" className="flex min-w-0 justify-center">
       {field ?? <button
         id={SEARCH_ISLAND_ID}
         data-compact=""
@@ -135,18 +139,17 @@ export function TopBar({ section, pathname, search = '', scroller, actions, onSe
         aria-keyshortcuts="Meta+K Control+K"
         className={cn(
           // LC81: the panel's field's shape, type and lens.
-          'w-[22rem] transition-colors', ISLAND_SHAPE, ISLAND_TEXT, ISLAND_HINT, ISLAND_SURFACE,
+          'w-full min-w-0 max-w-[22rem] overflow-hidden transition-colors', ISLAND_SHAPE, ISLAND_TEXT, ISLAND_HINT, ISLAND_SURFACE,
           ISLAND_FOCUS,
         )}
       >
         <Search aria-hidden className={ISLAND_LENS} />
-        <span>{ISLAND_PLACEHOLDER}</span>
+        <span className="truncate">{ISLAND_PLACEHOLDER}</span>
         <kbd aria-hidden className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 font-mono text-[11px] text-slate-500 dark:border-slate-700">{PALETTE_SHORTCUT}</kbd>
       </button>}
       </div>
-      <span className="flex-1" aria-hidden />
       {/* One box for the controls, measured for the field's room; the bar's gap between them, as before. */}
-      <div ref={setControls} className="flex shrink-0 items-center gap-3">{actions}</div>
+      <div ref={setControls} className="flex shrink-0 items-center gap-3 justify-self-end">{actions}</div>
       {/* L-75: the search's field, grown out of the pill (`CommandPalette`) to both sides, in the room the controls leave
           (`useFieldRoom`). After them in the page's order, so Tab goes from the field to the lists under the bar. */}
       <div

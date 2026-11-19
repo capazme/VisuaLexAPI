@@ -14,7 +14,7 @@ const feedbackTypes: { value: FeedbackType; label: string; icon: React.ElementTy
 ];
 
 /**
- * «Segnala un problema» (LC92): the form that was `FeedbackModal`, now a part of Impostazioni (`#segnala`), reached
+ * «Dicci cosa ti serve» (LC92, LC141): the form that was `FeedbackModal`, now a part of Impostazioni (`#segnala`), reached
  * from the bug beside «Impostazioni» and from the user menu. In the page, never over it (L-73); the confirmation too.
  */
 export function ReportProblemSection() {
@@ -71,10 +71,10 @@ export function ReportProblemSection() {
       <div ref={confirmation} tabIndex={-1} role="status" className={cn('flex items-start gap-3 p-4 focus:outline-none', CARD_RADIUS, CONTROL_BORDER)}>
         <Send size={18} className="mt-0.5 shrink-0 text-green-600" aria-hidden />
         <div className="min-w-0 space-y-2">
-          <p className="text-sm font-medium text-slate-900 dark:text-white">Grazie, la segnalazione è arrivata.</p>
+          <p className="text-sm font-medium text-slate-900 dark:text-white">Grazie, il messaggio è arrivato.</p>
           <p className="text-sm text-slate-500 dark:text-slate-400">La esamineremo al più presto.</p>
           <Button type="button" variant="link" onClick={reset}>
-            Scrivi un'altra segnalazione
+            Scrivi un altro messaggio
           </Button>
         </div>
       </div>
@@ -121,9 +121,9 @@ export function ReportProblemSection() {
           onChange={(e) => setMessage(e.target.value)}
           placeholder={
             type === 'bug'
-              ? 'Descrivi il problema riscontrato…'
+              ? 'Dicci cosa non va…'
               : type === 'suggestion'
-              ? 'Descrivi la tua idea o suggerimento…'
+              ? 'Dicci cosa ti serve…'
               : 'Scrivi il tuo messaggio…'
           }
           rows={5}

@@ -18,6 +18,14 @@ describe('ReportProblemSection (LC92)', () => {
     expect(within(group).getByRole('button', { name: 'Bug' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  // LC141: the part is «Dicci cosa ti serve»; the hints speak the same way.
+  it('asks «Dicci cosa non va…» for a bug and «Dicci cosa ti serve…» for a suggestion', () => {
+    render(<ReportProblemSection />);
+    expect(screen.getByLabelText('Descrizione')).toHaveAttribute('placeholder', 'Dicci cosa non va…');
+    fireEvent.click(screen.getByRole('button', { name: 'Suggerimento' }));
+    expect(screen.getByLabelText('Descrizione')).toHaveAttribute('placeholder', 'Dicci cosa ti serve…');
+  });
+
   // jsdom cannot measure: the classes are the check. At 390 px the three buttons did not fit on one row.
   it('lets the three type buttons wrap instead of overflowing a narrow column', () => {
     render(<ReportProblemSection />);
@@ -41,13 +49,13 @@ describe('ReportProblemSection (LC92)', () => {
     fireEvent.change(screen.getByLabelText('Descrizione'), { target: { value: '  La ricerca non risponde  ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invia' }));
     const confirmation = await screen.findByRole('status');
-    expect(confirmation).toHaveTextContent('Grazie, la segnalazione è arrivata.');
+    expect(confirmation).toHaveTextContent('Grazie, il messaggio è arrivato.');
     // The focus follows the flow: to the confirmation, then back to the text, never the body.
     // It comes in a passive effect, which may run after the confirmation is drawn (a busy machine): wait for it.
     await waitFor(() => expect(confirmation).toHaveFocus());
     expect(submitFeedback).toHaveBeenCalledWith({ type: 'bug', message: 'La ricerca non risponde' });
     expect(screen.queryByRole('dialog')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: "Scrivi un'altra segnalazione" }));
+    fireEvent.click(screen.getByRole('button', { name: "Scrivi un altro messaggio" }));
     expect(screen.getByLabelText('Descrizione')).toHaveValue('');
     expect(screen.getByLabelText('Descrizione')).toHaveFocus();
   });
