@@ -108,14 +108,14 @@ describe('SharedEnvironmentCard — its shape (S7a)', () => {
     expect(onLike).toHaveBeenCalledWith('env-1');
   });
 
-  it('has one action, outlined, not filled', () => {
+  it('has one action, quiet, as the packs\' «Aggiungi»', () => {
     renderCard(base);
     const add = screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ });
     // «Aggiungi» on a phone, the whole words from sm; the name whole on every width.
     expect(within(add).getByText('Aggiungi', { selector: 'span' })).toHaveClass('sm:hidden');
     expect(within(add).getByText('Aggiungi ai miei dossier')).toHaveClass('hidden', 'sm:inline');
-    // The common outlined button (LC114), `Button variant="secondary"`.
-    expect(add).toHaveClass('border', 'border-ink-200');
+    // LC114: `Button variant="quiet"`, as «Aggiungi» on the packs' cards.
+    expect(add).toHaveClass('border-transparent', 'bg-transparent');
     expect(add.className).not.toMatch(/bg-primary-600/);
     // Only the like, the action and the «⋯» menu: no counters drawn as bare numbers.
     expect(screen.getAllByRole('button')).toHaveLength(3);

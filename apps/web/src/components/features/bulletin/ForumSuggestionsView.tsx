@@ -36,7 +36,7 @@ export function ForumSuggestionsView({
         value={suggestionTab}
         onChange={setSuggestionTab}
         className="mb-4 w-fit max-w-full"
-        tabClassName="min-h-11 gap-2 px-4 md:min-h-8"
+        tabClassName="gap-2 px-4"
         size="sm"
         tabs={[
           {

@@ -235,9 +235,10 @@ export function SharedEnvironmentCard({
             </p>
           )}
           {!environment.isOwner && (
+            // LC114: quiet, as «Aggiungi» on the packs' cards just below: one action, one look; the card holds it already.
             <Button
               type="button"
-              variant="secondary"
+              variant="quiet"
               onClick={() => onImport(environment)}
               aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
               icon={<FolderPlus size={16} aria-hidden />}

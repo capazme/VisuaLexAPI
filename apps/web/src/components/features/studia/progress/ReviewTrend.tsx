@@ -268,7 +268,7 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
           </p>
         </div>
         {/* LC112: the common tabs, small (`SegmentedTabs size="sm"`), over the chart's panel. */}
-        <SegmentedTabs size="sm" label="Periodo" tabs={TREND_PERIODS} value={period} onChange={choosePeriod} panelId={panelId} tabClassName="min-h-11 md:min-h-8" />
+        <SegmentedTabs size="sm" label="Periodo" tabs={TREND_PERIODS} value={period} onChange={choosePeriod} panelId={panelId} />
       </div>
 
       <div ref={boxRef} id={panelId} role="tabpanel" aria-labelledby={`${panelId}-tab-${period}`} className="min-w-0">

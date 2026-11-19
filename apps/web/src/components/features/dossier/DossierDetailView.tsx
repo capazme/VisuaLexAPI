@@ -491,7 +491,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           panelId={VIEW_PANEL}
           className="w-fit max-w-full"
           // The tabs whole on a 390 px phone (LC54): less padding below `sm`.
-          tabClassName="min-h-11 gap-1.5 px-2.5 sm:gap-2 sm:px-4 md:min-h-8"
+          tabClassName="gap-1.5 px-2.5 sm:gap-2 sm:px-4"
           // LC113 (the consultant on #640 and #660): segments of 44 px on a phone (the track 48) and 32 in a track of 36 from md, 4 px corners, as Learn's period (#657).
           size="sm"
         />

@@ -187,7 +187,8 @@ export function ForumExploreView({
             icon={<Search size={16} aria-hidden />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca nei dossier pubblici…"
+            // LC114: short enough to be read whole where the search is narrowest (226 px at 768 with the sidebar).
+            placeholder="Cerca un dossier…"
             aria-label="Cerca nei dossier pubblici"
           />
         </form>

@@ -32,8 +32,8 @@ export function ForumTabs({ active, onChange, pendingCount }: ForumTabsProps) {
       value={active}
       onChange={onChange}
       className="w-full sm:w-fit sm:max-w-full"
-      // LC114: the small row (it was 52 px with 6 px corners), each tab 44 px to touch on a phone, as Fonti's (LC113).
-      tabClassName="min-h-11 flex-1 whitespace-nowrap px-2 sm:flex-none sm:px-4 md:min-h-8"
+      // LC114: the small row (it was 52 px with 6 px corners): 44 px on a phone, the tabs 44 with no taller row round them.
+      tabClassName="flex-1 whitespace-nowrap px-2 sm:flex-none sm:px-4"
       size="sm"
       tabs={FORUM_TAB_ORDER.map((id) => {
         const { label, short, icon: Icon } = TABS[id];

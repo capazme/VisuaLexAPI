@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import type { SharedEnvironment } from '../../../types';
 import { loadStudyPacks } from '../../../utils/studyPacks';
+import { appStore } from '../../../store/useAppStore';
 
 const service = vi.hoisted(() => ({
   list: vi.fn(),
@@ -94,6 +95,22 @@ describe('BulletinBoardPage - «Suggerisci contenuto» in the page', () => {
     fireEvent.keyDown(region, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Suggerisci contenuto' })).toBeNull());
     expect(menu).toHaveFocus();
+  });
+
+  // LC114, the consultant: a row's checkbox and its chevron had no name.
+  it('names each row\'s checkbox and a dossier\'s chevron', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Contratti', createdAt: '2026-11-01T10:00:00Z', items: [], tags: [] }] });
+    await open();
+    const region = await screen.findByRole('region', { name: 'Suggerisci contenuto' });
+    const box = within(region).getByRole('checkbox', { name: 'Seleziona «Contratti»' });
+    expect(box).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(box);
+    expect(box).toHaveAttribute('aria-checked', 'true');
+    const chevron = within(region).getByRole('button', { name: 'Apri «Contratti»' });
+    expect(chevron).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(chevron);
+    expect(within(region).getByRole('button', { name: 'Chiudi «Contratti»' })).toHaveAttribute('aria-expanded', 'true');
+    appStore.setState({ dossiers: [] });
   });
 
   it('closes with «Chiudi» and with «Annulla»', async () => {

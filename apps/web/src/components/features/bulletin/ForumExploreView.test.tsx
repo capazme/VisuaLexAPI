@@ -176,8 +176,10 @@ describe('ForumExploreView - the order and the category', () => {
     expect(choices.map((choice) => choice.textContent)).toEqual(['Recenti', 'Popolari', 'Aggiunti']);
     expect(choices[1]).toHaveAttribute('aria-checked', 'true');
     expect(choices.map((choice) => choice.tabIndex)).toEqual([-1, 0, -1]);
-    // `size="sm"`: 44 px on a phone and 36 from md, as tall as the menu beside it.
-    expect(choices[1]).toHaveClass('min-h-10', 'md:min-h-8');
+    // `size="sm"`: each choice 44 px on a phone (the row 44, no track round it), 32 inside a row of 36 from md.
+    expect(choices[1]).toHaveClass('min-h-11', 'md:min-h-8');
+    expect(order).toHaveClass('md:p-0.5');
+    expect(order).not.toHaveClass('p-0.5');
   });
 
   it('moves the order with the arrows, Home and End', () => {

@@ -245,7 +245,11 @@ export function CommunityThreadView({ threadId, onChanged, onDeleted }: Props) {
       const { outcome } = kind === 'thread' ? await articleDiscussionService.deleteThread(id) : await articleDiscussionService.deleteComment(id);
       // Nothing of the discussion stays: back to the list, its row gone. Emptied, its place stays: read it again.
       if (kind === 'thread' && outcome === 'deleted') onDeleted?.(id);
-      else await load();
+      else {
+        await load();
+        // «Elimina» is gone with what it deleted: the focus on the discussion's title, not left on the page's body.
+        heading.current?.focus({ preventScroll: true });
+      }
     } catch (failure) {
       setError(getErrorMessage(failure) || 'Impossibile eliminare. Riprova.');
     }

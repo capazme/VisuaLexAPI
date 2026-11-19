@@ -853,7 +853,8 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   the content is kept at full opacity, or the global rule's 150 ms (after the delay) would fade it in late. The
   trigger is the caller's (`aria-expanded`, `aria-controls`). «Oggi»'s study settings (`StudySettingsPanel`) use it.
   `SegmentedTabs` and `SegmentedTabPanel` («linguette che scorrono», U1; first on the Forum's three tabs and its
-  suggestions' «Ricevuti · Inviati», S7a) are a
+  suggestions' «Ricevuti · Inviati», S7a; `size="sm"`, LC114: on a phone segments of 44 px with no track round them,
+  the row 44, from md 2 px of track round segments of 32, the row 36 — no caller sets a height of its own) are a
   `tablist` over one `tabpanel`: the chosen tab's mark slides on `spring.snappy` (a `layoutId` in the row's own
   `LayoutGroup`, still on the first drawing), the content comes in over 160 ms with a 12 px shift the way the mark
   moved (to a tab further right, the content moves right too: U1's words), in CSS (`animate-in`, fill backwards —
@@ -3297,14 +3298,18 @@ meant to stay split; add new features as new files, not inside the shells:
   content; the dialogs still there (L-73) are listed and left out of the style checks. While
   Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
   on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
-  card that comes leaves a smaller shift upwards). «Pubblica un dossier»
+  card that comes leaves a smaller shift upwards). The search's hint is «Cerca un dossier…» (whole at 768 with the
+  sidebar, where the search is 226 px), its name «Cerca nei dossier pubblici». «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentPanel`, in the page since LC114, L-73: an `Expand` at the top of «I miei pubblicati», the
   common fields, not closed while the save travels) edits its name, description, category and tags only — what it
   holds changes from the dossier. «Suggerisci contenuto» on another's card (`SuggestContentPanel`, LC114, L-73: it
   was a window with a veil) opens in the page too, an `Expand` at the top of Explore: the focus on the space, Esc,
-  «Chiudi» or «Annulla» close it and the focus goes back to the card's menu; a space left open closes with its tab. Content becomes the user's dossiers di studio through one dialog, `StudyImportDialog` (the
+  «Chiudi» or «Annulla» close it and the focus goes back to the card's menu; a space left open closes with its tab.
+  Its rows' checkboxes (`EnvironmentContentViewer`) are `role="checkbox"` named «Seleziona «…»», a dossier's chevron
+  «Apri/Chiudi «…»» with `aria-expanded`. After «Elimina» in a discussion that stays (emptied, or a reply or comment
+  gone) the focus lands on the discussion's title. Content becomes the user's dossiers di studio through one dialog, `StudyImportDialog` (the
   dossiers listed, notes and highlights as switches, one server request, never an existing dossier changed;
   the toast is `studyImportSentence`): «Ai miei dossier» on a card (`AddToMyDossiersDialog`, `POST
   /shared-environments/:id/download`, then `forum_download` unless the item is the user's own), an environment
@@ -3317,7 +3322,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `article` with its title in EB Garamond 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
   from its token `--category-*`, never a hand-written colour; one line where the card has room, wrapped between its parts
   on a narrow one, a long username cut, whole on hover), two tags then «+N», «Mi piace» a heart with its number
-  (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined
+  (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», quiet (LC114: as «Aggiungi» on the packs' cards below; it was outlined)
   («Aggiungi» below `sm`, as the packs' cards, its name whole); a withdrawn card is a dashed edge on a quieter paper and
   the badge, never an opacity (it would trap the «⋯» menu in a stacking context, gotcha 22, and fade the text under AA).
   Beside the like, small, «aggiunto da 12» (nothing at 0); the views are the author's alone, beside it in «I miei

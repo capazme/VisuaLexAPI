@@ -524,7 +524,9 @@ describe('ForumCommunityPage: the open discussion', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Elimina la discussione' }));
     service.get.mockResolvedValue(thread({ isOwner: true, deleted: true, title: '', body: '', replies: [reply({ id: 'r1' })] }));
     await confirmDelete();
-    expect(await screen.findByRole('heading', { name: 'Discussione cancellata dall’autore' })).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: 'Discussione cancellata dall’autore' });
+    // «Elimina» is gone: the focus on the discussion's title, not on the body.
+    await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByTestId('where')).toHaveTextContent('/forum/community/t1');
     expect(screen.getByText('Serve un inadempimento grave.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Elimina la discussione' })).toBeNull();
@@ -562,6 +564,7 @@ describe('ForumCommunityPage: the open discussion', () => {
     await confirmDelete();
     await waitFor(() => expect(service.deleteComment).toHaveBeenCalledWith('r1'));
     await waitFor(() => expect(screen.queryByText('La mia risposta')).toBeNull());
+    expect(screen.getByRole('heading', { name: 'Risoluzione e inadempimento di scarsa importanza' })).toHaveFocus();
   });
 
   it('says when the discussion is not there any more', async () => {
