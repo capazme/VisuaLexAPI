@@ -51,18 +51,15 @@ const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
 );
 
-const StudiaPage = lazy(() =>
-  import('./components/features/studia/StudiaPage').then(m => ({ default: m.StudiaPage })),
-);
+// Loaded with «Oggi» (`PAGE_CODE.learn`): one wait for the frame and its home view, not two in a row (LC133).
+const StudiaPage = lazy(() => PAGE_CODE.learn().then(([m]) => ({ default: m.StudiaPage })));
 const MyCardsView = lazy(() =>
   import('./components/features/studia/MyCardsView').then(m => ({ default: m.MyCardsView })),
 );
 const ValidationQueueView = lazy(() =>
   import('./components/features/studia/ValidationQueueView').then(m => ({ default: m.ValidationQueueView })),
 );
-const ReviewHome = lazy(() =>
-  import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
-);
+const ReviewHome = lazy(() => PAGE_CODE.learn().then(([, m]) => ({ default: m.ReviewHome })));
 const CoursesView = lazy(() =>
   import('./components/features/studia/corsi/CoursesView').then(m => ({ default: m.CoursesView })),
 );

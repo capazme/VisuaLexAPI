@@ -1750,15 +1750,15 @@
 /* The practice's two views (U2, L-62): a row's «Apri accanto» that opens the first window, and a window's «Chiudi» that
    closes the last, pass between the overview and the reading view (`practice/practiceSwitch.ts`). Each act's panel
    becomes its entry in the index, the practice's header and «Giurisprudenza» theirs, the windows come in from the right
-   and go back there: 260 ms, `--ease-out`, no overshoot. The pieces are named only while it plays (gotcha 22), each by
+   and go back there: 180 ms (`--dur-pop`, `PLACE_CHANGE`: a change of place, LC133; it was 260), `--ease-out`, no overshoot. The pieces are named only while it plays (gotcha 22), each by
    the `--vlx-vt` in its own style. A picture keeps its size, anchored at its top left, and its box clips it: the text
    does not stretch while the box changes size. The root does not animate (above), so what is not a piece changes at
    once; under reduced motion no transition is started. */
 .vlx-practice-switching .vlx-vt { view-transition-name: var(--vlx-vt); }
-.vlx-practice-switching::view-transition-group(*) { animation-duration: 260ms; animation-timing-function: var(--ease-out); }
+.vlx-practice-switching::view-transition-group(*) { animation-duration: var(--dur-pop); animation-timing-function: var(--ease-out); }
 .vlx-practice-switching::view-transition-old(*),
 .vlx-practice-switching::view-transition-new(*) {
-  animation-duration: 260ms;
+  animation-duration: var(--dur-pop);
   animation-timing-function: var(--ease-out);
   height: 100%;
   object-fit: none;

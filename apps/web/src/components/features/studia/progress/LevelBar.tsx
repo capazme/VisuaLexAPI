@@ -33,9 +33,10 @@ export function LevelBar({ livello, className }: { livello: XpLivello; className
         <Illustration name="learn-livello" className="h-11 w-11" />
         <motion.p
           key={livello.livello}
-          initial={levelUp && !reduce ? { scale: 1.5, opacity: 0 } : false}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: dur.scene, ease: ease.out, delay: 0.2 }}
+          // There from the first frame (LC133): it was hidden for 200 ms (a delay from opacity 0) as Learn opened.
+          initial={levelUp && !reduce ? { scale: 1.5 } : false}
+          animate={{ scale: 1 }}
+          transition={{ duration: dur.scene, ease: ease.out }}
           className={cn('origin-left font-serif text-2xl font-medium leading-none tabular-nums', INK_TEXT)}
         >
           Livello {formatCount(livello.livello)}

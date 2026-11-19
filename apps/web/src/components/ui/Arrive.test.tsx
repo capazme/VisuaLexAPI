@@ -27,7 +27,7 @@ describe('Arrive (LC98)', () => {
     window.matchMedia = matchMedia;
   });
 
-  it('holds the placeholder, then brings the content in with a fade and a small rise, in dur.pop on ease.out', () => {
+  it('holds the placeholder, then brings the content in with a fade only: the wait came with a change that moved (LC133)', () => {
     const calls = recordAnimations();
     const { rerender } = render(tree(true));
     expect(screen.getByText('Segnaposto')).toBeInTheDocument();
@@ -37,14 +37,24 @@ describe('Arrive (LC98)', () => {
     expect(screen.queryByText('Segnaposto')).toBeNull();
     expect(calls).toHaveLength(1);
     expect(calls[0].el.contains(screen.getByText('Contenuto'))).toBe(true);
-    expect(calls[0].frames).toEqual([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }]);
+    expect(calls[0].frames).toEqual([{ opacity: 0, transform: 'none' }, { opacity: 1, transform: 'none' }]);
     expect(calls[0].timing).toEqual({ duration: dur.pop * 1000, easing: `cubic-bezier(${ease.out.join(', ')})` });
+  });
+
+  it('a wait begun in place, after it mounted, brings the content in with a fade and a 4 px rise', () => {
+    const calls = recordAnimations();
+    const { rerender } = render(tree(false));
+    rerender(tree(true));
+    rerender(tree(false));
+    expect(calls).toHaveLength(1);
+    expect(calls[0].frames).toEqual([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }]);
   });
 
   it('under reduced motion only fades', () => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({ matches: query.includes('reduce'), media: query })) as unknown as typeof window.matchMedia;
     const calls = recordAnimations();
-    const { rerender } = render(tree(true));
+    const { rerender } = render(tree(false));
+    rerender(tree(true));
     rerender(tree(false));
     expect(calls[0].frames[0]).toEqual({ opacity: 0, transform: 'none' });
   });

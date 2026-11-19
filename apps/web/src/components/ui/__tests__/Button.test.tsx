@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Button } from '../Button';
 
@@ -71,6 +71,29 @@ describe('Button', () => {
     rerender(<Button loading>Salva</Button>);
     expect(button).toBeDisabled();
     expect(moved()).not.toContain('opacity');
+  });
+
+  it('leaves the disabled state at once too: no transition while the colours change, hover and press keep theirs (LC133)', () => {
+    const { rerender } = render(<Button disabled>Accedi</Button>);
+    const button = screen.getByRole('button', { name: 'Accedi' });
+    // What the browser computes the new colours under: read as the style is flushed.
+    const seen: string[] = [];
+    const computed = window.getComputedStyle;
+    const spy = vi.spyOn(window, 'getComputedStyle').mockImplementation((el, pseudo) => {
+      if (el === button) seen.push(button.style.transition);
+      return computed(el, pseudo);
+    });
+    rerender(<Button>Accedi</Button>);
+    expect(button).toBeEnabled();
+    expect(seen).toEqual(['none']);
+    // Back on its own list afterwards: hover and press still answer in 120 ms.
+    expect(button.style.transition).toBe('');
+    expect(button.className).toContain('duration-(--dur-press)');
+    rerender(<Button loading>Accedi</Button>);
+    expect(seen).toEqual(['none', 'none']);
+    rerender(<Button loading>Accedi</Button>);
+    expect(seen).toHaveLength(2);
+    spy.mockRestore();
   });
 
   it('keeps a 20 px line at every size', () => {

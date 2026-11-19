@@ -32,6 +32,7 @@ import { provenance } from '../rassegne/rassegnaFilters';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 import { useOpenSettings } from '../settings/settingsRoute';
 import { focusLanding } from '../../../utils/focusPage';
+import { whenIdle } from '../../../lib/idle';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -206,6 +207,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
   const isDesktop = useIsDesktop();
   const still = Boolean(useReducedMotion());
+  // LC133: the band's rows drawn ahead, hidden and inert, once the page is idle: the first ⌘K paid their mount (~90 ms).
+  // Its reads stay on `isOpen` (`useAliasCatalog`, `useRassegneForTopic`): nothing is fetched for the hidden band.
+  const [prepared, setPrepared] = useState(false);
+  useEffect(() => whenIdle(() => setPrepared(true)), []);
 
   // Which way the step moved, for its slide: forward slides in from the right, back from the left.
   // Adjusted during render (own state, no effect). A step changed while the palette is closed (the reset)
@@ -1249,7 +1254,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         place.slot,
       )}
       {/* The band: under the bars, it grows and pushes the page down; no veil, nothing over the page (L-75). */}
-      <Expand open={isOpen} followContent={false} timing={SEARCH_TIMING} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
+      <Expand open={isOpen} keepMounted={prepared} followContent={false} timing={SEARCH_TIMING} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
         <div className={cn('border-b border-slate-200 dark:border-slate-800', overBar && 'pt-[calc(3.5rem+env(safe-area-inset-top))]')}>
           <div
             style={{ ['--palette-max-h' as string]: isDesktop

@@ -19,7 +19,7 @@ import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/servic
 import { Z_INDEX } from '../../constants/zIndex';
 import { preparePage } from '../../pageCode';
 import { focusLanding } from '../../utils/focusPage';
-import { dur, ease, spring } from '../../lib/motion';
+import { REPEAT_CLOSE, REPEAT_OPEN, dur, ease, spring } from '../../lib/motion';
 import { BookMark } from '../ui/BookMark';
 import { LexCraftLogo } from '../ui/LexCraftLogo';
 import type { SidebarLayout } from './sidebarWidth';
@@ -468,8 +468,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         // LC21: the prototype's bar, a step darker than the page in the light, the page's own ground in the dark.
         "bg-slate-100 dark:bg-slate-950",
         "border-r border-slate-200 dark:border-slate-800",
-        // Mobile slide
-        "transform transition-transform duration-(--dur-scene) ease-drawer",
+        // Mobile slide: its times in `style` (below)
+        "transform transition-transform",
         // `relative`, not `static`: the transform makes this aside a stacking
         // context, so anything inside it (hover tooltips) is trapped at the
         // aside's own level. Static would leave z-50 inert and page content
@@ -477,6 +477,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         "lg:translate-x-0 lg:relative",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}
+      // A repeated action (LC133, the frequency rule): 200 ms in on the drawer's curve, 150 out; it was 320 both ways.
+      style={layout === 'drawer' ? { transitionDuration: `${(isOpen ? REPEAT_OPEN : REPEAT_CLOSE).duration}ms`, transitionTimingFunction: (isOpen ? REPEAT_OPEN : REPEAT_CLOSE).easing } : undefined}
     >
       {/* LexCraft's logo (LC16), a link home and the bar's first Tab stop, in a row of its own over the switcher: the
           wordmark 120 px wide, its «L» flush with the switcher's mark (the box starts 11 of its 716 units, 1.8 px,

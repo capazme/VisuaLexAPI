@@ -10,7 +10,7 @@ import type { Materia } from './types/studia';
 import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
 import { CARD_GRID_COLUMNS, FULL_PAGE_FRAME, PAGE_FRAME } from './components/layout/frame';
 import { OVERVIEW_GRID } from './components/features/practice/besideLayout';
-import { dur } from './lib/motion';
+import { PLACE_CHANGE, dur } from './lib/motion';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -693,15 +693,16 @@ describe('the practice in two views (U2)', () => {
 });
 
 describe('the passage between the practice\'s two views (U2, L-62)', () => {
-  it('names its pieces only while it plays, lasts 260 ms on the ease-out curve, and brings the windows in from the right', async () => {
+  it('names its pieces only while it plays, lasts `PLACE_CHANGE` (180 ms) on the ease-out curve, and brings the windows in from the right', async () => {
     const css = await compile([]);
     // Named only under the root's class: at rest a piece is no stacking context (gotcha 22).
     expect(css).toMatch(/\.vlx-practice-switching \.vlx-vt\s*\{\s*view-transition-name:\s*var\(--vlx-vt\)/);
     expect(css).not.toMatch(/(^|\})\s*\.vlx-vt\s*\{/);
-    const duration = css.match(/\.vlx-practice-switching::view-transition-group\(\*\)\s*\{\s*animation-duration:\s*(\d+)ms;\s*animation-timing-function:\s*var\(--ease-out\)/);
+    // A change of place (LC133): `--dur-pop`, the 180 ms of `PLACE_CHANGE`, for the group and both pictures.
+    const duration = css.match(/\.vlx-practice-switching::view-transition-group\(\*\)\s*\{\s*animation-duration:\s*var\(--dur-(\w+)\);\s*animation-timing-function:\s*var\(--ease-out\)/);
     expect(duration).not.toBeNull();
-    expect(Number(duration![1])).toBeGreaterThanOrEqual(220);
-    expect(Number(duration![1])).toBeLessThanOrEqual(300);
+    expect(dur[duration![1] as keyof typeof dur] * 1000).toBe(PLACE_CHANGE.duration);
+    expect(css).toMatch(/::view-transition-new\(\*\)\s*\{[^}]*animation-duration:\s*var\(--dur-pop\)/);
     // The pictures keep their size: the text does not stretch while a box changes size.
     expect(css).toMatch(/::view-transition-new\(\*\)\s*\{[^}]*object-fit:\s*none/);
     // Clipped by its box, or the old panel's picture would paint at its full size over the incoming window.

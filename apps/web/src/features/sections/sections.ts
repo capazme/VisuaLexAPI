@@ -65,7 +65,7 @@ export function kickerOf(id: SectionId): string | null {
 export const SECTION_HOME_CODE: Partial<Record<SectionId, () => Promise<unknown>>> = {
   opus: PAGE_CODE.opus,
   forum: PAGE_CODE.forum,
-  gymnasium: () => Promise.all([import('../../components/features/studia/StudiaPage'), import('../../components/features/studia/ReviewHome')]),
+  gymnasium: PAGE_CODE.learn,
   academia: () => import('../../pages/MerltHubPage'),
 };
 

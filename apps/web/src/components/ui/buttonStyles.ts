@@ -70,7 +70,8 @@ export function buttonClassName(variant: ButtonVariant | ButtonAlias = 'primary'
     CONTROL_RADIUS,
     // The press answers in 120 ms (Y1, `--dur-press`) on `--ease-out`, and with it the button's colours (`TRANSITION`'s
     // 150 elsewhere): one duration for every property it lists. Not the opacity (LC132): busy or disabled, and back, the
-    // button changes at once, with no fade; entering it, its colours do not move either (`disabled:transition-none`).
+    // button changes at once, with no fade; entering it, its colours do not move either (`disabled:transition-none`), nor
+    // leaving it (`Button` turns the transition off for that change, LC133).
     'transition-[color,background-color,border-color,transform,translate,scale] duration-(--dur-press) ease-out disabled:transition-none',
     FOCUS_RING,
     DISABLED,
