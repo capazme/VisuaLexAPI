@@ -41,7 +41,7 @@ export function CreditEntry({ credit }: { credit: Credit }) {
       aria-labelledby={titleId}
       tabIndex={-1}
       // A card, as tall as its row's other one; its links at its foot.
-      className={cn('flex h-full scroll-mt-6 flex-col rounded-xl border border-slate-200 bg-white p-5 md:p-6 dark:border-slate-800 dark:bg-slate-900', FOCUS_RING)}
+      className={cn('flex h-full scroll-mt-6 flex-col rounded-xl border border-slate-200 bg-white p-5 md:p-6 dark:border-slate-800 dark:bg-slate-900')}
     >
       <h3 id={titleId} className="font-serif text-xl font-medium text-slate-900 [overflow-wrap:anywhere] dark:text-slate-50">
         {credit.name}
@@ -223,8 +223,8 @@ export function CreditsPage() {
                       id={group.id}
                       aria-labelledby={headingId}
                       tabIndex={-1}
-                      // Reached from the index, it takes the focus: its ring says where the keyboard is.
-                      className={cn('scroll-mt-6 rounded-xl', FOCUS_RING, index > 0 && 'mt-12')}
+                      // Reached from the index, it takes the focus (no ring: not a control, LC143).
+                      className={cn('scroll-mt-6 rounded-xl', index > 0 && 'mt-12')}
                     >
                       <h2 id={headingId} className="font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">
                         {group.title}

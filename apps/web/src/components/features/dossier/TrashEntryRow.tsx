@@ -95,7 +95,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
 
   return (
     // `Card`'s box (8 px, its border, the paper) on a list item.
-    <li ref={rowRef} tabIndex={-1} className={cn('bg-card px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500', CARD_RADIUS, CONTROL_BORDER)}>
+    <li ref={rowRef} tabIndex={-1} className={cn('bg-card px-3 py-2 focus-visible:outline-none', CARD_RADIUS, CONTROL_BORDER)}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-900 dark:text-white">{title}</p>

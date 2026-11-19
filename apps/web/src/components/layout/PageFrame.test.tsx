@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FOCUS_BUTTON_CLEARANCE, PAGE_KICKER, PAGE_TITLE, PageFrame } from './PageFrame';
+import { Button } from '../ui/Button';
 import { SECTION_PHRASES, kickerOf, sectionKicker } from '../../features/sections/sections';
 
 describe('PageFrame (W2)', () => {
@@ -136,6 +137,18 @@ describe('PageFrame (W2)', () => {
     const page = screen.getByRole('heading', { level: 1 });
     expect(page).not.toHaveAttribute('data-section-title');
     expect(page).not.toHaveAttribute('tabindex');
+  });
+
+  it('draws no ring on a landing title, while a button keeps its keyboard ring (LC143)', () => {
+    render(
+      <PageFrame title="Oggi" section="gymnasium" action={<Button>Nuova</Button>}>
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    const title = screen.getByRole('heading', { level: 1 });
+    expect(title).toHaveAttribute('tabindex', '-1');
+    expect(title.className).not.toMatch(/\bring-|focus-visible:|focus:/);
+    expect(screen.getByRole('button', { name: 'Nuova' }).className).toMatch(/focus-visible:ring-2/);
   });
 });
 
