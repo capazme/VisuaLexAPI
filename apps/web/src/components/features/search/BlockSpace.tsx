@@ -41,6 +41,8 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
   const [placed, setPlaced] = useState<T | null>(null);
   const open = value !== null && placed === value;
   const lastFocus = useRef<HTMLElement | null>(null);
+  // What the focus was given on closing (`FocusBack`): a redraw after it (a highlight saved later) takes it away.
+  const gaveTo = useRef<HTMLElement | null>(null);
   // Where the block was, from the root: found again there when `block` no longer can (its sign gone with the block's
   // last annotation), the text redrawn or not.
   const blockPath = useRef<number[] | null>(null);
@@ -59,6 +61,13 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
       // A redraw dropped the focus with the old element: it comes back where it was.
       const active = document.activeElement;
       if (lost && (active === document.body || active === null) && lastFocus.current && host.contains(lastFocus.current)) lastFocus.current.focus({ preventScroll: true });
+    }
+    // Closed, the paragraph it gave the focus to was redrawn: the focus would fall to the page. It goes to the new one.
+    const given = gaveTo.current;
+    if (given && value === null) {
+      const active = document.activeElement;
+      if (!given.isConnected && (active === document.body || active === null)) gaveTo.current = focusOn(focusTarget());
+      else if (active !== given) gaveTo.current = null;
     }
     if (value !== null && placed !== value && host.isConnected) setPlaced(value);
     if (value === null && placed !== null) setPlaced(null);
@@ -82,14 +91,14 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
   }, [open, rootRef, host]);
 
   // Closed, the focus goes back to the sign looked up again, or the block (`FocusBack`).
-  const focusTarget = () => {
+  function focusTarget() {
     const root = rootRef.current;
     return root && shown !== null ? trigger?.(root, shown) ?? findBlock(root, shown) : null;
-  };
+  }
 
   return createPortal(
     <div onFocus={(event) => { lastFocus.current = event.target as HTMLElement; }}>
-      <FocusBack open={open} host={host} target={focusTarget} />
+      <FocusBack open={open} host={host} target={focusTarget} onGiven={(to) => { gaveTo.current = to; }} />
       <ReaderSpace open={open} onClose={onClose} title={shown === null ? '' : title(shown)} line={shown === null ? undefined : line?.(shown)} icon={icon}>
         {shown !== null && <Fragment key={shown}>{children(shown)}</Fragment>}
       </ReaderSpace>
@@ -100,22 +109,27 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
 
 const SPACE_OPENED = 'vlx-space-opened';
 
+/** Focuses an element of the text (a paragraph takes `tabindex="-1"` for it), without scrolling; returns it. */
+function focusOn(to: HTMLElement | null): HTMLElement | null {
+  if (!to) return null;
+  if (!to.hasAttribute('tabindex')) to.setAttribute('tabindex', '-1');
+  to.focus({ preventScroll: true });
+  return to;
+}
+
 /**
  * On closing, the focus left in the space (or dropped to the page with it) goes to `target`. Drawn before the space, so
  * its effect runs before `Expand`'s, which would give it to whatever held it at the opening: a selection has no opener,
  * and a sign is redrawn.
  */
-function FocusBack({ open, host, target }: { open: boolean; host: HTMLElement; target: () => HTMLElement | null }) {
+function FocusBack({ open, host, target, onGiven }: { open: boolean; host: HTMLElement; target: () => HTMLElement | null; onGiven: (to: HTMLElement | null) => void }) {
   const wasOpen = useRef(open);
   useLayoutEffect(() => {
     if (open === wasOpen.current) return;
     wasOpen.current = open;
     const active = document.activeElement;
     if (open || !(active === document.body || active === null || host.contains(active))) return;
-    const to = target();
-    if (!to) return;
-    if (!to.hasAttribute('tabindex')) to.setAttribute('tabindex', '-1');
-    to.focus({ preventScroll: true });
+    onGiven(focusOn(target()));
     // `target` reads the props of this render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, host]);

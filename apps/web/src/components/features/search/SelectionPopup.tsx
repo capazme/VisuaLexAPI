@@ -312,10 +312,14 @@ export function SelectionPopup({
       } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey && !e.repeat) {
         // Quick highlight, with the ink chosen in the reading bar (H1), by the highlighter's rules (A4); once for a key
         // held down, whose repeats would come before the bar is gone (the owner's duplicates, 5 November)
+        // Taken: the letter is not typed where the focus lands next.
+        e.preventDefault();
         onHighlight(popup.ink.text, ink, popup.ink.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !copyOnly && !e.metaKey && !e.ctrlKey) {
+        // Taken: the note's field opens with the focus, and would get the «n» (LC142, Papiniano on #717).
+        e.preventDefault();
         const selRange = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : null;
         const r = selRange ?? { x: popup.x, y: popup.y, width: 0, height: 0 };
         onAddNote(popup.text, popup.startOffset, { x: r.x, y: r.y, width: r.width, height: r.height });

@@ -120,7 +120,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     const { container } = renderReader();
     fireEvent.click(await signOf(container, 2));
     const dialog = await screen.findByRole('region', { name: /Annotazioni · Nei contratti/ });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Rimuovi la (glossa|nota)/ }));
     expect(notificationStore.getState().entries.at(-1)).toMatchObject({ message: GLOSS_WORDS.removed, undoable: true });
     expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).not.toContain('g1');
     expect(assistantService.removeProposal).not.toHaveBeenCalled();
@@ -162,7 +162,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     const column = await screen.findByRole('complementary', { name: COLUMN });
     await waitFor(() => expect(column.querySelectorAll('.vlx-gloss-card:not(.opacity-0)')).toHaveLength(2));
     const [first] = within(column).getAllByRole('article');
-    fireEvent.click(within(first).getByRole('button', { name: 'Rimuovi' }));
+    fireEvent.click(within(first).getByRole('button', { name: /^Rimuovi la (glossa|nota)/ }));
     await waitFor(() => expect(document.activeElement?.getAttribute('data-gloss')).toBe('g3'));
   });
 
@@ -174,7 +174,7 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
     await waitFor(() => placed(card));
     const before = await signOf(container, 2);
-    fireEvent.click(within(card).getByRole('button', { name: 'Rimuovi' }));
+    fireEvent.click(within(card).getByRole('button', { name: /^Rimuovi la (glossa|nota)/ }));
     await waitFor(() => {
       const now = container.querySelector('.vlx-sign[data-block="2"]');
       // The sign was drawn again (the gloss left its count): the new one has the focus, not the page.

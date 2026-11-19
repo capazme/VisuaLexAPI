@@ -252,6 +252,16 @@ describe('BlockAnnotationsSheet — a block\'s sign, a space under the block (A4
     expect(props.onClose).toHaveBeenCalled();
   });
 
+  it('names each «Rimuovi» by what it removes', async () => {
+    setup([h1, { ...h1, id: 'h2', text: 'prestazioni corrispettive', startOffset: PLAIN.indexOf('prestazioni corrispettive') }]);
+    const space = await screen.findByRole('region', { name: TITLE });
+    expect(within(space).getAllByRole('button', { name: /^Rimuovi/ }).map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Rimuovi la nota «Vedi Cass. 2020»',
+      "Rimuovi l'evidenziazione «prestazioni corrispettive»",
+      "Rimuovi l'evidenziazione «risarcimento del danno»",
+    ]);
+  });
+
   it('removes a highlight and stays open; the last annotation closes it', async () => {
     const first = setup();
     let dialog = await screen.findByRole('region', { name: TITLE });

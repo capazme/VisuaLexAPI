@@ -190,4 +190,42 @@ describe('SelectionPopup in the page (LC142, L-73): the actions under the paragr
     rerender(<Harness bar={false} />);
     expect(document.querySelectorAll('[data-reader-slot]')).toHaveLength(0);
   });
+
+  it('N and H are taken: their letter is not typed where the focus lands (a note\'s field)', async () => {
+    render(<Harness />);
+    await select('fatto doloso', FIRST);
+    // `fireEvent` answers false when the event was prevented.
+    expect(fireEvent.keyDown(document.body, { key: 'n' })).toBe(false);
+    await select('commesso', SECOND);
+    expect(fireEvent.keyDown(document.body, { key: 'h' })).toBe(false);
+  });
+
+  it('after «Evidenzia», the focus is on the paragraph, and on the one drawn again when the text is redrawn later', async () => {
+    const { rerender } = render(<RedrawHarness version={1} />);
+    const space = await select('fatto doloso', FIRST);
+    fireEvent.click(within(space).getByRole('button', { name: /Evidenzia in/ }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull());
+    const before = screen.getByText(FIRST);
+    expect(document.activeElement).toBe(before);
+    // The highlight saved: the text is drawn again, every node replaced.
+    rerender(<RedrawHarness version={2} />);
+    const after = screen.getByText(FIRST);
+    expect(after).not.toBe(before);
+    expect(document.activeElement).toBe(after);
+  });
 });
+
+/** A text drawn as `SafeHTML` draws it: from a string, every node replaced when it changes. */
+function RedrawHarness({ version }: { version: number }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const html = `<div class="vlx-b vlx-comma" data-v="${version}">${FIRST}</div><div class="vlx-b vlx-comma" data-v="${version}">${SECOND}</div>`;
+  return (
+    <div ref={containerRef} data-testid="container">
+      <SelectionPopup inPage containerRef={containerRef} textRootRef={textRef} onHighlight={vi.fn()} onAddNote={vi.fn()} onCopy={vi.fn()} />
+      <div ref={textRef}>
+        <div dangerouslySetInnerHTML={{ __html: html }} />
+      </div>
+    </div>
+  );
+}

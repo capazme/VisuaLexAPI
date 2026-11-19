@@ -20,6 +20,8 @@ export const GLOSS_WORDS = {
   ].filter(Boolean).join(' · '),
   /** The section of a block's sheet that lists them. */
   column: "Glosse dell'IA",
+  /** The bin's name, with the passage's words: «Rimuovi la glossa su «contraenti»». */
+  remove: (words: string) => `Rimuovi la glossa su ${words}`,
   /** The notification of the bin, which offers «Annulla». */
   removed: 'Glossa rimossa',
   /** A bin refused by the server. */
