@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Flag, AlertCircle } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Textarea } from '../../ui/Textarea';
+import { useSpaceDraft } from './spaceDrafts';
 import { CONTROL_RADIUS } from '../../ui/controlStyles';
 import { ForumSpace } from './ForumSpace';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
@@ -52,7 +53,7 @@ export function ReportModal({ environmentId, onClose, onReported }: ReportModalP
 
 function ReportForm({ environmentId, onClose, onReported, setBusy }: ReportModalProps & { environmentId: string; setBusy: (busy: boolean) => void }) {
   const [reason, setReason] = useState<ReportReason | null>(null);
-  const [details, setDetails] = useState('');
+  const [details, setDetails, clearDetails] = useSpaceDraft(`report:${environmentId}`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +70,7 @@ function ReportForm({ environmentId, onClose, onReported, setBusy }: ReportModal
         reason,
         details.trim() || undefined
       );
+      clearDetails();
       onReported();
     } catch (err) {
       // The server says why in Italian (a second report: «Hai già segnalato questo elemento.»).

@@ -4,6 +4,7 @@ import { Button } from '../../ui/Button';
 import { Expand } from '../../ui/Expand';
 import { IconButton } from '../../ui/IconButton';
 import { Textarea } from '../../ui/Textarea';
+import { useSpaceDraft } from './spaceDrafts';
 import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
 import { cn } from '../../../lib/utils';
 import { EnvironmentContentViewer } from './EnvironmentContentViewer';
@@ -65,7 +66,7 @@ function SuggestForm({ environment, headingId, onClose, onSuggested }: SuggestFo
   const { dossiers, quickNorms, customAliases, annotations, highlights } = useAppStore();
 
   const [selection, setSelection] = useState<EnvironmentSelection>(emptySelection);
-  const [message, setMessage] = useState('');
+  const [message, setMessage, clearMessage] = useSpaceDraft(`suggest:${environment.id}`);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -162,7 +163,7 @@ function SuggestForm({ environment, headingId, onClose, onSuggested }: SuggestFo
         items,
         message: message.trim() || undefined,
       });
-
+      clearMessage();
       onSuggested();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Errore nell\'invio del suggerimento';

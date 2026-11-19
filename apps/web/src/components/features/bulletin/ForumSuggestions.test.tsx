@@ -23,6 +23,17 @@ vi.mock('../../../services/sharedEnvironmentService', () => ({ sharedEnvironment
 vi.mock('../../../services/customAliasService', () => ({ customAliasService: aliases }));
 vi.mock('../../../services/notificationService', () => ({ notificationService: { markRead: vi.fn(async () => {}) } }));
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi.fn() }) }));
+// The publish form stands in as two buttons: one starts the publication and leaves it running, one has the server
+// refuse it (the form keeps its error and says so through `onFailed`, as the real one does).
+vi.mock('../dossier/PublishDossierDialog', () => ({
+  PublishDossierForm: ({ setBusy, headingId, onFailed }: { setBusy: (b: boolean) => void; headingId: string; onFailed?: () => void }) => (
+    <>
+      <h2 id={headingId}>Pubblica nel Forum</h2>
+      <button type="button" onClick={() => setBusy(true)}>Pubblica</button>
+      <button type="button" onClick={() => { setBusy(false); onFailed?.(); }}>Il server rifiuta</button>
+    </>
+  ),
+}));
 
 import { BulletinBoardPage } from './BulletinBoardPage';
 
@@ -252,5 +263,29 @@ describe('Forum suggestions in the page (LC140, L-73)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pubblica un dossier' }));
     expect(await screen.findByRole('region', { name: 'Pubblica un dossier' })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Link non valido' })).toBeNull());
+  });
+
+  // LC145, «no silent loss»: a space closed to make room for another keeps what was typed in it.
+  it('keeps «Rifiuta»\'s note typed when a refused publication reopens its space over the review', async () => {
+    appStore.setState({ dossiers: [{ id: 'd1', title: 'Dossier mio', createdAt: '', items: [{ id: 'i', type: 'norma', addedAt: '', data: {} }], kind: 'studio' }] as never });
+    press(await openTab());
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica un dossier' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Dossier mio/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica' }));
+    // While it publishes, a suggestion opens and a rejection note is typed.
+    press(screen.getByRole('button', { name: /da @marta/ }));
+    let region = await screen.findByRole('region', { name: REVIEW });
+    press(within(region).getByRole('button', { name: 'Rifiuta «Una nota»' }));
+    fireEvent.change(within(region).getByRole('textbox', { name: /Nota per chi ha suggerito/ }), { target: { value: 'Non ora' } });
+    // The server refuses: the publish space opens again, and the review closes to make room.
+    fireEvent.click(screen.getByRole('button', { name: 'Il server rifiuta' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: REVIEW })).toBeNull());
+    expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
+    // Opened again, the note is there.
+    press(screen.getByRole('button', { name: /da @marta/ }));
+    region = await screen.findByRole('region', { name: REVIEW });
+    press(within(region).getByRole('button', { name: 'Rifiuta «Una nota»' }));
+    expect(within(region).getByRole('textbox', { name: /Nota per chi ha suggerito/ })).toHaveValue('Non ora');
+    expect(service.declineSuggestionItem).not.toHaveBeenCalled();
   });
 });
