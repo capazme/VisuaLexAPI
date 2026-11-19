@@ -27,6 +27,8 @@ export function startCountdown(ms: number, onEnd: () => void, onChange?: () => v
   const run = () => {
     startedAt = Date.now();
     timer = setTimeout(() => {
+      // Fired after the page (a test's jsdom) is gone: nothing left to close, and `stop` would touch `document`.
+      if (typeof document === 'undefined') return;
       timer = undefined;
       left = 0;
       stop();

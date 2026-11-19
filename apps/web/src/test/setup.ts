@@ -33,6 +33,10 @@ afterEach(async () => {
   euCaseLaw.clearEuCaseLawCache()
   const articleCards = await import('../utils/articleCardsCache')
   articleCards.clearArticleCardsCache()
+  // No notification, and no countdown of one, outlives its test: a timer firing after jsdom is gone throws (LC136).
+  // A file that mocks the module whole has no reset, and no real notification to clear.
+  const notifications = await import('../components/ui/notifications/notifications')
+  if ('resetNotifications' in notifications) notifications.resetNotifications()
 })
 
 // Mock localStorage
