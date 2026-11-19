@@ -379,11 +379,23 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(await screen.findByText('Nessuna nota su questa decisione.')).toBeInTheDocument();
   });
 
+  // LC139 (L-73): «Note» and «Evidenziazioni» open in the page under the toolbar, one at a time.
+  it('opens the notes and the highlights in the page, one at a time', async () => {
+    seed([H], []);
+    render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri note' }));
+    expect(await screen.findByRole('region', { name: /^Note su / })).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
+    expect(await screen.findByRole('region', { name: 'Evidenziazioni' })).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('region', { name: /^Note su / })).toBeNull());
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('hides the highlights from the picker without losing them', async () => {
     seed([H], []);
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
     fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Nascondi evidenziazioni' }));
+    fireEvent.click(within(await screen.findByRole('region', { name: 'Evidenziazioni' })).getByRole('button', { name: 'Nascondi' }));
     await waitFor(() => expect(container.querySelector('.highlights-hidden')).not.toBeNull());
     expect(container.querySelector('mark')).not.toBeNull();
   });
@@ -576,7 +588,7 @@ describe('DecisionReadingSurface — the key passages', () => {
     appStore.setState({ highlights: [{ id: 'own', normaKey: KEY, articleId: '', text: PRINCIPLE, startOffset: plain.indexOf(PRINCIPLE), color: 'yellow' } as Highlight] });
     const { container } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Nascondi evidenziazioni' }));
+    fireEvent.click(within(await screen.findByRole('region', { name: 'Evidenziazioni' })).getByRole('button', { name: 'Nascondi' }));
     await waitFor(() => expect(container.querySelector('.highlights-hidden')).not.toBeNull());
     await act(async () => { fireEvent.click(container.querySelector<HTMLElement>('.highlight-mark [data-key-passage="principio"]')!); });
     expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
@@ -585,7 +597,9 @@ describe('DecisionReadingSurface — the key passages', () => {
   it('counts none of them among the reader\'s highlights: there is nothing to export', async () => {
     mount();
     fireEvent.click(screen.getByRole('button', { name: 'Gestisci evidenziazioni' }));
-    expect(await screen.findByRole('button', { name: 'Nessuna evidenziazione da esportare' })).toBeDisabled();
+    const space = await screen.findByRole('region', { name: 'Evidenziazioni' });
+    expect(space).toHaveTextContent('Nessuna evidenziazione');
+    expect(within(space).getByRole('button', { name: 'Esporta in .txt' })).toBeDisabled();
   });
 
   it('leaves a link inside a passage to its own click', async () => {

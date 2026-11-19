@@ -197,19 +197,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         return articleItemIds(dossier, norma_data).length > 0;
     });
 
-    const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
+    // The spaces under the toolbar (LC125, LC139, L-73): one open at a time, another one taking its place.
+    const [space, setSpace] = useState<'dossier' | 'notes' | 'highlights' | 'copy' | 'export' | 'date' | null>(null);
+    const openSpace = (name: NonNullable<typeof space>) => setSpace(name);
+    const toggleSpace = (name: NonNullable<typeof space>) => setSpace((s) => (s === name ? null : name));
+    const closeSpace = (name: NonNullable<typeof space>) => setSpace((s) => (s === name ? null : s));
     const dossierSpaceId = useId();
-    const [isPeekOpen, setIsPeekOpen] = useState(false);
-    // State (not ref) so the popover re-reads the anchor when the button
-    // actually mounts. Using ref.current in render triggers the
-    // react-hooks/refs lint and can miss the post-mount update.
-    const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
-    const [showCopyModal, setShowCopyModal] = useState(false);
-    const [showAdvancedExport, setShowAdvancedExport] = useState(false);
-    const [showVersionInput, setShowVersionInput] = useState(false);
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-    const [isHighlightsPeekOpen, setIsHighlightsPeekOpen] = useState(false);
-    const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
     // Local visibility toggle: when true, the article body keeps the markup
     // (so highlights aren't lost) but renders `.highlight-mark` transparent
     // via the `.highlights-hidden` class scoped to contentRef. Per-article,
@@ -715,7 +709,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleTextAtDate = (choice: TextAtDateChoice) => {
-        setShowVersionInput(false);
+        closeSpace('date');
         showToast(
             choice.kind === 'original' ? 'Ricerca del testo originale' : `Ricerca del testo al ${formatDateForDisplay(choice.date)}`,
             'info',
@@ -729,7 +723,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 search(quickNormParams);
                 break;
             case 'pick_date':
-                setShowVersionInput(true);
+                openSpace('date');
                 break;
             case 'open_next_day':
                 if (display.banner?.nextDay) {
@@ -923,34 +917,32 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 copyLockedReason={display.copyBlockedReason}
                 url={url}
                 articleText={article_text || ''}
-                isNotesPeekOpen={isPeekOpen}
-                notesButtonRef={setNotesButtonEl}
+                isNotesPeekOpen={space === 'notes'}
                 notesCount={readOnly ? 0 : allPanelAnnotations.length}
-                isHighlightsPeekOpen={isHighlightsPeekOpen}
-                highlightsButtonRef={setHighlightsButtonEl}
+                isHighlightsPeekOpen={space === 'highlights'}
                 highlightsCount={readOnly ? 0 : allPanelHighlights.length}
                 isDiscussionOpen={discussion.open}
                 discussionCount={glossesEnabled ? glossCount : 0}
-                onToggleNotes={() => setIsPeekOpen(v => !v)}
-                onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
+                onToggleNotes={() => toggleSpace('notes')}
+                onToggleHighlightsPeek={() => toggleSpace('highlights')}
                 onToggleDiscussion={discussion.toggle}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
                 onMobileCopy={handleMobileCopy}
                 onOpenStudyMode={isBeside ? undefined : onOpenStudyMode}
                 compact={isBeside}
-                onOpenCopyModal={() => setShowCopyModal(true)}
+                onOpenCopyModal={() => openSpace('copy')}
                 onOpenDossier={hostDossier
                     ? () => addToThisDossier(hostDossier.id, { norma: norma_data }, showToast)
-                    : () => setDossierPopoverOpen(true)}
+                    : () => openSpace('dossier')}
                 dossierLabel={hostDossier ? 'Aggiungi a questa pratica' : undefined}
-                dossierExpanded={hostDossier ? undefined : dossierPopoverOpen}
+                dossierExpanded={hostDossier ? undefined : space === 'dossier'}
                 dossierControls={hostDossier ? undefined : dossierSpaceId}
                 hideDossier={dossierCommandInRow || inHostDossier}
                 onShareLink={handleShareLink}
                 onCopyLink={handleCopyLink}
-                onOpenAdvancedExport={() => setShowAdvancedExport(true)}
-                onOpenVersionInput={() => setShowVersionInput(true)}
+                onOpenAdvancedExport={() => openSpace('export')}
+                onOpenVersionInput={() => openSpace('date')}
                 onCompare={handleCompare}
                 find={display.textVisible ? {
                     isOpen: isFindOpen,
@@ -960,23 +952,48 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 } : undefined}
             />
 
-            {/* «Aggiungi alla pratica» opens under the toolbar, where the reader is reading (LC125, L-73). */}
+            {/* «Aggiungi alla pratica» and the toolbar's other spaces open under it, where the reader is reading (LC125, LC139, L-73). */}
             <AddToDossierPopover
                 id={dossierSpaceId}
-                isOpen={dossierPopoverOpen}
-                onClose={() => setDossierPopoverOpen(false)}
+                isOpen={space === 'dossier'}
+                onClose={() => closeSpace('dossier')}
                 norma={norma_data}
                 onAdded={(_dossierId, title) => showToast(`Aggiunto a «${title}»`, 'success')}
                 onDuplicate={(title) => showToast(`Già presente in «${title}»`, 'info')}
             />
 
+            <CopyModal
+                isOpen={space === 'copy'}
+                onClose={() => closeSpace('copy')}
+                onCopy={handleAdvancedCopy}
+                hasNotes={!readOnly && allPanelAnnotations.length > 0}
+                hasHighlights={!readOnly && allPanelHighlights.length > 0}
+            />
+
+            <AdvancedExportModal
+                inPage
+                isOpen={space === 'export'}
+                onClose={() => closeSpace('export')}
+                articleData={data}
+                annotations={readOnly ? NO_ANNOTATIONS : allPanelAnnotations}
+                highlights={readOnly ? NO_HIGHLIGHTS : allPanelHighlights}
+            />
+
+            <TextAtDateDialog
+                isOpen={space === 'date'}
+                onClose={() => closeSpace('date')}
+                onConfirm={handleTextAtDate}
+                euAct={isEuropeanAct(norma_data.tipo_atto)}
+                today={todayInRome()}
+                initialDate={requestedDate}
+            />
+
             <NotesPeekPanel
-                isOpen={isPeekOpen}
-                anchorEl={notesButtonEl}
+                isOpen={space === 'notes'}
                 annotations={allPanelAnnotations}
                 articleLabel={shortNorm(norma_data)}
                 noteAnchor={noteAnchor}
-                onClose={() => setIsPeekOpen(false)}
+                onClose={() => closeSpace('notes')}
                 onAddNote={handleAddNote}
                 onUpdateNote={updateAnnotation}
                 onRemoveNote={removeAnnotation}
@@ -986,11 +1003,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             />
 
             <HighlightsActionsPicker
-                isOpen={isHighlightsPeekOpen}
-                anchorEl={highlightsButtonEl}
+                isOpen={space === 'highlights'}
                 highlightsCount={allPanelHighlights.length}
                 highlightsHidden={highlightsHidden}
-                onClose={() => setIsHighlightsPeekOpen(false)}
+                onClose={() => closeSpace('highlights')}
                 onToggleVisibility={() => setHighlightsHidden(v => !v)}
                 onExportTxt={handleExportHighlightsTxt}
             />
@@ -1219,31 +1235,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onClose={() => setToastMessage(null)}
                 />
             )}
-
-            <CopyModal
-                isOpen={showCopyModal}
-                onClose={() => setShowCopyModal(false)}
-                onCopy={handleAdvancedCopy}
-                hasNotes={!readOnly && allPanelAnnotations.length > 0}
-                hasHighlights={!readOnly && allPanelHighlights.length > 0}
-            />
-
-            <AdvancedExportModal
-                isOpen={showAdvancedExport}
-                onClose={() => setShowAdvancedExport(false)}
-                articleData={data}
-                annotations={readOnly ? NO_ANNOTATIONS : allPanelAnnotations}
-                highlights={readOnly ? NO_HIGHLIGHTS : allPanelHighlights}
-            />
-
-            <TextAtDateDialog
-                isOpen={showVersionInput}
-                onClose={() => setShowVersionInput(false)}
-                onConfirm={handleTextAtDate}
-                euAct={isEuropeanAct(norma_data.tipo_atto)}
-                today={todayInRome()}
-                initialDate={requestedDate}
-            />
 
             <DecisionPreviewPopup {...decisionLinks.popupProps} />
 

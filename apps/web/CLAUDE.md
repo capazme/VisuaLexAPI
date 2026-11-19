@@ -2286,8 +2286,8 @@ text), never what came back. On a past text the practice's row, the dossier read
 Study Mode take no notes, highlights, discussions or quick-norm (the selection
 popup offers only "Copia"), and the update notes open;
 an article that did not exist yet draws no text, only the way forward. The
-"Testo alla data" dialog (`TextAtDateDialog`) replaces the old "Cerca versione"
-modal; the result opens as a row of its own in the act, labelled with the day asked for (the text in
+"Testo alla data" space (`TextAtDateDialog`, in the page under the toolbar since LC139, L-73) replaces the old
+"Cerca versione" modal; the result opens as a row of its own in the act, labelled with the day asked for (the text in
 force stays another row: `practiceArticleKey` carries the version).
 `utils/citation.ts` writes how a lawyer cites it, in the owner's style ("art. 1284
 c.c., nel testo in vigore al 29 dicembre 2007"; "art. 2, l. 7 agosto 1990, n. 241,
@@ -2356,16 +2356,21 @@ A comma over `DIFF_WORD_CAP` words that would have been «modificato» is «risc
 confronto parola per parola» (`tooLong`). One scroll replaces the old synchronised scrolling (the rows are the
 alignment).
 
-**Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
-free notes; the notes beside the text (`AnnotationMargin`: a card per anchored note, read, edited and removed there,
+**Notes**: a space under the toolbar (`NotesPeekPanel`; LC139, L-73: it was a popover, a sheet on a phone) for
+browsing and free notes; the notes beside the text (`AnnotationMargin`: a card per anchored note, read, edited and removed there,
 and the editor of a new one — the selection bar's «Nota», the note tool —, a sheet from the bottom with no room); a
 click on a wavy underline goes to its card; the block's sheet from a sign, for everything one block holds. Deliberately
 distinct entry points — don't collapse them.
 
 **Highlights**: created, removed and recoloured from the selection — `SelectionPopup`'s «Evidenzia» and H, or the
 highlighter (`HighlighterButton`, its tool and its menu, A4) —, always through `useHighlightInk`'s rules. The toolbar's
-«Evidenziazioni» button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
-exports to `.txt` — it is not a second creator (that was tried and rolled back).
+«Evidenziazioni» button opens `HighlightsActionsPicker`, a space under the toolbar (LC139) that toggles visibility and
+exports to `.txt` — it is not a second creator (that was tried and rolled back). The toolbar's spaces (LC125, LC139,
+L-73) open one at a time under it (`space` in `ArticleTabContent`, the decision's two likewise): «Aggiungi alla
+pratica», «Note», «Evidenziazioni», «Copia» (`ui/CopyModal`), «Esporta…» (`AdvancedExportModal inPage`; Study Mode,
+itself still over the page, keeps its window) and «Testo alla data». Each is a `ReaderSpace` (an `Expand`, a region
+with its title and «Chiudi»; the focus on the space, never in a field; Esc and «Chiudi» give it back to the command,
+and wait while a PDF is written): the twin of the Forum's `ForumSpace`, to be unified.
 Hiding them also hides the signs' colour dots and the signs that hold only
 highlights.
 
@@ -3362,7 +3367,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `AnnotationMargin.tsx` and `MarginCards.tsx` (the notes beside the text),
   `NoteComposerSheet.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsSheet.tsx` (everything a block holds, opened from its sign),
-  `NoteToolButton.tsx` (the note tool), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  `NoteToolButton.tsx` (the note tool), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReaderSpace.tsx` (the toolbar's spaces), `ReadingToolbar.tsx`,
   `SearchPanel.tsx` (streaming merge logic; the stream's closing `kind: 'time_budget'` line raises «Caricamento interrotto» with `notify`, and «Carica i mancanti» appends the missing articles to
   `searchQueue`, D-323), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
   the close button and the filters 44 px on a phone — `CommandPalette.test.tsx` reads the file; its colours are

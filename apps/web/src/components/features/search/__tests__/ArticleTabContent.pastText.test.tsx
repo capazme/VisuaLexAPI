@@ -329,23 +329,23 @@ describe('ArticleTabContent — the way back and the way on', () => {
   it('opens the dialog from the chip and asks for a text on a day, keeping the annex', async () => {
     show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
     fireEvent.click(screen.getByRole('button', { name: 'In vigore dal 28 dicembre 2025' }));
-    const dialog = screen.getByRole('dialog', { name: 'Testo alla data' });
+    const dialog = screen.getByRole('region', { name: 'Testo alla data' });
     fireEvent.change(within(dialog).getByLabelText('Data'), { target: { value: '2007-12-29' } });
     fireEvent.click(within(dialog).getByRole('button', { name: /Mostra il testo/ }));
     expect(triggerSearch).toHaveBeenCalledWith({
       act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1284',
       version: 'vigente', version_date: '2007-12-29', annex: '2',
     });
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument()); // it fades out
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo alla data' })).not.toBeInTheDocument()); // it fades out
   });
 
   it('starts the dialog from the day a shared link wrote in words', async () => {
     show(article(MIDDLE, { versione: 'vigente', data_versione: '12 ottobre 2007' }));
     fireEvent.click(screen.getByRole('button', { name: 'Testo storico · dal 25 dicembre 2003 al 29 dicembre 2007' }));
-    const dialog = screen.getByRole('dialog', { name: 'Testo alla data' });
+    const dialog = screen.getByRole('region', { name: 'Testo alla data' });
     expect(within(dialog).getByLabelText('Data')).toHaveValue('2007-10-12');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Annulla' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo alla data' })).not.toBeInTheDocument());
   });
 
   it('refuses an act of the Union in the dialog', () => {
@@ -378,7 +378,7 @@ describe('ArticleTabContent — an article that did not exist yet', () => {
   it('offers to pick another date', () => {
     show(notYet());
     fireEvent.click(screen.getByRole('button', { name: 'Scegli un’altra data' }));
-    expect(screen.getByRole('dialog', { name: 'Testo alla data' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Testo alla data' })).toBeInTheDocument();
   });
 
   it('switches off copying and the dossier', () => {

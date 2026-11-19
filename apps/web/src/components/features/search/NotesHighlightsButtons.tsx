@@ -47,7 +47,6 @@ export function NotesHighlightsButtons({
                     variant="quiet"
                     onClick={onToggleNotes}
                     aria-expanded={isNotesOpen}
-                    aria-haspopup="dialog"
                     aria-label={named('Note', notesCount)}
                     className={word}
                     title={tip(isNotesOpen ? 'Chiudi le note' : 'Le note sull’articolo', lockedReason)}
@@ -63,7 +62,6 @@ export function NotesHighlightsButtons({
                     variant="quiet"
                     onClick={onToggleHighlights}
                     aria-expanded={isHighlightsOpen}
-                    aria-haspopup="dialog"
                     aria-label={named('Evidenziazioni', highlightsCount)}
                     className={word}
                     title={tip(isHighlightsOpen ? 'Chiudi le evidenziazioni' : 'Mostra, nascondi o esporta le evidenziazioni', lockedReason)}
@@ -85,7 +83,6 @@ export function NotesHighlightsButtons({
                 size="sm"
                 onClick={onToggleNotes}
                 aria-expanded={isNotesOpen}
-                aria-haspopup="dialog"
                 aria-label={notesName}
                 className={cn("relative disabled:pointer-events-auto",
                     isNotesOpen
@@ -110,7 +107,6 @@ export function NotesHighlightsButtons({
                 size="sm"
                 onClick={onToggleHighlights}
                 aria-expanded={isHighlightsOpen}
-                aria-haspopup="dialog"
                 aria-label={highlightsName}
                 className={cn("relative disabled:pointer-events-auto",
                     isHighlightsOpen

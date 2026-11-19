@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TextAtDateDialog, type TextAtDateDialogProps } from './TextAtDateDialog';
 import { CONTROL_HEIGHT, FIELD_CONTROL } from '../../ui/controlStyles';
@@ -25,12 +26,12 @@ describe('TextAtDateDialog', () => {
 
     it('renders nothing while closed', () => {
         setup({ isOpen: false });
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.queryByRole('region')).not.toBeInTheDocument();
     });
 
     it('says what the date means and what it does not', () => {
         setup();
-        expect(screen.getByRole('dialog', { name: 'Testo alla data' })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Testo alla data' })).toBeInTheDocument();
         expect(screen.getByText('Normattiva mostra il testo in vigore in quel giorno.')).toBeInTheDocument();
         expect(screen.getByText(/non dice quale disciplina si applichi al fatto/)).toBeInTheDocument();
     });
@@ -127,5 +128,32 @@ describe('TextAtDateDialog', () => {
         const { onClose } = setup();
         fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
         expect(onClose).toHaveBeenCalled();
+    });
+
+    // LC139 (L-73): in the page under the toolbar, not a window.
+    it('opens as a region that takes the focus, not the date field; Esc and «Chiudi» give it back', () => {
+        function Host() {
+            const [open, setOpen] = useState(false);
+            return (
+                <>
+                    <button type="button" onClick={() => setOpen(true)}>Testo alla data…</button>
+                    <TextAtDateDialog isOpen={open} onClose={() => setOpen(false)} onConfirm={() => {}} euAct={false} today="2026-10-01" />
+                </>
+            );
+        }
+        render(<Host />);
+        const command = screen.getByRole('button', { name: 'Testo alla data…' });
+        command.focus();
+        fireEvent.click(command);
+        const region = screen.getByRole('region', { name: 'Testo alla data' });
+        expect(region).toHaveFocus();
+        expect(screen.queryByRole('dialog')).toBeNull();
+        fireEvent.keyDown(region, { key: 'Escape' });
+        expect(screen.queryByRole('region')).toBeNull();
+        expect(command).toHaveFocus();
+        fireEvent.click(command);
+        fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
+        expect(screen.queryByRole('region')).toBeNull();
+        expect(command).toHaveFocus();
     });
 });

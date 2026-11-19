@@ -5,6 +5,7 @@ import { loadJsPdf } from '../../utils/loadJsPdf';
 import { cn } from '../../lib/utils';
 import { DISABLED, TOUCH_TARGET_RESPONSIVE } from '../../constants/interactions';
 import { Modal } from './Modal';
+import { ReaderSpace } from '../features/search/ReaderSpace';
 import type { ArticleData } from '../../types';
 import { citeNorm, inForceCitation, shortNorm } from '../../utils/sources';
 import { todayInRome } from '../../utils/dateUtils';
@@ -28,6 +29,11 @@ interface AdvancedExportModalProps {
    */
   annotations: Array<{ id: string; text: string; createdAt: string; anchorText?: string }>;
   highlights: Array<{ id: string; text: string; color: string }>;
+  /**
+   * In the page under the reader's toolbar (LC139, L-73), not a window: Esc and «Chiudi» close it, waiting while the PDF
+   * is written. Study Mode, itself still over the page (F2), keeps the window.
+   */
+  inPage?: boolean;
 }
 
 type ExportFormat = 'clipboard' | 'markdown' | 'pdf' | 'rtf' | 'txt';
@@ -38,6 +44,7 @@ export function AdvancedExportModal({
   articleData,
   annotations,
   highlights,
+  inPage = false,
 }: AdvancedExportModalProps) {
   const { article_text, norma_data } = articleData;
 
@@ -362,6 +369,202 @@ export function AdvancedExportModal({
     }
   };
 
+  const footer = (
+    <>
+      <button
+        onClick={close}
+        disabled={writingPdf}
+        className={cn(TOUCH_TARGET_RESPONSIVE, DISABLED, 'px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background')}
+      >
+        Annulla
+      </button>
+      <button
+        onClick={handleExport}
+        disabled={writingPdf}
+        aria-busy={writingPdf || undefined}
+        className={cn(
+          TOUCH_TARGET_RESPONSIVE,
+          DISABLED,
+          'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
+          copied
+            ? 'bg-green-600 text-white'
+            : 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white'
+        )}
+      >
+        {copied ? (
+          <>
+            <Check size={16} />
+            Copiato!
+          </>
+        ) : exportFormat === 'clipboard' ? (
+          <>
+            <Copy size={16} />
+            Copia negli appunti
+          </>
+        ) : (
+          <>
+            {writingPdf ? (
+              <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
+            ) : (
+              <Download size={16} />
+            )}
+            Scarica {exportFormat.toUpperCase()}
+          </>
+        )}
+      </button>
+    </>
+  );
+  const body = (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto di base</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {sections.filter(s => ['text', 'citation'].includes(s.id)).map(section => (
+            <button
+              key={section.id}
+              onClick={() => toggleSection(section.id)}
+              disabled={writingPdf}
+              className={cn(
+                TOUCH_TARGET_RESPONSIVE,
+                'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
+                section.enabled
+                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+              )}
+            >
+              {section.icon}
+              <span className="text-sm font-medium">{section.label}</span>
+              {section.enabled && <Check size={14} className="ml-auto" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {(annotations.length > 0 || highlights.length > 0) && (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto personale</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {sections.filter(s => ['notes', 'highlights'].includes(s.id)).map(section => {
+              const hasContent =
+                (section.id === 'notes' && annotations.length > 0) ||
+                (section.id === 'highlights' && highlights.length > 0);
+
+              if (!hasContent) return null;
+
+              const count = section.id === 'notes' ? annotations.length : highlights.length;
+
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => toggleSection(section.id)}
+                  disabled={writingPdf}
+                  className={cn(
+                    TOUCH_TARGET_RESPONSIVE,
+                    'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
+                    section.enabled
+                      ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  )}
+                >
+                  {section.icon}
+                  <span className="text-sm font-medium">{section.label}</span>
+                  <span className="text-xs opacity-60">({count})</span>
+                  {section.enabled && <Check size={14} className="ml-auto" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato di esportazione</h3>
+        <div className="grid grid-cols-3 gap-2 sm:flex">
+          <button
+            onClick={() => setExportFormat('clipboard')}
+            disabled={writingPdf}
+            className={cn(
+              TOUCH_TARGET_RESPONSIVE,
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+              exportFormat === 'clipboard'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+            )}
+          >
+            <Copy size={16} />
+            <span className="text-sm font-medium">Copia</span>
+          </button>
+          <button
+            onClick={() => setExportFormat('markdown')}
+            disabled={writingPdf}
+            className={cn(
+              TOUCH_TARGET_RESPONSIVE,
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+              exportFormat === 'markdown'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+            )}
+          >
+            <FileCode size={16} />
+            <span className="text-sm font-medium">MD</span>
+          </button>
+          <button
+            onClick={() => setExportFormat('pdf')}
+            disabled={writingPdf}
+            className={cn(
+              TOUCH_TARGET_RESPONSIVE,
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+              exportFormat === 'pdf'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+            )}
+          >
+            <FileType size={16} />
+            <span className="text-sm font-medium">PDF</span>
+          </button>
+          <button
+            onClick={() => setExportFormat('rtf')}
+            disabled={writingPdf}
+            className={cn(
+              TOUCH_TARGET_RESPONSIVE,
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+              exportFormat === 'rtf'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+            )}
+          >
+            <FileText size={16} />
+            <span className="text-sm font-medium">RTF</span>
+          </button>
+          <button
+            onClick={() => setExportFormat('txt')}
+            disabled={writingPdf}
+            className={cn(
+              TOUCH_TARGET_RESPONSIVE,
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+              exportFormat === 'txt'
+                ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
+                : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+            )}
+          >
+            <FileText size={16} />
+            <span className="text-sm font-medium">TXT</span>
+          </button>
+        </div>
+      </div>
+      {pdfFailed && <p role="alert" className="text-sm text-amber-800 dark:text-amber-200">Download non riuscito: riprova.</p>}
+    </div>
+  );
+
+  if (inPage) {
+    return (
+      <ReaderSpace open={isOpen} onClose={close} busy={writingPdf} title="Esporta l’articolo" line={shortNorm(norma_data)} icon={<Download size={16} aria-hidden className="shrink-0" />} className="max-w-2xl">
+        {body}
+        <div className="mt-4 flex justify-end gap-2">{footer}</div>
+      </ReaderSpace>
+    );
+  }
+
   return (
     <Modal
       isOpen={isOpen}
@@ -371,191 +574,9 @@ export function AdvancedExportModal({
       description={shortNorm(norma_data)}
       icon={<Download size={20} />}
       variant="info"
-      footer={
-        <>
-          <button
-            onClick={close}
-            disabled={writingPdf}
-            className={cn(TOUCH_TARGET_RESPONSIVE, DISABLED, 'px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background')}
-          >
-            Annulla
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={writingPdf}
-            aria-busy={writingPdf || undefined}
-            className={cn(
-              TOUCH_TARGET_RESPONSIVE,
-              DISABLED,
-              'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
-              copied
-                ? 'bg-green-600 text-white'
-                : 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white'
-            )}
-          >
-            {copied ? (
-              <>
-                <Check size={16} />
-                Copiato!
-              </>
-            ) : exportFormat === 'clipboard' ? (
-              <>
-                <Copy size={16} />
-                Copia negli appunti
-              </>
-            ) : (
-              <>
-                {writingPdf ? (
-                  <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
-                ) : (
-                  <Download size={16} />
-                )}
-                Scarica {exportFormat.toUpperCase()}
-              </>
-            )}
-          </button>
-        </>
-      }
+      footer={footer}
     >
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto di base</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {sections.filter(s => ['text', 'citation'].includes(s.id)).map(section => (
-              <button
-                key={section.id}
-                onClick={() => toggleSection(section.id)}
-                disabled={writingPdf}
-                className={cn(
-                  TOUCH_TARGET_RESPONSIVE,
-                  'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
-                  section.enabled
-                    ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                )}
-              >
-                {section.icon}
-                <span className="text-sm font-medium">{section.label}</span>
-                {section.enabled && <Check size={14} className="ml-auto" />}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {(annotations.length > 0 || highlights.length > 0) && (
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto personale</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {sections.filter(s => ['notes', 'highlights'].includes(s.id)).map(section => {
-                const hasContent =
-                  (section.id === 'notes' && annotations.length > 0) ||
-                  (section.id === 'highlights' && highlights.length > 0);
-
-                if (!hasContent) return null;
-
-                const count = section.id === 'notes' ? annotations.length : highlights.length;
-
-                return (
-                  <button
-                    key={section.id}
-                    onClick={() => toggleSection(section.id)}
-                    disabled={writingPdf}
-                    className={cn(
-                      TOUCH_TARGET_RESPONSIVE,
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
-                      section.enabled
-                        ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                    )}
-                  >
-                    {section.icon}
-                    <span className="text-sm font-medium">{section.label}</span>
-                    <span className="text-xs opacity-60">({count})</span>
-                    {section.enabled && <Check size={14} className="ml-auto" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato di esportazione</h3>
-          <div className="grid grid-cols-3 gap-2 sm:flex">
-            <button
-              onClick={() => setExportFormat('clipboard')}
-              disabled={writingPdf}
-              className={cn(
-                TOUCH_TARGET_RESPONSIVE,
-                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
-                exportFormat === 'clipboard'
-                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              )}
-            >
-              <Copy size={16} />
-              <span className="text-sm font-medium">Copia</span>
-            </button>
-            <button
-              onClick={() => setExportFormat('markdown')}
-              disabled={writingPdf}
-              className={cn(
-                TOUCH_TARGET_RESPONSIVE,
-                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
-                exportFormat === 'markdown'
-                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              )}
-            >
-              <FileCode size={16} />
-              <span className="text-sm font-medium">MD</span>
-            </button>
-            <button
-              onClick={() => setExportFormat('pdf')}
-              disabled={writingPdf}
-              className={cn(
-                TOUCH_TARGET_RESPONSIVE,
-                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
-                exportFormat === 'pdf'
-                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              )}
-            >
-              <FileType size={16} />
-              <span className="text-sm font-medium">PDF</span>
-            </button>
-            <button
-              onClick={() => setExportFormat('rtf')}
-              disabled={writingPdf}
-              className={cn(
-                TOUCH_TARGET_RESPONSIVE,
-                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
-                exportFormat === 'rtf'
-                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              )}
-            >
-              <FileText size={16} />
-              <span className="text-sm font-medium">RTF</span>
-            </button>
-            <button
-              onClick={() => setExportFormat('txt')}
-              disabled={writingPdf}
-              className={cn(
-                TOUCH_TARGET_RESPONSIVE,
-                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
-                exportFormat === 'txt'
-                  ? 'bg-primary-50 border-primary-200 text-primary-700 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              )}
-            >
-              <FileText size={16} />
-              <span className="text-sm font-medium">TXT</span>
-            </button>
-          </div>
-        </div>
-        {pdfFailed && <p role="alert" className="text-sm text-amber-800 dark:text-amber-200">Download non riuscito: riprova.</p>}
-      </div>
+      {body}
     </Modal>
   );
 }
