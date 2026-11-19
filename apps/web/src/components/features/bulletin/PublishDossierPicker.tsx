@@ -38,6 +38,11 @@ export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
   const headingId = useId();
   const spaceId = useId();
   const close = () => { if (!busy) onClose(); };
+  // Publishing, the form's button waits (disabled): the focus stays on the space, not on the page's body.
+  const setWorking = (working: boolean) => {
+    setBusy(working);
+    if (working) document.getElementById(spaceId)?.focus({ preventScroll: true });
+  };
 
   return (
     <Expand id={spaceId} open={open} onClose={close} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER)}>
@@ -54,7 +59,7 @@ export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
             onAlreadyPublished={() => void refreshDossier(chosen.id)}
             headingId={headingId}
             busy={busy}
-            setBusy={setBusy}
+            setBusy={setWorking}
           />
         </div>
       ) : (

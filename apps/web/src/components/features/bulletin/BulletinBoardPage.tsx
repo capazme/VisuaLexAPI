@@ -27,7 +27,7 @@ import { sharedEnvironmentService } from '../../../services/sharedEnvironmentSer
 import { customAliasService } from '../../../services/customAliasService';
 import { notificationService } from '../../../services/notificationService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
-import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
+import type { Environment, SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
 import { PUBLIC_DOSSIERS_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 
@@ -60,6 +60,8 @@ export function BulletinBoardPage() {
 
   // Modals
   const [showPublishModal, setShowPublishModal] = useState(false);
+  // The archive's «Recupera i dossier»: one of the tabs' spaces too.
+  const [recoveringEnv, setRecoveringEnv] = useState<Environment | null>(null);
   const [importingEnv, setImportingEnv] = useState<SharedEnvironment | null>(null);
   const [reportingEnvId, setReportingEnvId] = useState<string | null>(null);
   const [suggestingTo, setSuggestingTo] = useState<SharedEnvironment | null>(null);
@@ -374,6 +376,8 @@ export function BulletinBoardPage() {
 
   /** The spaces of the tabs (L-73): one open at a time, none left open in a tab for the next visit. */
   const closeSpaces = () => {
+    setShowPublishModal(false);
+    setRecoveringEnv(null);
     setSuggestingTo(null);
     setEditingEnv(null);
     setImportingEnv(null);
@@ -381,6 +385,11 @@ export function BulletinBoardPage() {
     setReviewingSuggestion(null);
     setEditingSuggestion(null);
     setAliasConflict(null);
+  };
+
+  const openPublish = () => {
+    closeSpaces();
+    setShowPublishModal(true);
   };
 
   // Handle import click
@@ -447,7 +456,7 @@ export function BulletinBoardPage() {
       line="I dossier di studio pubblicati dalla comunità"
       section="forum"
       action={
-        <Button id="tour-forum-publish" onClick={() => setShowPublishModal(true)} aria-expanded={showPublishModal} icon={<Upload size={16} aria-hidden />}>
+        <Button id="tour-forum-publish" onClick={openPublish} aria-expanded={showPublishModal} icon={<Upload size={16} aria-hidden />}>
           Pubblica un dossier
         </Button>
       }
@@ -522,11 +531,17 @@ export function BulletinBoardPage() {
             onDelete={handleDeleteClick}
             onWithdraw={handleWithdraw}
             onRepublish={handleRepublish}
-            onPublishClick={() => setShowPublishModal(true)}
+            onPublishClick={openPublish}
+            publishOpen={showPublishModal}
           />
         )}
         {activeTab === 'my' && (
-          <ArchivedEnvironmentsSection onRecovered={handleStudyDossiersAdded} onMessage={showToast} />
+          <ArchivedEnvironmentsSection
+            onRecovered={handleStudyDossiersAdded}
+            onMessage={showToast}
+            recovering={recoveringEnv}
+            onRecoveringChange={(env) => { closeSpaces(); setRecoveringEnv(env); }}
+          />
         )}
 
         {activeTab === 'suggestions' && (

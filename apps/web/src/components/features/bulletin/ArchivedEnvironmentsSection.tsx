@@ -13,6 +13,9 @@ import type { Environment, StudyImportReport } from '../../../types';
 interface Props {
   onRecovered: (report: StudyImportReport) => void;
   onMessage: (message: string, type: 'success' | 'error' | 'info') => void;
+  /** Given by the Forum's page, so «Recupera i dossier» is one of its spaces, one open at a time. */
+  recovering?: Environment | null;
+  onRecoveringChange?: (env: Environment | null) => void;
 }
 
 /**
@@ -21,10 +24,12 @@ interface Props {
  * the server, from the stored row; «Esporta JSON» and «Elimina» as before. No environment is created any more; the
  * section is absent for a user with none. «Recupera i dossier» opens in the page, under the heading (LC138, L-73).
  */
-export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
+export function ArchivedEnvironmentsSection({ onRecovered, onMessage, recovering: given, onRecoveringChange }: Props) {
   const environments = useAppStore((s) => s.environments);
   const deleteEnvironment = useAppStore((s) => s.deleteEnvironment);
-  const [recovering, setRecovering] = useState<Environment | null>(null);
+  const [own, setOwn] = useState<Environment | null>(null);
+  const recovering = given !== undefined ? given : own;
+  const setRecovering = onRecoveringChange ?? setOwn;
   const [deleting, setDeleting] = useState<Environment | null>(null);
   const [deleteFrom, setDeleteFrom] = useState<HTMLElement | null>(null);
   if (environments.length === 0) return null;

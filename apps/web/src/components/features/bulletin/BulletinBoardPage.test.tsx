@@ -187,3 +187,54 @@ describe('BulletinBoardPage - «Segnala», «Aggiungi ai miei dossier» and «Pu
     expect(command).toHaveFocus();
   });
 });
+
+// LC138, the on-screen round: every space of the tabs, the header's «Pubblica un dossier» and the archive's «Recupera i
+// dossier» included, opens alone («Versioni» apart, in the view).
+describe('BulletinBoardPage - one space at a time', () => {
+  const mine = { ...env('m', 'Mio'), isOwner: true };
+  const archived = {
+    id: 'e1', name: 'Privacy', createdAt: '', quickNorms: [], customAliases: [], annotations: [], highlights: [],
+    dossiers: [{ id: 'd1', title: 'GDPR', createdAt: '', items: [] }],
+  };
+
+  it('«Recupera i dossier» closes «Modifica» and is closed by it, and by the tab', async () => {
+    service.getMyShared.mockResolvedValue([mine] as never);
+    appStore.setState({ environments: [archived] as never });
+    page();
+    fireEvent.click(screen.getByRole('tab', { name: /Miei/ }));
+    const menu = await screen.findByRole('button', { name: 'Azioni su «Mio»' });
+    fireEvent.click(menu);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Modifica/ }));
+    expect(await screen.findByRole('region', { name: 'Modifica il dossier pubblicato' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Recupera i dossier di «Privacy»' }));
+    expect(screen.getByRole('region', { name: 'Recupera i dossier' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Modifica il dossier pubblicato' })).toBeNull());
+    fireEvent.click(menu);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Modifica/ }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Recupera i dossier' })).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Recupera i dossier di «Privacy»' }));
+    fireEvent.click(screen.getByRole('tab', { name: /Esplora/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Miei/ }));
+    await screen.findByRole('button', { name: 'Azioni su «Mio»' });
+    expect(screen.queryByRole('region', { name: 'Recupera i dossier' })).toBeNull();
+    service.getMyShared.mockResolvedValue([]);
+    appStore.setState({ environments: [] });
+  });
+
+  it('«Pubblica un dossier» closes a card\'s space and a card\'s space closes it', async () => {
+    appStore.setState({ dossiers: [] });
+    page();
+    const menu = await screen.findByRole('button', { name: 'Azioni su «Recente»' });
+    fireEvent.click(menu);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Segnala/ }));
+    await screen.findByRole('region', { name: 'Segnala il dossier pubblicato' });
+    const publish = screen.getByRole('button', { name: 'Pubblica un dossier' });
+    fireEvent.click(publish);
+    expect(screen.getByRole('region', { name: 'Pubblica un dossier' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Segnala il dossier pubblicato' })).toBeNull());
+    fireEvent.click(menu);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Segnala/ }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Pubblica un dossier' })).toBeNull());
+    expect(publish).toHaveAttribute('aria-expanded', 'false');
+  });
+});

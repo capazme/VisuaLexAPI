@@ -128,8 +128,15 @@ describe('VersionHistoryModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ripristina versione' }));
     const region = screen.getByRole('region', { name: 'Cronologia versioni' });
     await waitFor(() => expect(region).toHaveFocus());
-    expect(await screen.findByText('Ripristino non riuscito')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ripristino non riuscito');
     fireEvent.keyDown(region, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('names each «Ripristina» with its version', async () => {
+    vi.mocked(sharedEnvironmentService.getVersions).mockResolvedValue(versions);
+    render(<VersionHistoryModal environment={env} onClose={() => {}} onRestored={() => {}} />);
+    expect(await screen.findByRole('button', { name: 'Ripristina v2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ripristina v1' })).toBeInTheDocument();
   });
 });

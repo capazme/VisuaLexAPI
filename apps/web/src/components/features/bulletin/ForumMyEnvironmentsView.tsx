@@ -17,6 +17,8 @@ interface ForumMyEnvironmentsViewProps {
   onWithdraw: (env: SharedEnvironment) => void;
   onRepublish: (env: SharedEnvironment) => void;
   onPublishClick: () => void;
+  /** «Pubblica un dossier» open under the header. */
+  publishOpen?: boolean;
 }
 
 export function ForumMyEnvironmentsView({
@@ -31,6 +33,7 @@ export function ForumMyEnvironmentsView({
   onWithdraw,
   onRepublish,
   onPublishClick,
+  publishOpen = false,
 }: ForumMyEnvironmentsViewProps) {
   // Version history is owned here: BulletinBoardPage wires every other owner
   // action but not onViewVersions, and the parent file is out of scope, so the
@@ -69,7 +72,7 @@ export function ForumMyEnvironmentsView({
         <p className="text-slate-600 dark:text-slate-400 mb-4">
           Non hai ancora pubblicato un dossier nel Forum.
         </p>
-        <Button onClick={onPublishClick} icon={<Upload size={16} aria-hidden />}>
+        <Button onClick={onPublishClick} aria-expanded={publishOpen} icon={<Upload size={16} aria-hidden />}>
           Pubblica un dossier
         </Button>
       </div>

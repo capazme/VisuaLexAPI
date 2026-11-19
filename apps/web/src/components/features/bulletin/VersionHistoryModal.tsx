@@ -83,7 +83,7 @@ function VersionList({ environment, spaceId, onRestored }: { environment: Shared
   return (
     <>
       {error && (
-        <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-300 text-sm">
+        <div role="alert" className="mb-4 flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-300 text-sm">
           <AlertTriangle size={16} />
           {error}
         </div>
@@ -127,6 +127,7 @@ function VersionList({ environment, spaceId, onRestored }: { environment: Shared
                 size="sm"
                 onClick={(event) => { setConfirmFrom(event.currentTarget); setConfirmVersion(version); }}
                 disabled={restoringId !== null}
+                aria-label={`Ripristina v${version.version}`}
                 className="shrink-0"
               >
                 <RotateCcw size={14} />
