@@ -245,6 +245,27 @@ describe('SelectionPopup in the page (LC142, L-73): the actions under the paragr
     });
   });
 
+  it('in a low window under the reader\'s sticky toolbar, the words and the space cannot both be seen: an island', async () => {
+    const height = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 300 });
+    const toolbar = document.createElement('div');
+    toolbar.style.position = 'sticky';
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return this === toolbar ? new DOMRect(0, 0, 390, 109) : this.classList.contains('vlx-b') ? new DOMRect(0, 110, 390, 50) : new DOMRect();
+    });
+    document.elementFromPoint = (_x: number, y: number) => (y < 109 ? toolbar : null);
+    try {
+      render(<Harness />);
+      document.body.prepend(toolbar);
+      const island = await select('fatto doloso', FIRST);
+      expect(island.closest('[data-reader-slot]')).toBeNull();
+    } finally {
+      spy.mockRestore();
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+    }
+  });
+
   it('under the paragraph, the space is not scrolled into view by itself: the selected words stay', async () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;

@@ -641,7 +641,7 @@ function liveWordsBox(): DOMRect | null {
 /** Where the actions open: under the paragraph when its end is within about one view of the words (LC142, option A). */
 function placeOf(block: HTMLElement | null, words: DOMRect, container: DOMRect, root: HTMLElement | null): Pick<PopupState, 'block' | 'under' | 'words' | 'below' | 'ordinal'> {
   const box = { top: words.top, right: words.right, bottom: words.bottom, left: words.left };
-  const under = !!block && opensUnder(block.getBoundingClientRect().bottom, words.bottom, viewOf(block));
+  const under = !!block && opensUnder(block.getBoundingClientRect().bottom, words.top, viewOf(block));
   const ordinal = block && root ? Array.from(root.querySelectorAll(PARAGRAPHS)).indexOf(block) : -1;
   return { block, under, words: box, below: words.bottom - container.top + 8, ordinal };
 }
