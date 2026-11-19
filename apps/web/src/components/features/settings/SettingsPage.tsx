@@ -24,6 +24,7 @@ import type { SettingsSection } from '../../../types';
 import { forgetUserData } from '../../../services/sessionEnd';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { scrollParentOf } from '../../../utils/scrollParent';
+import { focusLanding } from '../../../utils/focusPage';
 import { KeyboardShortcutsSection } from './KeyboardShortcutsSection';
 import { AliasSection } from './AliasSection';
 import { QuickNormsSection } from './QuickNormsSection';
@@ -124,6 +125,8 @@ export function SettingsPage() {
                 target.blur();
                 return;
             }
+            // As «Indietro» does (`BackLink`): the focus lands on the title of the page reached, not on the body (LC127).
+            focusLanding(true);
             goBack();
         };
         window.addEventListener('keydown', onKeyDown);
