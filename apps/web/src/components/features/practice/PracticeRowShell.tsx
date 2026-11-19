@@ -103,6 +103,8 @@ export function PracticeRowShell({
   return (
     <div
       data-practice-row={rowKey}
+      // The dossier's entries on this row, for «Cronologia»'s «Apri nella pratica» (LC137).
+      data-voci={dossier?.itemIds.join(' ') || undefined}
       // Read by the overview's strip of decisions (U2): an open row takes the strip's width.
       data-row-open={isOpen || undefined}
       // Clear of the act's sticky heading (`--practice-head`, set by the act block) when scrolled into view.

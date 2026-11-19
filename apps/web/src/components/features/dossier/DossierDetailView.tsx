@@ -45,9 +45,11 @@ import { DossierTasksPanel } from '../planner/DossierTasksPanel';
 import { DeadlineCard } from '../../../features/deadlines/DeadlineCard';
 import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { scrollParentOf } from '../practice/practiceView';
+import { DossierChronology } from './DossierChronology';
+import type { ChronologyEntry } from './chronology';
 
 const VIEW_PANEL = 'dossier-view';
-type DossierView = 'fonti' | 'atti' | 'compiti';
+type DossierView = 'fonti' | 'atti' | 'compiti' | 'cronologia';
 import type { useTrash } from './useTrash';
 import { EditDossierPanel } from './EditDossierPanel';
 import { DossierVersionsCompare } from './DossierVersionsCompare';
@@ -105,6 +107,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // `?vista=atti` opens on the acts; `?vista=lettura` (LC54), the reading, is «Fonti» now (LC86).
   const [view, setView] = useState<DossierView>(() => (new URLSearchParams(window.location.search).get('vista') === 'atti' ? 'atti' : 'fonti'));
   const [attiCount, setAttiCount] = useState<number | null>(null);
+  // «Cronologia»'s «Apri nella pratica» (LC137): the entry to bring into view once «Fonti» is shown.
+  const [openEntry, setOpenEntry] = useState<ChronologyEntry | null>(null);
   const [editing, setEditing] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selecting, setSelecting] = useState(false);
@@ -136,6 +140,17 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const fullLayout = useMemo(() => layoutDossier(dossier.items), [dossier.items]);
   // What it holds, in one line, as the list's card says it (S7c).
   const dossierCounts = countsLine(dossier.items);
+
+  // A note is its own row in «Fonti»; a note about an article is read in the article's row, a decision in its own.
+  useEffect(() => {
+    if (view !== 'fonti' || !openEntry) return;
+    const rows = (id: string) => document.querySelector<HTMLElement>(`[data-voce="${CSS.escape(id)}"], [data-voci~="${CSS.escape(id)}"]`);
+    const row = rows(openEntry.id) ?? (openEntry.aboutItemId ? rows(openEntry.aboutItemId) : null);
+    setOpenEntry(null);
+    if (!row) return;
+    row.scrollIntoView({ block: 'start' });
+    row.querySelector<HTMLElement>('button, [role="button"]')?.focus({ preventScroll: true });
+  }, [view, openEntry]);
 
   // «Fonti»'s filter and selection (LC88), handed to the reading's rows through `FontiToolsContext`.
   const query = itemSearchQuery.trim().toLowerCase();
@@ -532,6 +547,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             { id: 'fonti', label: 'Fonti', extra: <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{dossier.items.length}</span> },
             { id: 'atti', label: 'Atti', extra: attiCount === null ? undefined : <span className="relative font-mono text-xs text-slate-500 dark:text-slate-400">{attiCount}</span> },
             { id: 'compiti', label: 'Compiti' },
+            // LC137: the facts by date, in a pratica di lavoro only (as its deadlines).
+            ...(dossier.kind !== 'studio' ? [{ id: 'cronologia' as const, label: 'Cronologia' }] : []),
           ]}
           value={view}
           onChange={chooseView}
@@ -549,6 +566,18 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           {dossier.kind !== 'studio' && <DeadlineCard dossierId={dossier.id} />}
           <DossierTasksPanel dossierId={dossier.id} />
         </div>
+        {dossier.kind !== 'studio' && (
+          <div hidden={view !== 'cronologia'}>
+            <DossierChronology
+              items={dossier.items}
+              onOpen={(entry) => {
+                setItemSearchQuery('');
+                chooseView('fonti');
+                setOpenEntry(entry);
+              }}
+            />
+          </div>
+        )}
         <div hidden={view !== 'atti'}>
           <DossierAttiPanel dossierId={dossier.id} onCount={setAttiCount} />
         </div>

@@ -433,10 +433,10 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
 describe('DossierDetailView — one «Fonti» for the sources and the reading (LC86)', () => {
   afterEach(() => { window.history.replaceState(null, '', '/'); });
 
-  it('offers three views in order: Fonti, Atti, Compiti; the narrow padding keeps them whole on a phone', () => {
+  it('offers four views in order: Fonti, Atti, Compiti, Cronologia; the narrow padding keeps them whole on a phone', () => {
     renderView();
     const tabs = within(screen.getByRole('tablist', { name: 'Viste della pratica' })).getAllByRole('tab');
-    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Atti', 'Compiti']);
+    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Atti', 'Compiti', 'Cronologia']);
     for (const tab of tabs) expect(tab).toHaveClass('px-2.5', 'sm:px-4');
   });
 
@@ -545,5 +545,57 @@ describe('DossierDetailView — one «Fonti» for the sources and the reading (L
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
     expect(screen.queryByRole('menuitem', { name: 'Apri anche in Ricerca' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Apri tutto in Ricerca' })).toBeNull();
+  });
+});
+
+describe('DossierDetailView — «Cronologia» (LC137)', () => {
+  const dated: Dossier = {
+    ...dossier,
+    items: [
+      ...dossier.items,
+      { id: 'n2', type: 'note', addedAt: '2026-11-01T09:00:00Z', data: '12/03/2025 — Notifica della diffida' },
+      { id: 'n3', type: 'note', addedAt: '2026-11-02T09:00:00Z', data: '**2024-06-30**: firma del contratto' },
+      { id: 's1', type: 'sentenza', addedAt: '', data: { corte: 'cassazione', archivio: 'civile', numero: 123, anno: 2024, data_deposito: '2024-09-15', etichetta: 'Cass. civ., n. 123/2024' } },
+    ],
+  };
+
+  it('shows the dated facts by year, oldest first, in the page under the tabs, never in a dialog', () => {
+    renderView(dated);
+    fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
+    const y2024 = screen.getByRole('region', { name: '2024 (2)' });
+    const y2025 = screen.getByRole('region', { name: '2025 (1)' });
+    expect(y2024.compareDocumentPosition(y2025) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(y2024).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      expect.stringContaining('firma del contratto'),
+      expect.stringContaining('Cass. civ., n. 123/2024'),
+    ]);
+    expect(within(y2024).getByText(/30 giugno 2024/).closest('p')).toHaveTextContent('Nota');
+    expect(within(y2024).getByText(/15 settembre 2024/).closest('p')).toHaveTextContent('Sentenza');
+    expect(screen.getByText(/1 nota senza data non compare/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Dal più recente' }));
+    expect(screen.getAllByRole('region', { name: /^\d{4} / }).map((r) => r.getAttribute('aria-labelledby'))).toEqual(['chronology-2025', 'chronology-2024']);
+  });
+
+  it('opens a note in «Fonti», clearing the filter, the focus on its row', () => {
+    renderView(dated);
+    fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
+    const row = within(screen.getByRole('region', { name: '2025 (1)' }));
+    fireEvent.click(row.getByRole('button', { name: 'Apri nella pratica' }));
+    expect(screen.getByRole('tab', { name: /^Fonti/ })).toHaveAttribute('aria-selected', 'true');
+    const note = document.querySelector('[data-voce="n2"]')!;
+    expect(note).toBeVisible();
+    expect(note.contains(document.activeElement)).toBe(true);
+  });
+
+  it('says how dates are read when nothing has one', () => {
+    renderView();
+    fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
+    expect(screen.getByText(/Le note che iniziano con una data, come 12\/03\/2025/)).toBeVisible();
+  });
+
+  it('is not offered in a pratica di studio', () => {
+    renderView({ ...dated, kind: 'studio' });
+    expect(screen.queryByRole('tab', { name: 'Cronologia' })).toBeNull();
   });
 });
