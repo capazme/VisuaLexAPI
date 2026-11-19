@@ -476,8 +476,8 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
   });
 
   it('draws the new section\'s entries at once, with no cascade (T1, LC129)', () => {
-    // jsdom has no Web Animations: the spy records what moves.
-    const animate = vi.fn();
+    // jsdom has no Web Animations: the spy records what moves (the menu's roll-up listens to its end).
+    const animate = vi.fn(() => ({ cancel: vi.fn(), reverse: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
     try {
       renderSidebar('/');
