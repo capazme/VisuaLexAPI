@@ -1716,8 +1716,8 @@ or focuses and selects the query when already open), by «Cerca nel testo» in t
 (`FindInTextButton`) of `DecisionReadingToolbar`. Cmd/Ctrl+F is intercepted on `/`
 only, where the workspace is drawn; on every other route it is the browser's, and leaving `/` closes the
 window. It is also the browser's while an overlay covers the workspace (`isWorkspaceCovered`): an element
-with `aria-modal="true"`, or one marked `data-find-overlay` — Study Mode, `CommandPalette`, `CompareView`,
-`PDFViewer`. A new full-screen overlay that is not a modal dialog in ARIA terms takes the mark on its
+with `aria-modal="true"`, or one marked `data-find-overlay` — Study Mode, `CommandPalette`, `CompareView`
+(`PDFViewer` opens in the page since LC124, so it no longer covers it). A new full-screen overlay that is not a modal dialog in ARIA terms takes the mark on its
 root, rendered only while open; do not add `aria-modal` for this alone (Study Mode lost it: its note
 popovers are portalled outside it, and VoiceOver hides what lies outside a modal dialog). The hand-rolled
 `z-50`/`z-[100]` modals sit under the window, which stays over them, visible and usable.
@@ -3384,7 +3384,7 @@ meant to stay split; add new features as new files, not inside the shells:
   of an anchored part that is no control drops it to the body, and `focusLanding` gives it back. `ui/Switch` (one size,
   44 × 24), `ui/Textarea` (on `controlStyles`, as `Input`) and `ui/Card` (one box, no variants) are the common ones.
 - `features/workspace/` — what a practice's rows borrow from the old workspace: `LazyStudyMode` (the
-  `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are lazy the same way) and
+  `StudyMode/` bundle behind `lazy()`; `CompareView` is lazy the same way) and
   `ArticleNavigation` (an act's previous/next arrows). The floating tabs, their dock and their panels are gone
   (round 6 of the norm-tab redesign).
 - `features/practice/` — the practice, the norm-tab's replacement (spec
@@ -3486,8 +3486,8 @@ meant to stay split; add new features as new files, not inside the shells:
   cancels the start;
   `lazyModules.guard.test.ts` refuses a static import of it. `index.css` still overrides its stylesheet, which lands
   after it as before.
-  `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
-  `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
+  `SearchPanel` mounts them (imported statically: the table is the app's main surface; Study Mode and
+  `CompareView` stay behind `lazy()`; `PDFViewer`, a space in the page since LC124, is static too), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window
   replaces) or in the full-screen reader on a phone (`isDesktopViewport`), a norm cited in a window (or
   in the reader) enters its act and opens beside that window (in the reader, on a phone; `SearchPanel`:

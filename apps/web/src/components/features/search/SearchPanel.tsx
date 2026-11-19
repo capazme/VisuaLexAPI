@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
+import { PDFViewer } from '../../ui/PDFViewer';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
 import { SearchX, X, Info } from 'lucide-react';
 import { addToHistory } from '../../../services/historyService';
@@ -599,6 +599,14 @@ export function SearchPanel() {
       <PracticeNotice />
       {/* The reading's host (LC52 c2): its search gestures are the Corpus's search, drained above, as before. */}
       <ReadingHostContext.Provider value={readingHost}>
+      {/* The act's PDF opens in the page, above the reading (LC124, L-73). */}
+      <PDFViewer
+        isOpen={pdfState.isOpen}
+        onClose={() => setPdfState(s => ({ ...s, isOpen: false }))}
+        pdfUrl={pdfState.url}
+        isLoading={pdfState.isLoading}
+        className="mb-3"
+      />
       {isDesktop ? (
         // LC60: no bar of practices: the Ricerca is one reading bench of the session.
         <div id={WORKSPACE_AREA_ID} className="w-full">
@@ -769,15 +777,6 @@ export function SearchPanel() {
         annexNumber={autoSwitchDialog.annexNumber}
       />
 
-      {/* PDF Viewer Modal — loaded only when explicitly opened */}
-      <Suspense fallback={null}>
-        <PDFViewer
-          isOpen={pdfState.isOpen}
-          onClose={() => setPdfState(s => ({ ...s, isOpen: false }))}
-          pdfUrl={pdfState.url}
-          isLoading={pdfState.isLoading}
-        />
-      </Suspense>
     </>
   );
 }

@@ -52,7 +52,6 @@ const EXCEPTIONS: Record<string, Counts & { why: string }> = {
   'components/ui/AnnexSwitchDialog.tsx': { radius: 5, why: COMMON_WINDOW },
   'components/ui/CopyModal.tsx': { radius: 6, why: COMMON_WINDOW },
   'components/ui/Modal.tsx': { radius: 6, duration: 1, why: COMMON_WINDOW },
-  'components/ui/PDFViewer.tsx': { radius: 4, duration: 1, why: COMMON_WINDOW },
   'components/ui/PreviewFrame.tsx': { radius: 2, duration: 1, why: COMMON_WINDOW },
   'components/ui/Sheet.tsx': { radius: 2, why: COMMON_WINDOW },
 
@@ -174,7 +173,6 @@ const PILLS: Record<string, number> = {
   'components/ui/CopyModal.tsx': 2,
   'components/ui/IconButton.tsx': 1,
   'components/ui/MenuButton.tsx': 1,
-  'components/ui/PDFViewer.tsx': 1,
   'components/ui/ProgressBar.tsx': 3,
   'components/ui/ServiceHealthMenuEntry.tsx': 1,
   'components/ui/Skeleton.tsx': 1,
