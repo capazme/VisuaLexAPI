@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { EnvironmentSuggestion, SuggestionItem, SuggestionItemType } from '../../../types';
 import { SuggestionItemCard } from './SuggestionItemCard';
@@ -81,6 +81,11 @@ function Edit({ suggestion, spaceId, setBusy: setSpaceBusy, onRevoke, onItemsAdd
       setShowRevokeAll(false);
     }
   };
+
+  // Read again after a revocation, the item goes with the button that had the focus: the focus waits on the space.
+  useEffect(() => {
+    if (document.activeElement === document.body) document.getElementById(spaceId)?.focus({ preventScroll: true });
+  }, [suggestion.items, spaceId]);
 
   const pendingCount = suggestion.counts.pending;
 
@@ -178,7 +183,7 @@ function Edit({ suggestion, spaceId, setBusy: setSpaceBusy, onRevoke, onItemsAdd
       <ConfirmDialog
         open={showRevokeAll}
         variant="danger"
-        title={`Revocare ${pendingCount} item pending?`}
+        title={`Revocare ${pendingCount} item in attesa?`}
         message="Solo gli item non ancora revisionati verranno rimossi. Le decisioni già prese dall'autore restano."
         confirmLabel="Revoca tutti"
         focusCancel

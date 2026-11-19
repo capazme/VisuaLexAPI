@@ -24,7 +24,8 @@ interface SuggestionReviewDialogProps {
   onDecline: (itemId: string, reviewNote?: string) => Promise<void>;
   /** A 409 on an alias item's «Prendi»: the choice opens under that item. */
   aliasConflict: AliasConflict | null;
-  onAliasChoose: (choice: AliasChoice) => Promise<void>;
+  /** True when the choice stays open (another 409 on the new trigger). */
+  onAliasChoose: (choice: AliasChoice) => Promise<boolean>;
   onAliasCancel: () => void;
   onClose: () => void;
 }
@@ -126,12 +127,14 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
     if (choice.action === 'skip') { backToTake(itemId); onAliasCancel(); return; }
     setAliasBusy(true);
     setBusy(true);
+    let stays = false;
     try {
-      await onAliasChoose(choice);
+      stays = await onAliasChoose(choice);
     } finally {
       setAliasBusy(false);
       setBusy(false);
-      focusSpace();
+      // The item taken, its «Prendi» goes: the focus waits on the review. Still open, it stays in the choice.
+      if (!stays) focusSpace();
     }
   };
 

@@ -324,10 +324,10 @@ export function BulletinBoardPage() {
   }, [editingSuggestion, fetchSuggestions]);
 
   // The choice under an alias item whose trigger the user already has (a 409 on «Prendi»).
-  const handleAliasChoice = async (choice: AliasChoice) => {
-    if (!aliasConflict) return;
-    if (choice.action === 'skip') { setAliasConflict(null); return; }
-    if (!reviewingSuggestion) { setAliasConflict(null); return; }
+  const handleAliasChoice = async (choice: AliasChoice): Promise<boolean> => {
+    if (!aliasConflict) return false;
+    if (choice.action === 'skip') { setAliasConflict(null); return false; }
+    if (!reviewingSuggestion) { setAliasConflict(null); return false; }
     try {
       if (choice.action === 'replace') {
         if (!aliasConflict.existingAliasId) {
@@ -353,14 +353,15 @@ export function BulletinBoardPage() {
       if (choice.action === 'rename' && maybeAxios.response?.status === 409 && maybeAxios.response.data?.error === 'alias_trigger_conflict') {
         const body = maybeAxios.response.data as { suggestedTrigger: string; existingAliasId?: string };
         setAliasConflict({ itemId: aliasConflict.itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId });
-        return;
+        return true;
       }
       const msg = err instanceof Error ? err.message : 'Errore';
       setToast({ type: 'error', message: msg });
       setAliasConflict(null);
-      return;
+      return false;
     }
     setAliasConflict(null);
+    return false;
   };
 
   // Sync reviewingSuggestion with refreshed server data. reviewingSuggestion is intentionally

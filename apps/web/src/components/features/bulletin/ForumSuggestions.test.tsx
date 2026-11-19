@@ -175,15 +175,20 @@ describe('Forum suggestions in the page (LC140, L-73)', () => {
     expect(row).toHaveFocus();
   });
 
-  it('keeps «Revocare…?» a confirmation, the only dialog, and revokes the item', async () => {
+  it('keeps «Revocare…?» a confirmation, the only dialog; the item revoked, the focus goes to the space', async () => {
     await openTab();
     fireEvent.click(screen.getByRole('tab', { name: /Inviati/ }));
     press(await screen.findByRole('button', { name: /a "Contratti" di @luca/ }));
     const region = await screen.findByRole('region', { name: EDIT });
     press(within(region).getByRole('button', { name: 'Revoca «Mia nota»' }));
     const confirm = await screen.findByRole('alertdialog', { name: 'Revocare questo item?' });
+    // Read again, the item is gone, with the button the confirmation grew from.
+    service.getSentSuggestions.mockResolvedValue([{ ...sent, items: [], counts: { pending: 0, taken: 0, declined: 0 }, aggregateStatus: 'revoked' }]);
     fireEvent.click(within(confirm).getByRole('button', { name: 'Revoca' }));
     await waitFor(() => expect(service.revokeSuggestionItem).toHaveBeenCalledWith('s1', 'n2'));
+    await waitFor(() => expect(within(region).queryByRole('button', { name: 'Revoca «Mia nota»' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    await waitFor(() => expect(region).toHaveFocus());
   });
 
   it('one space at a time: a suggestion closes the other, the switch and the tab close both', async () => {

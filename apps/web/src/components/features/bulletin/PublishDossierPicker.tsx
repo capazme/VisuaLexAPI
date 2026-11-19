@@ -54,6 +54,8 @@ export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
             otherDossiers={dossiers}
             onClose={onClose}
             onPublished={(message) => {
+              // Published, nothing holds the space open any more.
+              setBusy(false);
               void refreshDossier(chosen.id);
               onPublished(message);
             }}
