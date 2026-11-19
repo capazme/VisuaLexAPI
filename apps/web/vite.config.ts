@@ -17,6 +17,7 @@ export const ROUTE_PAGES: ReadonlyArray<readonly [string, readonly string[]]> = 
   ['/crediti', ['src/pages/CreditsPage.tsx']],
   ['/collega-app', ['src/features/connections/ConnectAiAppPage.tsx']],
   ['/work', ['src/components/features/planner/OpusPage.tsx', 'src/components/features/planner/OpusViews.tsx']],
+  ['/learn', ['src/components/features/studia/ReviewHome.tsx']],
 ]
 
 /**

@@ -301,6 +301,16 @@ describe('App routing — Studia', () => {
     expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();
   });
 
+  it('draws Learn\'s title «Oggi» with the page\'s first frame, while the view\'s code and data are still on their way (LC133)', async () => {
+    renderAt('/learn/ripasso');
+    // The first commit: no await, nothing resolved yet. The frame is in the first chunk; only the view waits.
+    expect(screen.getByRole('heading', { level: 1, name: 'Oggi' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Ripasso di oggi' })).toBeNull();
+    // One title: the view draws none of its own.
+    expect(await screen.findByRole('heading', { name: 'Ripasso di oggi' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
   it('sends /learn to the review', async () => {
     renderAt('/learn');
     expect(await screen.findByRole('heading', { name: 'Ripasso di oggi' })).toBeInTheDocument();

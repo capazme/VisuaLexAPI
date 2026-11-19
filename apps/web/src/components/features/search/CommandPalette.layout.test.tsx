@@ -13,7 +13,7 @@ vi.mock('framer-motion', async (importOriginal) => ({
 }));
 
 import { CommandPalette } from './CommandPalette';
-import { ISLAND_CLOSE, ISLAND_OPEN, SEARCH_CLOSE, SEARCH_OPEN } from '../../../lib/motion';
+import { SEARCH_CLOSE, SEARCH_OPEN } from '../../../lib/motion';
 import { appStore } from '../../../store/useAppStore';
 import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID } from '../../../utils/searchFieldControl';
 import type { CustomAlias, QuickNorm } from '../../../types';
@@ -262,6 +262,78 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     expect(box).toHaveValue('proc');
   });
 
+  it('draws the band ahead once the page is idle, hidden and out of reach, so the first ⌘K mounts nothing (LC133)', async () => {
+    asDesktop(true);
+    recordAnimations();
+    const user = userEvent.setup();
+    pillInBar();
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(document.querySelector('[data-palette-band]')).toBeNull();
+    // jsdom has no requestIdleCallback: the 200 ms fallback.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
+    const ahead = document.querySelector<HTMLElement>('[data-palette-band]')!;
+    expect(ahead).not.toBeNull();
+    expect(ahead.hidden).toBe(true);
+    expect(ahead).toHaveAttribute('inert');
+    expect(ahead).toHaveAttribute('aria-hidden', 'true');
+    expect(ahead.querySelector('[cmdk-item]')).not.toBeNull();
+    expect(screen.queryByRole('option')).toBeNull();
+    // Nothing read for it: the aliases' catalogue waits for an opening.
+    expect(fetch).not.toHaveBeenCalled();
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(ahead.hidden).toBe(false);
+    // No row mounted, cmdk's choice is still the first one, at every opening.
+    const chosen = () => ahead.querySelector('[cmdk-item][data-selected="true"]')?.textContent;
+    const first = ahead.querySelector('[cmdk-item]')?.textContent;
+    expect(chosen()).toBe(first);
+    const box = screen.getByRole('combobox');
+    expect(box).toHaveFocus();
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    expect(chosen()).not.toBe(first);
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(chosen()).toBe(first);
+    await user.keyboard('proc');
+    expect(screen.getByRole('combobox')).toHaveValue('proc');
+  });
+
+  it('opened before the page is idle, keeps the band from then on: the flag never changes while it closes (LC133)', () => {
+    asDesktop(true);
+    recordAnimations();
+    pillInBar();
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    const band = document.querySelector<HTMLElement>('[data-palette-band]')!;
+    const shut = runOn(band);
+    end(shut);
+    // Kept, hidden: not dropped by the closing that started before any idle time.
+    expect(document.querySelector('[data-palette-band]')).toBe(band);
+    expect(band.hidden).toBe(true);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(shut.animation.cancel).toHaveBeenCalled();
+    expect(band.hidden).toBe(false);
+  });
+
+  it('names the chosen row from the field, as it opens, as the arrows move and after a reopening (aria-activedescendant, LC133)', async () => {
+    asDesktop(true);
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const box = screen.getByRole('combobox');
+    const named = () => document.getElementById(box.getAttribute('aria-activedescendant') ?? '');
+    const chosen = () => document.querySelector('[cmdk-item][data-selected="true"]');
+    expect(chosen()).not.toBeNull();
+    await waitFor(() => expect(named()).toBe(chosen()));
+    expect(document.getElementById(box.getAttribute('aria-controls')!)).toHaveAttribute('role', 'listbox');
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    await waitFor(() => expect(named()).toBe(chosen()));
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(named()).toBe(chosen()));
+    await waitFor(() => expect(named()).toBe(document.querySelector('[cmdk-item]')));
+  });
+
   it('the band does not move while one types: its height changes at once, no row slides (LC129)', () => {
     asDesktop(true);
     recordAnimations();
@@ -331,20 +403,25 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     expect(pill.style.opacity).toBe('0');
   });
 
-  it('under reduced motion only fades, on the island\'s times as before LC132', () => {
+  it('under reduced motion only fades, the field and the band on ⌘K\'s own times (180 and 120 ms, LC133)', () => {
     asDesktop(true);
     recordAnimations();
     motionPref.reduced = true;
     const pill = pillInBar();
-    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const root = () => shapeOf().parentElement!;
     expect(runOn(root()).keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
-    expect(runOn(root()).options).toMatchObject(ISLAND_OPEN);
+    expect(runOn(root()).options).toMatchObject(SEARCH_OPEN);
     expect(runs.filter((run) => run.el === shapeOf())).toEqual([]);
     expect(pill.style.opacity).toBe('');
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(runOn(root()).keyframes.at(-1)).toEqual({ opacity: 0 });
-    expect(runOn(root()).options).toMatchObject(ISLAND_CLOSE);
+    expect(runOn(root()).options).toMatchObject(SEARCH_CLOSE);
+    // The band only fades too, on the same times: its content, no height.
+    const fades = runs.filter((run) => run.el.parentElement?.hasAttribute('data-palette-band'));
+    expect(fades.map((run) => run.options.duration)).toEqual([SEARCH_OPEN.duration, SEARCH_CLOSE.duration]);
+    expect(runs.some((run) => run.el.hasAttribute('data-palette-band'))).toBe(false);
   });
 
   it('follows the page to its new bar when the bar it grew in goes while open (/sentenze → /)', () => {

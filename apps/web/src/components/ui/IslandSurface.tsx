@@ -95,7 +95,7 @@ export interface IslandSurfaceProps extends Omit<HTMLAttributes<HTMLDivElement>,
   hideSource?: boolean;
   /** Grows only from a source under its box (the search's pill or field); elsewhere it fades. */
   within?: boolean;
-  /** Its two ways' times with motion: the island's by default; a repeated action takes shorter ones (`lib/motion.ts`, LC132). Under reduced motion the fade keeps the island's. */
+  /** Its two ways' times, the fade's under reduced motion too: the island's by default; a repeated action takes shorter ones (`lib/motion.ts`, LC132, LC133). */
   timing?: { open: KeyframeAnimationOptions; close: KeyframeAnimationOptions };
   /** The shape's look: ground, edge, corners, shadow. The content's corners must match its corners. */
   surfaceClassName?: string;
@@ -191,8 +191,8 @@ export function IslandSurface({
         root.style.pointerEvents = '';
         const from = still ? null : insetOf(source, root.getBoundingClientRect(), within);
         const element = source instanceof HTMLElement ? source : null;
-        // Under reduced motion the fade keeps the island's times: the owner's shorter ones are for the motion (LC132).
-        const timing = { ...(still ? ISLAND_OPEN : ways.open), fill: 'backwards' as const };
+        // Under reduced motion the fade takes the owner's times as well: a repeated action is no slower without motion (LC133).
+        const timing = { ...ways.open, fill: 'backwards' as const };
         // LC81: the field, at its place now (nothing runs on it), and where it starts: on the pill, or where it is.
         const fieldHome = field && fieldOn(field, field.getBoundingClientRect());
         const fieldFrom = field && (was?.field ?? (from && element ? { ...fieldOn(field, element.getBoundingClientRect()), opacity: 1 } : null));
@@ -246,7 +246,7 @@ export function IslandSurface({
     const { was, shadow, full, field, rest: others } = take();
     const pill = hidden.current;
     const to = still ? null : insetOf(pill ?? source, root.getBoundingClientRect(), within);
-    const timing = { ...(still ? ISLAND_CLOSE : ways.close), fill: 'forwards' as const };
+    const timing = { ...ways.close, fill: 'forwards' as const };
     const shapeNow = was?.shape ?? { ...shapeAt(full), boxShadow: shadow, opacity: 1 };
     const contentNow = was?.content ?? { clipPath: clipAt(full), opacity: 1 };
     // LC81: the field goes back onto the pill, seen to the end, and gives way to it in the same crossfade as the shape.

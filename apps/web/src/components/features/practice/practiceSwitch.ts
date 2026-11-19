@@ -5,7 +5,7 @@ import { articleRowKey, decisionRowKey, type BesideRef } from '../../../utils/pr
 
 /**
  * The passage between the practice's two views (U2, L-62): an act's panel shrinks and slides into the index while the
- * window comes in from the right, and back. A View Transition (`index.css`), 260 ms, played only for a row's «Apri
+ * window comes in from the right, and back. A View Transition (`index.css`), 180 ms (`PLACE_CHANGE`, LC133), played only for a row's «Apri
  * accanto» that opens the first window and a window's «Chiudi» that closes the last; any other change of view is
  * immediate. The pieces are named only while it plays: the class on the root, as `vlx-page-changing` (a
  * `view-transition-name` makes a stacking context, gotcha 22), and each piece's name in `--vlx-vt` on an element of

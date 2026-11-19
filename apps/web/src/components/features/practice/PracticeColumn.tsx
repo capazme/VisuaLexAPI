@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { scrollParentOf } from '../../../utils/scrollParent';
 import {
   DndContext,
   KeyboardSensor,
@@ -39,6 +40,58 @@ export interface PracticeColumnProps {
 }
 
 /**
+ * Brings an opened row into view, its heading and its article together (LC133). The article's space may still be
+ * growing from no height (`Expand`), so the row's own box is only its heading: the article is measured by its text, laid
+ * out at its full height already. A row taller than the room under the act's sticky head comes to the top (`start`);
+ * one that fits is brought in whole, its heading first (`nearest` on the row, then on the article).
+ */
+function revealOpenedRow(row: HTMLElement) {
+  const controlled = row.querySelector('[aria-expanded][aria-controls]')?.getAttribute('aria-controls');
+  const text = controlled ? document.getElementById(controlled) : null;
+  const scroller = scrollParentOf(row);
+  const room = (scroller ? scroller.clientHeight : window.innerHeight) - (parseFloat(getComputedStyle(row).scrollMarginTop) || 0);
+  const top = row.getBoundingClientRect().top;
+  const bottom = Math.max(row.getBoundingClientRect().bottom, text?.getBoundingClientRect().bottom ?? 0);
+  if (bottom - top > room) {
+    row.scrollIntoView({ block: 'start', behavior: 'auto' });
+    return;
+  }
+  row.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+  text?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+}
+
+/** How long an opened row is followed while its space opens and its text arrives (LC133: about 220 + 90 ms measured). */
+const FOLLOW_MS = 1000;
+/** What the user does to move the page: the following stops, the page is theirs. */
+const USER_MOVES = ['wheel', 'touchmove', 'pointerdown', 'keydown'] as const;
+
+/**
+ * Reveals an opened row now and again each time its size changes, for `FOLLOW_MS` or until the user moves the page: at
+ * the reveal the row is still closed (its heading alone), its space then opens and its text comes later. Each pass is
+ * `revealOpenedRow`, which does nothing once the row is in place. Returns the way to stop.
+ */
+function followOpenedRow(row: HTMLElement): () => void {
+  revealOpenedRow(row);
+  if (typeof ResizeObserver === 'undefined') return () => {};
+  const observer = new ResizeObserver(() => {
+    const controlled = row.querySelector('[aria-expanded][aria-controls]')?.getAttribute('aria-controls');
+    const text = controlled ? document.getElementById(controlled) : null;
+    // The text grows while the space around it is still held by its animation: watched too, once it is there.
+    if (text) observer.observe(text);
+    revealOpenedRow(row);
+  });
+  observer.observe(row);
+  const stop = () => {
+    observer.disconnect();
+    window.clearTimeout(timer);
+    USER_MOVES.forEach((type) => window.removeEventListener(type, stop, true));
+  };
+  const timer = window.setTimeout(stop, FOLLOW_MS);
+  USER_MOVES.forEach((type) => window.addEventListener(type, stop, { capture: true, passive: true }));
+  return stop;
+}
+
+/**
  * The practice's column (spec §3, D3; U2): its acts in their order — one under the other on a phone and in the index, a
  * grid of panels in the overview — reordered by drag (pointer and keyboard, as the dossier's acts); «Giurisprudenza»
  * follows them (§3.3). Outside the index it takes the practice's reveal (`takeReveal`, once, gotcha 14) and brings the
@@ -52,6 +105,9 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
   const hostDossier = useHostDossier();
   const revealKey = useAppStore((s) => (s.pendingReveal?.practiceId === practiceId ? s.pendingReveal.rowKey : null));
   const columnRef = useRef<HTMLDivElement>(null);
+  // The row being followed after a reveal: outlives the effect (the reveal taken clears its key), stopped by the next one.
+  const following = useRef<(() => void) | null>(null);
+  useEffect(() => () => following.current?.(), []);
   const isIndex = layout === 'index';
 
   useEffect(() => {
@@ -63,7 +119,9 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
     const row = Array.from(rows).find((el) => el.dataset.practiceRow === taken.rowKey);
     // At once and only if the row is out of view (LC132): the act's arrows come one after the other, and the browser's
     // smooth scroll took 450–500 ms each time. The same for every reveal (a search that landed, a find match, the way back).
-    row?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    if (!row) return;
+    following.current?.();
+    following.current = followOpenedRow(row);
   }, [revealKey, isIndex, practiceId, takeReveal]);
 
   const sensors = useSensors(
