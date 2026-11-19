@@ -89,7 +89,7 @@ export function PhoneTopBar({ menu, section, title, hidden, onReveal, onSearch, 
     >
       {/* `px-1`: the menu's icon lines up with the page's 16 px margin. From md the room of «Commenti» and «Tutto
           schermo», as the search field's bar: 10.5 rem, 8 px of air at 768 (LC4). */}
-      <div className="relative flex h-14 items-center gap-1 px-1 md:pr-[10.5rem] [&:has([data-palette-slot]:not(:empty))>[data-bar-title]]:invisible">
+      <div className="relative flex h-14 items-center gap-1 px-1 md:pr-[10.5rem] [&:has([data-palette-slot]:not(:empty))>[data-bar-title]]:invisible [&:has([data-palette-slot]:not(:empty))>[data-bar-action]]:invisible">
         <MenuToggle {...menu} />
         {/* Keyed by the name: the page's, once the title has scrolled out, fades in, 150 ms; at once under reduced motion
             (G8; inspired by iOS's large titles, written from scratch). Empty, it keeps its place between the buttons. */}

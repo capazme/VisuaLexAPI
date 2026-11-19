@@ -202,6 +202,9 @@ describe('Layout — «Dicci cosa ti serve» at the top right (LC141)', () => {
     expect(button).toHaveAttribute('title', 'Dicci cosa ti serve');
     expect(button).toHaveClass('min-h-11', 'max-md:w-11', 'max-md:px-0');
     expect(within(button).getByText('Dicci cosa ti serve')).toHaveClass('max-md:sr-only');
+    // Out of sight while the search's field is open over the bar.
+    expect(button).toHaveAttribute('data-bar-action');
+    expect(button.parentElement!.className).toContain('[&:has([data-palette-slot]:not(:empty))>[data-bar-action]]:invisible');
   });
 
   it('is not drawn for a guest, who has no part to reach', () => {

@@ -322,8 +322,6 @@ export function Layout() {
     return () => window.removeEventListener('keydown', handler);
   }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage, openSettings]);
 
-  // The controls of the top bar (LC21): the version's news and «Tutto schermo», compact and in line. «Commenti» left
-  // it for the bug beside «Impostazioni» in the sidebar (LC92).
   // LC141 (Luca, 19 Nov): «Dicci cosa ti serve», the bug at the top right again, in every bar; outlined, not filled, so
   // it does not compete with the page's own commands. Below md the icon alone, 44 px; it opens `/impostazioni#segnala`.
   const feedbackButton = isAuthenticated ? (
@@ -333,6 +331,8 @@ export function Layout() {
       size="sm"
       icon={<Bug size={16} aria-hidden />}
       title="Dicci cosa ti serve"
+      // Hidden while the search's field is open in its bar: the field's slot covers part of it.
+      data-bar-action=""
       onClick={() => openSettings('segnala')}
       className="shrink-0 whitespace-nowrap max-md:w-11 max-md:px-0"
     >
@@ -340,6 +340,8 @@ export function Layout() {
     </Button>
   ) : null;
 
+  // The controls of the top bar (LC21): the version's news and «Tutto schermo», compact and in line. «Commenti» left
+  // it for the bug beside «Impostazioni» in the sidebar (LC92).
   const barControls = (
     <>
       <ChangelogNotification inBar />
@@ -492,6 +494,7 @@ export function Layout() {
             // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
             className={cn(
               'relative flex h-[var(--search-bar-height)] flex-shrink-0 items-center justify-center gap-1 border-b', Z_INDEX.dropdown,
+              '[&:has([data-palette-slot]:not(:empty))>[data-bar-action]]:invisible',
               // LC21: the page's own ground, as the top bar of the other pages: no white band over the stone.
               'border-slate-200 bg-slate-50/90 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[10.5rem] lg:pl-8 lg:pr-[17rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-950/90',
             )}
