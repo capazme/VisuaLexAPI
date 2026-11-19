@@ -102,14 +102,9 @@ export function AnnexSuggestion({
           )}
         >
           {/* Icon */}
-          <motion.div
-            className="w-9 h-9 rounded-[8px] bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0"
-            initial={{ rotate: -10 }}
-            animate={{ rotate: 0 }}
-            transition={spring.gentle}
-          >
+          <div className="w-9 h-9 rounded-[8px] bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
             <Paperclip size={18} aria-hidden className="text-amber-700 dark:text-amber-300" />
-          </motion.div>
+          </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0 relative z-10">
