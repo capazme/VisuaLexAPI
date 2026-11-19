@@ -6,24 +6,30 @@ import { environmentService } from '../../../services/environmentService';
 import { exportEnvironmentToFile } from '../../../utils/environmentUtils';
 import { Button } from '../../ui/Button';
 import { StudyImportDialog } from './StudyImportDialog';
+import { ForumSpace } from './ForumSpace';
 import { becomesStudyDossiers } from '../../../utils/studyImportReport';
 import type { Environment, StudyImportReport } from '../../../types';
 
 interface Props {
   onRecovered: (report: StudyImportReport) => void;
   onMessage: (message: string, type: 'success' | 'error' | 'info') => void;
+  /** Given by the Forum's page, so «Recupera i dossier» is one of its spaces, one open at a time. */
+  recovering?: Environment | null;
+  onRecoveringChange?: (env: Environment | null) => void;
 }
 
 /**
  * «Ambienti salvati (archivio)» (spec 2026-10-13-environments-into-forum, D11b; the owner's answer 184): the private
  * environments saved before «Ambienti» went, read-only. «Recupera i dossier» makes their dossiers dossiers di studio on
  * the server, from the stored row; «Esporta JSON» and «Elimina» as before. No environment is created any more; the
- * section is absent for a user with none.
+ * section is absent for a user with none. «Recupera i dossier» opens in the page, under the heading (LC138, L-73).
  */
-export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
+export function ArchivedEnvironmentsSection({ onRecovered, onMessage, recovering: given, onRecoveringChange }: Props) {
   const environments = useAppStore((s) => s.environments);
   const deleteEnvironment = useAppStore((s) => s.deleteEnvironment);
-  const [recovering, setRecovering] = useState<Environment | null>(null);
+  const [own, setOwn] = useState<Environment | null>(null);
+  const recovering = given !== undefined ? given : own;
+  const setRecovering = onRecoveringChange ?? setOwn;
   const [deleting, setDeleting] = useState<Environment | null>(null);
   const [deleteFrom, setDeleteFrom] = useState<HTMLElement | null>(null);
   if (environments.length === 0) return null;
@@ -48,6 +54,25 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
           Gli ambienti che avevi salvato. Non se ne creano più: recuperane i dossier come dossier di studio.
         </p>
       </div>
+      <ForumSpace value={recovering} onClose={() => setRecovering(null)} icon={<FolderPlus size={20} aria-hidden className="shrink-0" />} title="Recupera i dossier">
+        {(env, setBusy) => (
+          <StudyImportDialog
+            intro={`Ciò che «${env.name}» conteneva ${becomesStudyDossiers(env.dossiers.length)}`}
+            dossiers={env.dossiers}
+            notes={env.annotations.length}
+            highlights={env.highlights.length}
+            confirmLabel="Recupera i dossier"
+            failure="Non è stato possibile recuperare i dossier. Riprova."
+            run={(switches) => environmentService.recover(env.id, switches)}
+            onClose={() => setRecovering(null)}
+            onAdded={(report) => {
+              setRecovering(null);
+              onRecovered(report);
+            }}
+            setBusy={setBusy}
+          />
+        )}
+      </ForumSpace>
       <ul className="divide-y divide-slate-100 rounded-[8px] border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-800">
         {environments.map((env) => (
           <li key={env.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -62,6 +87,7 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
                 type="button"
                 variant="quiet"
                 onClick={() => setRecovering(env)}
+                aria-expanded={recovering?.id === env.id}
                 disabled={env.dossiers.length === 0}
                 aria-label={`Recupera i dossier di «${env.name}»`}
                 icon={<FolderPlus size={14} aria-hidden />}
@@ -93,24 +119,6 @@ export function ArchivedEnvironmentsSection({ onRecovered, onMessage }: Props) {
           </li>
         ))}
       </ul>
-
-      {recovering && (
-        <StudyImportDialog
-          title="Recupera i dossier"
-          intro={`Ciò che «${recovering.name}» conteneva ${becomesStudyDossiers(recovering.dossiers.length)}`}
-          dossiers={recovering.dossiers}
-          notes={recovering.annotations.length}
-          highlights={recovering.highlights.length}
-          confirmLabel="Recupera i dossier"
-          failure="Non è stato possibile recuperare i dossier. Riprova."
-          run={(switches) => environmentService.recover(recovering.id, switches)}
-          onClose={() => setRecovering(null)}
-          onAdded={(report) => {
-            setRecovering(null);
-            onRecovered(report);
-          }}
-        />
-      )}
 
       <ConfirmDialog
         open={!!deleting}

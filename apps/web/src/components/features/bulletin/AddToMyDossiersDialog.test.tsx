@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import type { SharedEnvironment, StudyImportReport } from '../../../types';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 
@@ -49,5 +50,32 @@ describe('AddToMyDossiersDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
     expect(await screen.findByRole('alert')).toHaveTextContent("Troppe aggiunte: riprova tra un'ora.");
     expect(bus.publishMerltEvent).not.toHaveBeenCalled();
+  });
+
+  // LC138 (L-73): in the page at the top of the tab, not a window.
+  it('opens as a region that takes the focus; Esc and «Chiudi» close it and give the focus back', () => {
+    function Host() {
+      const [shown, setShown] = useState<SharedEnvironment | null>(null);
+      return (
+        <>
+          <button type="button" onClick={() => setShown(env)}>Aggiungi</button>
+          <AddToMyDossiersDialog sharedEnvironment={shown} onClose={() => setShown(null)} onAdded={vi.fn()} />
+        </>
+      );
+    }
+    render(<Host />);
+    const command = screen.getByRole('button', { name: 'Aggiungi' });
+    command.focus();
+    fireEvent.click(command);
+    const region = screen.getByRole('region', { name: 'Aggiungi ai miei dossier' });
+    expect(region).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(command).toHaveFocus();
+    fireEvent.click(command);
+    fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(command).toHaveFocus();
   });
 });
