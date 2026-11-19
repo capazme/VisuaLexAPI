@@ -14,6 +14,8 @@ import { ChangelogNotification } from '../ui/ChangelogNotification';
 import { NotificationHost } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { PageSlide } from '../ui/PageSlide';
+import { PageFade } from './PageFade';
+import { pageKeyOf } from './pageChange';
 import { SETTINGS_PATH, useOpenSettings, useSettingsRequests } from '../features/settings/settingsRoute';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
@@ -519,11 +521,12 @@ export function Layout() {
                 every other change of page keeps its own transition, so the key changes only entering and leaving them. */}
             <PageSlide pageKey={slidePage} back={slidePage === 'app'}>
               <AtLocation location={location}>
-                <div data-page-place className="contents">
+                {/* Every other change of page fades in here, the one layer for all (LC126). */}
+                <PageFade pageKey={pageKeyOf(pathname)}>
                   <RoutePage>
                     {outlet}
                   </RoutePage>
-                </div>
+                </PageFade>
               </AtLocation>
             </PageSlide>
           </div>
