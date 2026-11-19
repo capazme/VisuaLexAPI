@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Send, ThumbsUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -41,13 +41,22 @@ export function VoteButton({ voted, count, label, onVote, own = false }: { voted
   );
 }
 
-/** A reply's text and its send button; `onSend` resolves true once it is published, and the box empties. */
-export function ReplyForm({ onSend, placeholder = 'Scrivi una risposta…', sendLabel = 'Invia risposta' }: {
+/**
+ * A reply's text and its send button; `onSend` resolves true once it is published, and the box empties. `focusOnOpen`:
+ * the box takes the focus as it appears, for a box the user opened to write in («Commenta», LC114) — on a phone the
+ * keyboard rises, which is what was asked for. Never for the box always there at a discussion's foot.
+ */
+export function ReplyForm({ onSend, placeholder = 'Scrivi una risposta…', sendLabel = 'Invia risposta', focusOnOpen = false }: {
   onSend: (body: string) => Promise<boolean>;
   placeholder?: string;
   sendLabel?: string;
+  focusOnOpen?: boolean;
 }) {
   const [body, setBody] = useState('');
+  const field = useRef<HTMLTextAreaElement>(null);
+  // Once, as it appears: `focusOnOpen` is read at the opening.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (focusOnOpen) field.current?.focus(); }, []);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!body.trim()) return;
@@ -55,8 +64,9 @@ export function ReplyForm({ onSend, placeholder = 'Scrivi una risposta…', send
   };
   return (
     <form onSubmit={event => void submit(event)} className="mt-3 flex gap-2">
-      <textarea value={body} onChange={event => setBody(event.target.value)} required rows={2} placeholder={placeholder} aria-label={placeholder} className="min-w-0 flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm" />
-      <IconButton type="submit" variant="primary" size="sm" aria-label={sendLabel} icon={<Send aria-hidden />} className="self-end" />
+      <textarea ref={field} value={body} onChange={event => setBody(event.target.value)} required rows={2} placeholder={placeholder} aria-label={placeholder} className="min-w-0 flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm" />
+      {/* LC114: 36 px from md (44 on a phone), the common control's height, as the commands beside it; it was 32. */}
+      <IconButton type="submit" variant="primary" aria-label={sendLabel} icon={<Send aria-hidden />} className="self-end" />
     </form>
   );
 }

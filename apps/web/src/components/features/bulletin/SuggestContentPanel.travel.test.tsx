@@ -16,7 +16,7 @@ vi.mock('../../../utils/decisionFetchCache', () => ({ fetchDecisionCached: vi.fn
 import { appStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { fetchDecisionCached } from '../../../utils/decisionFetchCache';
-import { SuggestContentModal } from './SuggestContentModal';
+import { SuggestContentPanel } from './SuggestContentPanel';
 import { NOTICE, articleHighlight, articleNote, decisionHighlight, decisionNote, obscuredAnswer } from '../../../test/fixtures/travelFixtures';
 
 beforeEach(() => {
@@ -25,9 +25,9 @@ beforeEach(() => {
   appStore.setState({ dossiers: [], quickNorms: [], customAliases: [], annotations: [decisionNote, articleNote], highlights: [decisionHighlight, articleHighlight] });
 });
 
-describe('SuggestContentModal: words a court withdrew are not suggested', () => {
+describe('SuggestContentPanel: words a court withdrew are not suggested', () => {
   it('leaves the decision\'s anchors out of the suggestion and says so', async () => {
-    render(<SuggestContentModal environment={{ id: 'env', title: 'Forum', user: { username: 'collega' } } as never} onClose={vi.fn()} onSuggested={vi.fn()} />);
+    render(<SuggestContentPanel environment={{ id: 'env', title: 'Forum', user: { username: 'collega' } } as never} onClose={vi.fn()} onSuggested={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutto' }));
     expect(await screen.findByText(NOTICE)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Invia/ }));

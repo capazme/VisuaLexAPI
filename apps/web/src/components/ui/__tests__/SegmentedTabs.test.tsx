@@ -183,8 +183,8 @@ describe('SegmentedTabLinks', () => {
   // LC110: Opus's views, at their header's height from md and a bar at the screen's foot on a phone.
   it('in the small size stands at the fields\' height and corners', () => {
     render(<MemoryRouter initialEntries={['/viste/oggi']}><SegmentedTabLinks size="sm" links={LINKS} label="Viste" /></MemoryRouter>);
-    expect(screen.getByRole('navigation', { name: 'Viste' })).toHaveClass('p-0.5', 'rounded-md');
-    for (const link of screen.getAllByRole('link')) expect(link).toHaveClass('min-h-10', 'md:min-h-8', 'rounded-md');
+    expect(screen.getByRole('navigation', { name: 'Viste' })).toHaveClass('md:p-0.5', 'rounded-md');
+    for (const link of screen.getAllByRole('link')) expect(link).toHaveClass('min-h-11', 'md:min-h-8', 'rounded-md');
   });
 
   it('as a foot bar puts each icon over its words on a phone, the mark tinted, the icon hidden from md', () => {
@@ -207,9 +207,9 @@ describe('SegmentedTabs, small', () => {
   it('makes the row 44 px on a phone and 36 from md, with 4 px corners', () => {
     render(<SegmentedTabs size="sm" label="Ordina" tabs={[{ id: 'a', label: 'Data' }, { id: 'b', label: 'Nome' }]} value="a" onChange={() => {}} />);
     const row = screen.getByRole('radiogroup', { name: 'Ordina' });
-    // 2 px of track round segments of 40 and 32 px.
-    expect(row).toHaveClass('p-0.5', 'rounded-md');
-    expect(row).not.toHaveClass('p-1', 'rounded-lg');
-    for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveClass('min-h-10', 'md:min-h-8', 'rounded-md');
+    // LC114: segments of 44 px with no track round them on a phone (the row 44); 2 px of track round 32 from md.
+    expect(row).toHaveClass('md:p-0.5', 'rounded-md');
+    expect(row).not.toHaveClass('p-1', 'p-0.5', 'rounded-lg');
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveClass('min-h-11', 'md:min-h-8', 'rounded-md');
   });
 });

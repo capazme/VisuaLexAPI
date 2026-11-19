@@ -46,7 +46,7 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
       // Words a court withdrew are not offered (spec §8.6).
       const travelling = await travellingSelection(chosenAnnotations, chosenHighlights);
       const items: Array<{ itemType: SuggestionItemType; payload: unknown }> = [];
-      // (same per-type builder as SuggestContentModal — extract to a util
+      // (same per-type builder as SuggestContentPanel — extract to a util
       //  when the third caller appears, not earlier.)
       for (const id of selection.annotationIds.filter(i => travelling.annotationIds.has(i))) {
         const a = annotations.find(x => x.id === id);

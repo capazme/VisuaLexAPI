@@ -4,7 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { tagLabel } from '../../../utils/tagLabel';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
 import { cn } from '../../../lib/utils';
 import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 
@@ -105,7 +105,7 @@ export function SharedEnvironmentCard({
       className={cn(
         // Resting depth only (LC30): the card is not a link, and a hover lift would make a stacking context that traps the
         // «⋯» menu under the next card.
-        'group relative flex h-full flex-col rounded-xl border',
+        'group relative flex h-full flex-col rounded-[8px] border',
         // Withdrawn: a dashed edge on a quieter paper, and the badge — no opacity, which would trap the «⋯» menu in a
         // stacking context of its own and fade the text under AA.
         isWithdrawn
@@ -114,7 +114,7 @@ export function SharedEnvironmentCard({
       )}
     >
       {/* The category's hue down the leading edge, from its token; no clipping on the card, so the «⋯» menu can hang out. */}
-      <span aria-hidden="true" className="absolute -bottom-px -left-px -top-px w-1 rounded-l-xl" style={{ backgroundColor: hue }} />
+      <span aria-hidden="true" className="absolute -bottom-px -left-px -top-px w-1 rounded-l-[8px]" style={{ backgroundColor: hue }} />
 
       <div className="flex flex-1 flex-col p-4 pl-5">
         {/* The title, the badges of the state, the «⋯» menu. */}
@@ -203,26 +203,24 @@ export function SharedEnvironmentCard({
         {/* As tall as the action, on a card without one too (the user's own), so every foot lines up. */}
         {/* Where the card is too narrow for all three, the action goes under them, whole, at the right. */}
         <div className="mt-auto flex min-h-[3.375rem] flex-wrap items-center gap-x-2 gap-y-2 pt-4">
-          <button
+          {/* `Button` quiet (LC114): on a computer as tall as the action beside it, 36 px, 44 on a phone. */}
+          <Button
             type="button"
+            variant="quiet"
             onClick={() => onLike(environment.id)}
             disabled={isLiking}
             aria-pressed={environment.userLiked}
             aria-label={`Mi piace: ${environment.likeCount}`}
+            icon={<Heart size={18} aria-hidden className={environment.userLiked ? 'fill-current' : ''} />}
             className={cn(
-              'inline-flex min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm tabular-nums transition-colors disabled:opacity-50 md:min-w-0',
-              TOUCH_TARGET_RESPONSIVE,
-              // On a computer as tall as the action beside it, not the heart's 18 px.
-              'md:min-h-9',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
+              'min-w-11 shrink-0 gap-1.5 px-2 tabular-nums md:min-w-0',
               environment.userLiked
-                ? 'text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800',
+                ? 'text-red-700 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-400'
+                : 'text-slate-600 dark:text-slate-400',
             )}
           >
-            <Heart size={18} aria-hidden className={environment.userLiked ? 'fill-current' : ''} />
             <span aria-hidden>{environment.likeCount}</span>
-          </button>
+          </Button>
           {/* Beside the like, small: how many added it (nothing at 0), and — to its author only, in «I miei
               pubblicati» — how many viewed it. */}
           {(environment.downloadCount > 0 || showOwnerActions) && (
@@ -237,22 +235,20 @@ export function SharedEnvironmentCard({
             </p>
           )}
           {!environment.isOwner && (
-            <button
+            // LC114: quiet, as «Aggiungi» on the packs' cards just below: one action, one look; the card holds it already.
+            <Button
               type="button"
+              variant="quiet"
               onClick={() => onImport(environment)}
               aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
-              className={cn(
-                'ml-auto inline-flex min-w-0 max-w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
-                TOUCH_TARGET_RESPONSIVE,
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
-              )}
+              icon={<FolderPlus size={16} aria-hidden />}
+              className="ml-auto min-w-0 max-w-full gap-1.5 whitespace-nowrap px-3 font-semibold"
             >
-              <FolderPlus size={16} aria-hidden className="shrink-0" />
               {/* «Aggiungi» on a phone, as the packs' cards say it, the whole words from `sm` (at 320 px they were cut);
                   the name, the button's label, is whole on every width. */}
               <span className="truncate sm:hidden">Aggiungi</span>
               <span className="hidden truncate sm:inline">Aggiungi ai miei dossier</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>

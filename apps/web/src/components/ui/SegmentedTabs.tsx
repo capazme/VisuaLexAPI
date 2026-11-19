@@ -54,9 +54,10 @@ const tabId = (panelId: string, id: string) => `${panelId}-tab-${id}`;
 const MARK_STYLE = { borderRadius: 6, boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' };
 
 const TRACK = 'flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800';
-// The small row: 2 px of track round segments of 40 and 32 px make `CONTROL_HEIGHT.md`'s 44 and 36.
-const TRACK_SM = cn('p-0.5', CONTROL_RADIUS);
-const SEGMENT_SM = 'min-h-10 px-3 text-xs md:min-h-8';
+// The small row (LC114, the consultant's rule: a segment is 44 px to touch on a phone): on a phone segments of 44 px
+// with no track round them, the row 44; from md 2 px of track round segments of 32, the row `CONTROL_HEIGHT.md`'s 36.
+const TRACK_SM = cn('md:p-0.5', CONTROL_RADIUS);
+const SEGMENT_SM = 'min-h-11 px-3 text-xs md:min-h-8';
 /** The small mark's corners: 2 px inside the track's 4. */
 const MARK_STYLE_SM = { ...MARK_STYLE, borderRadius: 2 };
 // The words change colour over the mark's slide (`spring.snappy`, 0.3 s).

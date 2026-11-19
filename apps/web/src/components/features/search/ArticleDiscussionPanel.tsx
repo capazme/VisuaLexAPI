@@ -623,7 +623,8 @@ export function ArticleDiscussionPanel({
                       <Button type="button" variant="link" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)}>
                         Rispondi
                       </Button>
-                      <ReportButton label="Segnala la glossa" inline={isMargin} onReport={() => void reportThread(thread.id)} />
+                      {/* Never on one's own gloss (LC114): the server knows the author (`isOwner`). */}
+                      {!thread.isOwner && <ReportButton label="Segnala la glossa" inline={isMargin} onReport={() => void reportThread(thread.id)} />}
                       {isLocated && onGoToPassage && (
                         <Button type="button" variant="link" onClick={() => onGoToPassage(thread.id)} icon={<LocateFixed size={12} aria-hidden />} className="ml-auto gap-1">
                           Vai al passo
