@@ -133,7 +133,6 @@ export function GlossCard({
             className={cn(
                 'rounded-[8px] border bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none transition-[border-color,box-shadow] motion-reduce:transition-none dark:bg-slate-900',
                 active ? 'border-primary-500 ring-1 ring-primary-500 dark:border-primary-400 dark:ring-primary-400' : 'border-slate-200 dark:border-slate-700',
-                'focus-visible:ring-2 focus-visible:ring-primary-500',
                 className,
             )}
         >

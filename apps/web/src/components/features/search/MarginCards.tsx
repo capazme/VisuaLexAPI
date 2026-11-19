@@ -9,10 +9,7 @@ import { scrollToMiddle } from '../../../utils/scrollParent';
 import { quoteForLabel } from '../../../utils/articleAnnotations';
 
 /** The card's frame, as an application's gloss's (`GlossCard`): a comment of a word processor. */
-const CARD = cn(
-    'rounded-[8px] border border-slate-200 bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none dark:border-slate-700 dark:bg-slate-900',
-    'focus-visible:ring-2 focus-visible:ring-primary-500',
-);
+const CARD = 'rounded-[8px] border border-slate-200 bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none dark:border-slate-700 dark:bg-slate-900';
 // The card's commands, as `GlossCard`'s: `Button`'s quiet row at 36 px from md, a compact gap.
 const ACTION_ROW = 'gap-1 px-2';
 const DANGER = 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400';

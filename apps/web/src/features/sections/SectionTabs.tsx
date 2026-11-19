@@ -33,8 +33,8 @@ export function SectionTabs({ forumCount, onChoose, inDrawer = false }: { forumC
             onPointerEnter={() => preparePage(s.home)}
             onPointerDown={() => preparePage(s.home)}
             onFocus={() => preparePage(s.home)}
-            onClick={(event) => {
-              chooseSection(s.id, { still: inDrawer, byPointer: event.detail > 0 });
+            onClick={() => {
+              chooseSection(s.id, { still: inDrawer });
               onChoose?.();
             }}
             className={cn(
