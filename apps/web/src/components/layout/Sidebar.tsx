@@ -10,7 +10,6 @@ import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { SectionTabs } from '../../features/sections/SectionTabs';
 import { useSection } from '../../features/sections/useSection';
-import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
 import { PALETTE_SHORTCUT, focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
@@ -349,7 +348,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const { user, isAdmin, isValidator, logout } = useAuth();
   const coursesOn = useCoursesSwitch() === 'on';
   const { section, active } = useSection();
-  const sectionEntries = useEntriesEntrance(section);
   const { count: forumNotifications } = useForumNotifications(!!user);
   // Overdue plus today's tasks (`PlannerHost` reads them): beside «Scadenziario» in Opus.
   const todayCount = plannerStore((s) => s.todayCount) ?? 0;
@@ -563,7 +561,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             once, so without a new group every section kept the first one's name and the column glided in from the old
             section's entry (#457); a new section's column appears in place. */}
         <LayoutGroup key={layout === 'drawer' ? `drawer-${section}` : section} id={layout === 'drawer' ? `drawer-${section}` : section}>
-          <div ref={sectionEntries} role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start", words ? "gap-0.5" : "gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
+          <div role="group" aria-label={active.name} className={cn("flex w-full flex-col items-start", words ? "gap-0.5" : "gap-3 md:gap-2", section !== 'opus' && "mt-1 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2")}>
             {section === 'gymnasium' && (
               <>
                 {/* Studying, then writing and validating (Gymnasium spec §4). */}

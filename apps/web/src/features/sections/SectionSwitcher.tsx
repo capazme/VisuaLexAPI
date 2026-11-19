@@ -8,10 +8,10 @@ import { prefersReducedMotion } from './sectionTransition';
 import { isMerltEnabled } from '../merlt/featureFlag';
 import { plannerStore } from '../../components/features/planner/plannerStore';
 import { todayCountLabel } from '../../components/features/planner/taskDates';
-import { SECTION_MENU_MS, rollName, rollUpMenu, slideCheck, unrollMenu, type RollingUp } from './sectionMenuMotion';
+import { rollUpMenu, slideCheck, unrollMenu, type RollingUp } from './sectionMenuMotion';
 
-/** Closed; open; chosen (the check arrives, nothing more can be chosen); rolling back up. */
-type Phase = 'closed' | 'open' | 'chosen' | 'closing';
+/** Closed; open; rolling back up (after a choice too: nothing more can be chosen). */
+type Phase = 'closed' | 'open' | 'closing';
 
 const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const HOVER = 'hover:bg-slate-100 dark:hover:bg-slate-800';
@@ -37,9 +37,8 @@ const motionHere = () => typeof Element.prototype.animate === 'function' && !pre
  * The switcher at the top of the sidebar, where the open book was (spec S3). `withName`: the bar with words (from `xl`,
  * and the phone's drawer) makes it a split button (S6): on the left the section's mark and name, which go to its home
  * («Vai a Gymnasium: Oggi»); after a thin rule an arrow, which opens the menu of the sections. In the rail it is one
- * button, the mark, which opens the menu. The menu unrolls from the top, its entries come in one after the other, one
- * check slides to the section chosen, and the menu closes by itself a moment after, while the page has already
- * changed and the button's name rolls to the new one. The Forum's count rides its entry, and a dot on the mark says it
+ * button, the mark, which opens the menu. The menu unrolls from the top, one check marks the section chosen, and the
+ * menu rolls up at once while the page changes (LC129: no wait, no cascade). The Forum's count rides its entry, and a dot on the mark says it
  * from any other section (S5). `inDrawer`: the phone's drawer, which closes over the change, so the page changes at
  * once under it (T1).
  */
@@ -62,8 +61,6 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
   const closing = useRef<RollingUp | null>(null);
   // Opened again while it rolled up: it turns back from where it is, and does not unroll from the top.
   const turnedBack = useRef(false);
-  // The close that follows a choice, on its way: a new opening or a close by hand calls it off.
-  const closeLater = useRef<() => void>(() => {});
   const menuId = useId();
   const shown = phase !== 'closed';
   const expanded = phase === 'open';
@@ -74,14 +71,12 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
     setChosen(null);
   };
   const close = (returnFocus: boolean) => {
-    closeLater.current();
     if (returnFocus) arrowRef.current?.focus();
     if (!shown || phase === 'closing') return;
     setPhase('closing');
     closing.current = rollUpMenu(menuRef.current, finishClosing);
   };
   const open = (at: 'first' | 'last') => {
-    closeLater.current();
     turnedBack.current = closing.current !== null;
     closing.current?.turnBack();
     closing.current = null;
@@ -98,10 +93,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
     const menu = menuRef.current;
     if (phase !== 'open' || !menu) return;
     const entries = [...menu.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
-    if (!turnedBack.current) {
-      const checkedAt = entries.findIndex((entry) => entry.getAttribute('aria-checked') === 'true');
-      unrollMenu(menu, entries, menu.querySelector<HTMLElement>('[data-testid="section-check"]'), Math.max(checkedAt, 0));
-    }
+    if (!turnedBack.current) unrollMenu(menu);
     turnedBack.current = false;
     (focusAt === 'first' ? entries[0] : entries[entries.length - 1])?.focus();
   }, [phase, focusAt]);
@@ -116,8 +108,6 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
     return () => document.removeEventListener('mousedown', onDown);
   });
 
-  useEffect(() => () => closeLater.current(), []);
-
   const onArrowKey = (event: KeyboardEvent) => {
     // Enter and Space are the button's own click, which opens it.
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -131,26 +121,14 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
 
   const choose = (id: SectionId, event: ReactMouseEvent<HTMLButtonElement>) => {
     setChosen(id);
-    setPhase('chosen');
     // The focus leaves the menu before the change starts, which gives it to the new page's title (T1).
     arrowRef.current?.focus();
     // A key's click (Enter, Space) has `detail` 0.
     chooseSection(id, { still: inDrawer, byPointer: event.detail > 0 });
     onChoose?.();
-    closeLater.current();
     // The phone's drawer closes over the change and takes the menu with it (T1): it goes at once, as it did.
-    if (!motionHere() || inDrawer) {
-      finishClosing();
-      return;
-    }
-    // The 200 ms in which the check is seen arriving count from the first frame drawn after the choice: the change
-    // holds the screen still until the new page is there (T1).
-    let timer = 0;
-    const cancelFrames = afterHold(() => (timer = window.setTimeout(() => close(false), SECTION_MENU_MS.closeAfter)));
-    closeLater.current = () => {
-      cancelFrames();
-      window.clearTimeout(timer);
-    };
+    if (!motionHere() || inDrawer) finishClosing();
+    else close(false);
   };
 
   const goHome = (event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -194,7 +172,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
             className={cn('relative flex min-w-0 items-center gap-2.5 rounded-l-xl pl-1 pr-3 transition-colors', HOVER, FOCUS)}
           >
             {mark}
-            <RollingName section={section} />
+            <SectionName section={section} />
           </button>
           <span aria-hidden className="my-2.5 w-px shrink-0 bg-slate-200 dark:bg-slate-800" />
           <button {...arrowProps} aria-label={`Cambia sezione${news}`} className={cn('grid w-11 shrink-0 place-items-center rounded-r-xl text-slate-500 transition-colors dark:text-slate-400', HOVER, FOCUS)}>
@@ -202,7 +180,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
               aria-hidden
               className={cn(
                 'h-4 w-4 transition-transform ease-out motion-reduce:transition-none',
-                phase === 'open' || phase === 'chosen' ? 'rotate-180 duration-[260ms]' : 'duration-[180ms]',
+                phase === 'open' ? 'rotate-180 duration-[260ms]' : 'duration-[180ms]',
               )}
             />
           </button>
@@ -231,41 +209,11 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
   );
 }
 
-/** The section's name on the button: on a change the old one rises and goes, the new one comes from below (S6). */
-function RollingName({ section }: { section: SectionId }) {
-  const [names, setNames] = useState<{ now: SectionId; leaving: SectionId | null }>({ now: section, leaving: null });
-  // Derived during render: the name to roll away is the one drawn until now.
-  if (names.now !== section) setNames({ now: section, leaving: motionHere() ? names.now : null });
-  const box = useRef<HTMLSpanElement>(null);
-  const leaving = useRef<HTMLSpanElement>(null);
-  const coming = useRef<HTMLSpanElement>(null);
-
-  // In the next frame drawn, which is after the change's hold (T1), and measured there: a measure in the commit would
-  // force a layout of the whole page while the new one is drawn.
-  useLayoutEffect(() => {
-    if (!names.leaving) return;
-    const frame = requestAnimationFrame(() => {
-      if (!box.current || !coming.current) return;
-      // A roll that ends after a newer one began leaves the newer one alone.
-      rollName(box.current, leaving.current, coming.current, leaving.current?.offsetWidth ?? 0, () =>
-        setNames((current) => (current.now === names.now ? { ...current, leaving: null } : current)),
-      );
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [names]);
-
-  const nameOf = (id: SectionId) => SECTIONS.find((s) => s.id === id)!.name;
+/** The section's name on the button: on a change it is the new one at once (LC129: the roll is gone). */
+function SectionName({ section }: { section: SectionId }) {
   return (
-    <span ref={box} aria-hidden className="relative flex min-w-0 overflow-hidden text-sm font-semibold text-slate-900 dark:text-slate-100">
-      {names.leaving && (
-        <span ref={leaving} key={names.leaving} className="absolute left-0 top-0 whitespace-nowrap">
-          {nameOf(names.leaving)}
-        </span>
-      )}
-      {/* Not truncated: while the box widens to a longer name, an ellipsis would show in the first frames. */}
-      <span ref={coming} key={names.now} className="whitespace-nowrap">
-        {nameOf(names.now)}
-      </span>
+    <span aria-hidden className="relative flex min-w-0 overflow-hidden text-sm font-semibold text-slate-900 dark:text-slate-100">
+      <span className="whitespace-nowrap">{SECTIONS.find((s) => s.id === section)!.name}</span>
     </span>
   );
 }
