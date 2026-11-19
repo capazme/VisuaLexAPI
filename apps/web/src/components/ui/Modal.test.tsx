@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Modal } from './Modal';
+import { ConfirmDialog } from './ConfirmDialog';
 
 describe('Modal', () => {
   it('is a child of document.body even inside a transformed container', () => {
@@ -125,5 +126,18 @@ describe('Modal', () => {
     fireEvent.keyDown(wrapper, { key: 'Tab', shiftKey: true });
     expect(screen.getByRole('button', { name: 'ultimo' })).toHaveFocus();
     offsetParent.mockRestore();
+  });
+
+  // LC119: a confirmation stays after L-73 (L-74), on a box's 8 px; the other windows keep 14 until they go.
+  it('rounds a confirmation\'s shape and content at 8 px, a window that grows at 14', () => {
+    const { unmount } = render(<ConfirmDialog open title="Eliminare?" message="Non si annulla." origin={null} onConfirm={() => {}} onCancel={() => {}} />);
+    const confirm = screen.getByRole('alertdialog');
+    expect(confirm.querySelectorAll('.rounded-\\[8px\\]')).toHaveLength(2);
+    expect(confirm.querySelector('.rounded-2xl')).toBeNull();
+    unmount();
+    render(<Modal isOpen onClose={() => {}} title="Finestra" growFrom={null}><p>Testo</p></Modal>);
+    const window = screen.getByRole('dialog');
+    expect(window.querySelectorAll('.rounded-2xl')).toHaveLength(2);
+    expect(window.querySelector('.rounded-\\[8px\\]')).toBeNull();
   });
 });

@@ -42,6 +42,8 @@ import { DOSSIER_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { CARD_GRID_COLUMNS } from '../../layout/frame';
 import { Illustration } from '../../ui/Illustration';
+import { Arrive } from '../../ui/Arrive';
+import { DossierListSkeleton } from '../../ui/Skeleton';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -355,15 +357,18 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
       {/* A grid of cards of at least 20rem (U1 §7), as many as the frame holds: one on a phone, two at 768 px, three at
           1366 px with the sidebar, four at 1920, seven at 2560 in full screen. */}
+      {/* Read again after «Riprova»: not empty yet, only not read. The cards' place held meanwhile, and their entrance
+          (LC98, LC119). */}
+      <Arrive
+        loading={isLoadingData && filteredDossiers.length === 0 && !searchQuery && !selectedCategory}
+        placeholder={<><p role="status" className="sr-only">Apro le pratiche…</p><DossierListSkeleton /></>}
+      >
       <div className={cn('grid gap-4 md:gap-6', CARD_GRID_COLUMNS)}>
         {filteredDossiers.length === 0 ? (
           searchQuery || selectedCategory ? (
             <div className="col-span-full">
               <EmptyState variant="dossier" title="Nessun risultato" description="Prova a modificare i filtri di ricerca." />
             </div>
-          ) : isLoadingData ? (
-            // Read again after «Riprova»: not empty yet, only not read.
-            <p role="status" className="col-span-full p-6 text-sm text-slate-600 dark:text-slate-400">Apro le pratiche…</p>
           ) : (
             // No dossier yet (S7c): what a dossier is for and the two ways to begin; no drawing since LC21.
             <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
@@ -500,6 +505,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           })
         )}
       </div>
+      </Arrive>
 
       <DossierModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </PageFrame>
