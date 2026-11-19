@@ -427,6 +427,10 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
     expect(screen.getByRole('status')).toHaveTextContent('Apro le pratiche…');
     expect(screen.queryByRole('heading', { name: 'Nessuna pratica di lavoro' })).toBeNull();
+    // LC120: the cards' place in the list's own grid, not a list that turns into a grid when they come.
+    const placeholder = document.querySelector('[data-skeleton-card]')!;
+    expect(placeholder.parentElement).toHaveClass('grid', 'gap-4', 'md:gap-6', CARD_GRID_COLUMNS);
+    expect(placeholder).toHaveClass('flex', 'flex-col', 'p-4', 'md:p-5');
   });
 
   // LC21: the line art is gone (no drawing over an empty list); the words and the two ways to begin stay.
