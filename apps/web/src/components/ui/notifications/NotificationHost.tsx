@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { spring } from '../../../lib/motion';
+import { REPEAT_MOVE } from '../../../lib/motion';
 import { useWorkspaceCovered } from '../../../hooks/useWorkspaceCovered';
 import { NotificationCard } from './NotificationCard';
 import { FOOT_STACK_BOTTOM, footBarStore } from './footBar';
@@ -25,7 +25,7 @@ import {
 /**
  * The app's notifications (K1a): every `Toast` and every «Annulla» (`showUndoToast`) is drawn here while it is mounted,
  * in a stack at the bottom of the screen (at the top for the few that ask), three at most: the newest is drawn first,
- * a fourth closes the oldest, and the others move into place with a spring. A list named «Notifiche»; what each says
+ * a fourth closes the oldest, and the others move into place in 200 ms, with no bounce (LC132). A list named «Notifiche»; what each says
  * is read from two live regions, polite and assertive (an error interrupts), when it arrives. Mounted once, in `Layout`, in the toast band
  * of the z-index scale: above dialogs, so an error raised under one still shows.
  */
@@ -129,7 +129,7 @@ function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'b
         <ol aria-label="Notifiche" className="flex flex-col gap-2">
           {/* The newest first. */}
           {[...entries].reverse().map((entry) => (
-            <motion.li key={entry.id} layout={still ? false : 'position'} transition={{ layout: spring.gentle }} className="pointer-events-auto">
+            <motion.li key={entry.id} layout={still ? false : 'position'} transition={{ layout: REPEAT_MOVE }} className="pointer-events-auto">
               <NotificationCard
                 entry={entry}
                 still={still}

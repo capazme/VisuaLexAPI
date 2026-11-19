@@ -35,9 +35,14 @@ const column = (practiceId: string, layout: PracticeLayout = 'overview') =>
 const actHeadings = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
 
 let scrolled: Element[];
+let scrollArgs: unknown[];
 beforeEach(() => {
   scrolled = [];
-  vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) { scrolled.push(this); });
+  scrollArgs = [];
+  vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element, arg?: unknown) {
+    scrolled.push(this);
+    scrollArgs.push(arg);
+  });
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -56,6 +61,8 @@ describe('PracticeColumn (spec §3)', () => {
     expect(s().pendingReveal).toBeNull();
     expect(scrolled).toHaveLength(1);
     expect(scrolled[0].getAttribute('data-practice-row')).toBe(rowKey);
+    // At once, and only if it is out of view (LC132): never the browser's smooth scroll at every arrow.
+    expect(scrollArgs[0]).toEqual({ block: 'nearest', behavior: 'auto' });
     expect(screen.getByTestId('reader')).toBeInTheDocument();
   });
 

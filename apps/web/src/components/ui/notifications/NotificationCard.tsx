@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent as Rea
 import { motion, useAnimate, useDragControls, type AnimationPlaybackControls, type PanInfo } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { ease } from '../../../lib/motion';
+import { REPEAT_CLOSE, REPEAT_OPEN, ease } from '../../../lib/motion';
 import { CARD_RADIUS, CONTROL_RADIUS } from '../controlStyles';
 import type { HoldReason } from './countdown';
 import type { NotificationEntry, NotificationType } from './notifications';
@@ -20,6 +20,7 @@ import type { SourceRect } from '../IslandSurface';
 
 /** The swipe's exit and its fade under reduced motion, in seconds. */
 const NOTIFICATION_S = { away: 0.26, fade: 0.15 } as const;
+const NOTIFICATION_TIMING = { open: REPEAT_OPEN, close: REPEAT_CLOSE };
 
 /** The pill it grows from: 120 × 32 at the middle of the edge it appears at, or as wide as it where it is narrower. */
 const PILL = { width: 120, height: 32 };
@@ -217,6 +218,8 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
       <IslandSurface
         data-body
         source={pillAt(entry.position)}
+        // A repeated action (LC132): 200 ms in, 150 out, not the island's 280/220.
+        timing={NOTIFICATION_TIMING}
         // Every closing but a swipe goes back into the pill; the stack takes it off once it lands.
         open={!closing || swiped}
         onClosed={() => {

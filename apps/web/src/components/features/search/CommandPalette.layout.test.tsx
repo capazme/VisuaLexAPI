@@ -13,7 +13,7 @@ vi.mock('framer-motion', async (importOriginal) => ({
 }));
 
 import { CommandPalette } from './CommandPalette';
-import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
+import { ISLAND_CLOSE, ISLAND_OPEN, SEARCH_CLOSE, SEARCH_OPEN } from '../../../lib/motion';
 import { appStore } from '../../../store/useAppStore';
 import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID } from '../../../utils/searchFieldControl';
 import type { CustomAlias, QuickNorm } from '../../../types';
@@ -199,25 +199,25 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     Reflect.deleteProperty(Element.prototype, 'animate');
   });
 
-  it('the field grows out of the pill to both sides, one time and one curve; «Chiudi» fades in; the pill hidden under it', async () => {
+  it('the field grows out of the pill to both sides at once, in 180 ms; «Chiudi» fades in; the pill hidden under it (LC132)', () => {
     asDesktop(true);
     recordAnimations();
     const pill = pillInBar();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    // Started once the mount is over (the pill shows meanwhile), never under its long frames.
-    expect(runs.find((run) => run.el === shapeOf())).toBeUndefined();
-    expect(pill.style.opacity).toBe('');
-    await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
+    // Started in the commit that opens it: no wait for the mount's frames (LC132: up to 150 ms before).
     const grow = runOn(shapeOf());
+    expect(grow).toBeDefined();
+    expect(grow.options.delay ?? 0).toBe(0);
+    expect(grow.options.duration).toBe(180);
     expect(grow.keyframes[0]).toMatchObject({ top: '0px', right: '208px', bottom: '0px', left: '208px', borderRadius: '16px' });
     expect(grow.keyframes.at(-1)).toMatchObject({ top: '0px', right: '0px', bottom: '0px', left: '0px' });
-    expect(grow.options).toMatchObject(ISLAND_OPEN);
+    expect(grow.options).toMatchObject(SEARCH_OPEN);
     expect(runOn(contentOf()).keyframes[0]).toEqual({ clipPath: 'inset(0px 208px 0px 208px round 16px)' });
     // LC81: the field is the pill from the first frame, on its box (FLIP: a move and its width) …
     const field = runOn(document.querySelector('[data-island-field]')!);
     expect(field.keyframes[0]).toEqual({ transform: 'translate(336px, 10px)', minWidth: '352px', maxWidth: '352px', opacity: 1 });
     expect(field.keyframes.at(-1)).toMatchObject({ transform: 'translate(0px, 0px)', opacity: 1 });
-    expect(field.options).toMatchObject(ISLAND_OPEN);
+    expect(field.options).toMatchObject(SEARCH_OPEN);
     // … and «Chiudi» fades in beside it, from a quarter of the way.
     expect(runOn(screen.getByRole('button', { name: 'Chiudi' })).keyframes).toEqual([{ opacity: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 1 }]);
     expect(pill.style.opacity).toBe('0');
@@ -226,7 +226,7 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     expect(grow.animation.cancel).toHaveBeenCalled();
   });
 
-  it('the band grows in height and pushes the page, by the island\'s times; closing, the reverse', () => {
+  it('the band grows in height and pushes the page, by the island\'s times (180 and 120 ms); closing, the reverse', () => {
     asDesktop(true);
     recordAnimations();
     pillInBar();
@@ -235,23 +235,26 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     const open = runOn(band());
     expect(Object.keys(open.keyframes[0])).toEqual(['height']);
     expect(open.keyframes[0]).toEqual({ height: '0px' });
-    expect(open.options).toMatchObject(ISLAND_OPEN);
+    expect(open.options).toMatchObject(SEARCH_OPEN);
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     // Going: `aria-hidden`, no longer named.
     const shut = runOn(document.querySelector('[data-palette-band]')!);
     expect(shut.keyframes.at(-1)).toEqual({ height: '0px' });
-    expect(shut.options).toMatchObject(ISLAND_CLOSE);
+    expect(shut.options).toMatchObject(SEARCH_CLOSE);
+    expect(shut.options.duration).toBe(120);
   });
 
-  it('takes the keys from the first frame of the opening: the field has the focus before the island grows, no letter lost (LC129)', async () => {
+  it('takes the keys from the first frame of the opening: the field has the focus as the island starts to grow, no letter lost (LC129, LC132)', async () => {
     asDesktop(true);
     recordAnimations();
     const user = userEvent.setup();
     pillInBar();
     const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    // The island has not started yet (it waits for the mount's long frames): the field takes the keys all the same.
-    expect(runs.find((run) => run.el === shapeOf())).toBeUndefined();
+    // The island is growing already, in the same commit (no wait), and the field has the focus while it grows.
+    const growing = runs.find((run) => run.el === shapeOf());
+    expect(growing).toBeDefined();
+    expect(growing!.animation.cancel).not.toHaveBeenCalled();
     const box = screen.getByRole('combobox');
     expect(box).toHaveFocus();
     // Typed where the focus is, as a hand right after ⌘K.
@@ -280,25 +283,24 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     recordAnimations();
     const pill = pillInBar();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
     end(runOn(shapeOf()));
 
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     const shrink = runOn(shapeOf());
     expect(shrink.keyframes.at(-1)).toMatchObject({ top: '0px', right: '208px', bottom: '0px', left: '208px', opacity: 0 });
-    expect(shrink.options).toMatchObject(ISLAND_CLOSE);
+    expect(shrink.options).toMatchObject(SEARCH_CLOSE);
     // LC81: the field lands on the pill, and gives way to it in the shape's crossfade.
     expect(runOn(document.querySelector('[data-island-field]')!).keyframes.at(-1)).toMatchObject({ transform: 'translate(336px, 10px)', maxWidth: '352px', opacity: 0 });
     const back = runOn(pill);
     expect(back.keyframes).toEqual([{ opacity: 0 }, { opacity: 0, offset: 0.99 }, { opacity: 1 }]);
-    expect(back.options).toMatchObject(ISLAND_CLOSE);
+    expect(back.options).toMatchObject(SEARCH_CLOSE);
     expect(pill.style.opacity).toBe('0');
     end(shrink);
     expect(pill.style.opacity).toBe('');
     await waitFor(() => expect(document.querySelector('[data-palette-slot]')).toBeEmptyDOMElement());
   });
 
-  it('opened again while it closes grows from where it is on screen', async () => {
+  it('opened again while it closes grows from where it is on screen', () => {
     asDesktop(true);
     recordAnimations();
     const pill = pillInBar();
@@ -306,12 +308,11 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     const computed = window.getComputedStyle.bind(window);
     vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element, pseudo?: string | null) => {
       const style = computed(el, pseudo);
-      const mid = runs.some((run) => run.el === el && run.options.duration === ISLAND_CLOSE.duration);
+      const mid = runs.some((run) => run.el === el && run.options.duration === SEARCH_CLOSE.duration);
       if (!mid) return style;
       return new Proxy(style, { get: (target, key) => (typeof key === 'string' && key in caught ? caught[key] : Reflect.get(target, key)) });
     });
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(runOn(shapeOf())).toBeDefined());
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     const closing = runOn(shapeOf());
     // Renders while it closes start no second closing.
@@ -323,32 +324,20 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     const again = runOn(shapeOf());
     expect(again).not.toBe(closing);
     expect(again.keyframes[0]).toMatchObject({ top: '0px', right: '120px', bottom: '0px', left: '120px', borderRadius: '15px', opacity: '0.4' });
-    expect(again.options).toMatchObject(ISLAND_OPEN);
+    expect(again.options).toMatchObject(SEARCH_OPEN);
     expect(runOn(contentOf()).keyframes[0]).toMatchObject({ clipPath: caught.clipPath });
     expect(shapeOf().parentElement!.style.pointerEvents).toBe('');
     expect(runOn(pill).animation.cancel).toHaveBeenCalled();
     expect(pill.style.opacity).toBe('0');
   });
 
-  it('closed before it started is gone at once, the pill never hidden', async () => {
-    asDesktop(true);
-    recordAnimations();
-    const pill = pillInBar();
-    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
-    await waitFor(() => expect(document.querySelector('[data-palette-slot]')).toBeEmptyDOMElement());
-    expect(runs.filter((run) => run.el.hasAttribute('data-island-shape'))).toEqual([]);
-    expect(pill.style.opacity).toBe('');
-  });
-
-  it('under reduced motion only fades, by the same times', async () => {
+  it('under reduced motion only fades, on the island\'s times as before LC132', () => {
     asDesktop(true);
     recordAnimations();
     motionPref.reduced = true;
     const pill = pillInBar();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const root = () => shapeOf().parentElement!;
-    await waitFor(() => expect(runOn(root())).toBeDefined());
     expect(runOn(root()).keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
     expect(runOn(root()).options).toMatchObject(ISLAND_OPEN);
     expect(runs.filter((run) => run.el === shapeOf())).toEqual([]);

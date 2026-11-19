@@ -562,12 +562,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   the layout's content area, not `<main>`, so the bars at the top and the floating buttons hold still. It is named only
   while a transition runs (`lib/pageTransition.ts`, the class `vlx-page-changing` on the root; the sign-in page's
   entrance goes through it too): a `view-transition-name` makes a stacking context (gotcha 22), and `<main>` keeps
-  its own with `isolate`. The content fades out in `--dur-press`, then the new one fades in rising by 5 px in
-  `--dur-press`, `--ease-out`: 240 ms (`dur.panel`, LC98: the `--dur-*` of `:root` mirror `lib/motion.ts`), no overlap, nothing drawn over the screen; the root and the groups do not animate (a group's
+  its own with `isolate`. The old content goes at once and the new one fades in rising by 5 px in `--dur-pop`,
+  `--ease-out`: 180 ms, `PageFade`'s time (LC132; it was 120 ms out, then 120 in; LC98: the `--dur-*` of `:root` mirror `lib/motion.ts`), no overlap, nothing drawn over the screen; the root and the groups do not animate (a group's
   default 250 ms would outlast the change, `theme.test.ts` checks the budget), the root's pictures do not blend
   (`mix-blend-mode: normal`: the default `plus-lighter` adds old and new, the old sidebar's entries showing through
   the new, a light page washed out), and `::view-transition` takes no pointer, so a tap reaches the page. The
-  240 ms start once the new page is there: the router renders a navigation in a transition (`flushSync` would not make
+  180 ms start once the new page is there: the router renders a navigation in a transition (`flushSync` would not make
   it synchronous), so the old page's picture holds for the new title, at most `HOLD_MAX` (150 ms), watched by a
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
   that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
@@ -754,11 +754,11 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   Framer Motion and Web Animations): the field grows into the panel (`PanelGrowth`): the same place and width, the panel
   uncovered from the field's height down to its own (`clip-path`, `calc(100% - <the field's height>)` to
   `calc(0% - 0px)`, one template so the two ends interpolate; the corners from the field's 12 px to a card's 16), in
-  about 280 ms on `ease.out` (no bounce; a curve, not a spring); the clip is set before the first paint, so the panel
-  never flashes open, and the growth starts once the first frame is drawn (mounting the rows is a long frame, which an
-  animation started before it would spend unseen); Web Animations with no fill, so once grown nothing holds the clip and
+  about 280 ms on `ease.out` (no bounce; a curve, not a spring; since LC132 the island and its band take 180 ms to open
+  and 120 to close, `SEARCH_OPEN`/`SEARCH_CLOSE`, starting in the commit that opens them, with no wait); the clip is set
+  before the first paint, so the panel never flashes open; Web Animations with no fill, so once grown nothing holds the clip and
   the card's `shadow-lg` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
-  Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
+  Closing (Esc, a click outside, a choice), the same way back (120 ms since LC132) from wherever it is (a growth cut short
   included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
   Animations the panel is drawn at once. While the box filters, the list changes at once: no row slides, fades or pops
   out, and the band does not follow its height (`Expand`'s `followContent={false}`) — LC129: nothing moves at a key; the letters the box matched are drawn in toga, semibold (`Matched`, over `matchRanges` in
@@ -888,7 +888,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   the bottom (at the top for `position="top"`; from `md` at the right, 32 px from the bottom; over a bar held at the foot,
   `footBarStore`: «Sposta l'evidenziazione», Opus's views on a phone, its height with the safe area), three at most per edge — the newest first, a fourth closes the oldest
   plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
-  out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
+  out stands), the others move in 200 ms with no bounce (`REPEAT_MOVE`, LC132; it was `spring.gentle`); a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
   again). Where no host is mounted (a component's test) a `Toast` draws itself alone at
   its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`)
@@ -929,10 +929,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   without motion within 300 ms of another closing, and at once on keyboard focus; otherwise a 120 ms fade, no shape.
   **What opens over the content grows out of what opened it** (LC85, L-76: the «⋯» menus of `MenuButton`, the
   notifications, `ConfirmDialog` through `Modal`'s `growFrom`, `WireConfirm`): `ui/IslandSurface`, the search
-  island's technique (`CommandPalette` uses it too, with `hideSource`, `within`, `settle`). Two layers, the shape
+  island's technique (`CommandPalette` uses it too, with `hideSource`, `within`). Two layers, the shape
   (ground, edge, corners, shadow: `surfaceClassName`) and the content clipped to it, grow by Web Animations from the
   source's rectangle, which may lie outside the box (negative insets), to the box in `ISLAND_OPEN` (280 ms), the content
-  seen from a quarter of the way, and go back in `ISLAND_CLOSE` (220 ms); interrupted, each way starts from the values
+  seen from a quarter of the way, and go back in `ISLAND_CLOSE` (220 ms) — or in the `timing` its owner gives, at once
+  with no wait (LC132: ⌘K and its band `SEARCH_OPEN`/`SEARCH_CLOSE`, 180/120 ms; the notifications `REPEAT_OPEN`/
+  `REPEAT_CLOSE`, 200/150 ms; ⌘K no longer waits up to 150 ms, `settle`, before growing); interrupted, each way starts from the values
   on screen; closing, the surface is `inert`. Kept mounted by `AnimatePresence` or by its owner (`open`, `onClosed`).
   The source is an element or a rectangle against the box (the notifications' pill); a confirmation's is its `origin`, required
   on `ConfirmDialog` and `WireConfirm` (`event.currentTarget`; for a menu's entry the trigger, which `MenuButton` hands
@@ -948,7 +950,12 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   only, `HOVER_LIFT` lifts 1 px for a fine pointer and goes on nothing that is a row or a list item.
   **Motion** comes from `lib/motion.ts` (`ease`, `dur`, `spring.snappy` for panels and rows,
   `spring.gentle` for rare moments): no component types a spring or a curve, and a transition names what
-  changes. `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring, with no exception
+  changes. **The frequency rule** (LC132, the comment in `lib/motion.ts`, `README-UX.md` §7): a keystroke moves
+  nothing; a repeated action takes at most 150–200 ms, with no spring and no cascade; a change of place 180 ms. `Button`
+  turns busy or disabled at once (its transition leaves out the opacity, `disabled:transition-none`). `Expand` opens in
+  200 ms and closes in 150 (`REPEAT_*`; under reduced motion its fades as before), and brings itself into view only if it
+  would leave it, at once (`block: 'nearest'`, `behavior: 'auto'`); so does a practice's revealed row (the act's
+  arrows, a find match: `PracticeColumn`). `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring, with no exception
   since the Gymnasium celebration's stamp is gone (G9). A row or a list item takes a colour change on hover, never a
   scale or a lift.
 
@@ -2429,7 +2436,7 @@ through `windowFocusRequest`, a one-shot signal the window takes atomically; a t
 note's tools take the bar's look by `triggerClassName`), ⌘K's fields (the box stays cmdk's and keeps the focus at the
 opening), the find window, «Apri accanto» and «Azioni» of a row in «Fonti» (36 px from `md`, 44 on a phone). The case
 law's section opens as an `Expand` under its heading (Esc closes it); a row's text sits in an open `Expand`, so «Mostra
-tutto» follows the height on `ISLAND_OPEN`. «Fonti · Atti · Compiti» are `SegmentedTabs size="sm"`; «Seleziona»
+tutto» follows the height on `REPEAT_OPEN` (LC132). «Fonti · Atti · Compiti» are `SegmentedTabs size="sm"`; «Seleziona»
 carries `aria-controls`. `search/ricerca.guard.test.ts` refuses, in both folders, a bare `<button>`, `<select>` or
 `<input>` without `bare-button: <reason>` on the line above, the old local looks (`ACTION`, `LINK`, `FIELD_INPUT`…),
 a 6, 10 or 16 px radius and a duration by hand; the windows over the content still there (L-73) are listed, left out
@@ -3373,7 +3380,8 @@ meant to stay split; add new features as new files, not inside the shells:
   state): «Indietro» and Esc (pressed in the page or with the focus nowhere) go back there, or to `/` when it was
   opened by its address. It comes in with `PageSlide` and leaves the other way (`back`): `Layout`'s key for it changes
   only entering and leaving Impostazioni. What opens inside it opens in the page (`Expand`). A section's views (Pratiche's
-  list, dossier and trash; Learn's and Opus's views) move the same way through `layout/ViewSlide` (LC98), in their order,
+  list, dossier and trash; Learn's and Opus's views) move through `layout/ViewSlide` (LC98) in 180 ms (LC132): sideways
+  by 12 px, in their order, only between a list and its detail (`drill`), every other change as `PageFade`,
   the focus then on the page's `data-page-title`; what arrives after a wait comes in through `ui/Arrive` over a `Skeleton`.
   «Indietro» above a page's frame is `ui/BackLink` (LC104, Amministrazione): the focus lands on the title reached or,
   toward an anchor (`/impostazioni#amministrazione`), on the anchored part's heading once drawn; the browser's own focus

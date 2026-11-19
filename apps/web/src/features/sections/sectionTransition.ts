@@ -109,8 +109,8 @@ export interface SectionTransition {
 }
 
 /**
- * The section change (T1): the page's content fades out, the new one fades in rising by a few pixels — 240 ms once
- * the new page is there, through the browser's View Transition on `vlx-page`, the layout's content area (`index.css`,
+ * The section change (T1): the page's content goes at once, the new one fades in rising by a few pixels — 180 ms once
+ * the new page is there, `PageFade`'s time (LC132; it was 120 out, then 120 in), through the browser's View Transition on `vlx-page`, the layout's content area (`index.css`,
  * `lib/pageTransition`); nothing covers the screen, and a tap goes through to the page. The switcher's mark changes
  * colour (`SectionSwitcher`); the sidebar's new entries are there at once (LC129: their cascade is gone). A tap or a key
  * during it brings it to its end; the browser's Back drops it, with no swap if the page had not changed yet. The focus

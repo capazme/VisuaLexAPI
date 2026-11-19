@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { BookOpen, ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { dur, ease } from '../../../lib/motion';
+import { SEARCH_CLOSE, SEARCH_OPEN, dur, ease } from '../../../lib/motion';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -84,6 +84,9 @@ const LIST_KEYS = new Set(['Enter', 'ArrowUp', 'ArrowDown', 'Home', 'End']);
 function keepKeys(event: ReactKeyboardEvent) {
   if (LIST_KEYS.has(event.key) && !(event.target as HTMLElement).hasAttribute('cmdk-input')) event.stopPropagation();
 }
+
+/** The island and its band, one gesture: `SEARCH_OPEN` and `SEARCH_CLOSE` for both (LC132, the frequency rule). */
+const SEARCH_TIMING = { open: SEARCH_OPEN, close: SEARCH_CLOSE };
 
 /**
  * The tint under the row the keyboard (or the pointer) has chosen: it is where the key is, in the same frame, with no
@@ -1236,7 +1239,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           onClosed={() => setFieldOut(false)}
           source={place.source}
           hideSource
-          settle
+          timing={SEARCH_TIMING}
           surfaceClassName=""
           contentClassName="relative flex min-w-0 items-center"
           className="w-full max-w-3xl"
@@ -1246,7 +1249,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         place.slot,
       )}
       {/* The band: under the bars, it grows and pushes the page down; no veil, nothing over the page (L-75). */}
-      <Expand open={isOpen} followContent={false} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
+      <Expand open={isOpen} followContent={false} timing={SEARCH_TIMING} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
         <div className={cn('border-b border-slate-200 dark:border-slate-800', overBar && 'pt-[calc(3.5rem+env(safe-area-inset-top))]')}>
           <div
             style={{ ['--palette-max-h' as string]: isDesktop

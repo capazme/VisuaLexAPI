@@ -741,16 +741,15 @@ describe('the section change (T1)', () => {
     return match!.slice(1).map(Number);
   };
 
-  it('fades the page out, then in rising by a few pixels, in under 250 ms, with no overlap and nothing else moving', async () => {
+  it('lets the old page go at once and fades the new one in rising by a few pixels in `dur.pop`, as `PageFade` (LC132)', async () => {
     const css = await compile([]);
-    // Its times are `lib/motion.ts`'s `dur`, as `--dur-*` (LC98).
+    // Its time is `lib/motion.ts`'s `dur`, as `--dur-*` (LC98): `PageFade`'s 180 ms, with no delay.
     const token = (name: string) => ms(css, new RegExp(`--dur-${name}:\\s*(\\d+)ms`))[0];
-    const out = token(css.match(/::view-transition-old\(vlx-page\)\s*\{\s*animation:\s*vlx-page-out\s+var\(--dur-(\w+)\)/)?.[1] ?? 'none');
-    const names = css.match(/::view-transition-new\(vlx-page\)\s*\{\s*animation:\s*vlx-page-in\s+var\(--dur-(\w+)\)\s+var\(--ease-out\)\s+var\(--dur-(\w+)\)/);
+    expect(css).toMatch(/::view-transition-old\(vlx-page\)\s*\{\s*animation:\s*none;\s*opacity:\s*0/);
+    const names = css.match(/::view-transition-new\(vlx-page\)\s*\{\s*animation:\s*vlx-page-in\s+var\(--dur-(\w+)\)\s+var\(--ease-out\)\s+both/);
     expect(names).not.toBeNull();
-    const [into, delay] = [token(names![1]), token(names![2])];
-    expect(delay).toBeGreaterThanOrEqual(out);
-    expect(delay + into).toBeLessThan(250);
+    expect(names![1]).toBe('pop');
+    expect(token(names![1])).toBe(dur.pop * 1000);
     const [rise] = ms(css, /@keyframes vlx-page-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*translate:\s*0\s+(\d+)px/);
     expect(rise).toBeGreaterThanOrEqual(4);
     expect(rise).toBeLessThanOrEqual(6);
@@ -763,7 +762,6 @@ describe('the section change (T1)', () => {
     expect(css).not.toMatch(/(^|\})\s*\.vlx-page\s*\{/);
     // A tap goes through to the page; from the sign-in page, with no old page, the new one does not wait.
     expect(css).toMatch(/::view-transition\s*\{\s*pointer-events:\s*none/);
-    expect(css).toMatch(/::view-transition-new\(vlx-page\):only-child\s*\{\s*animation-delay:\s*0ms/);
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
     expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
   }, 30000);

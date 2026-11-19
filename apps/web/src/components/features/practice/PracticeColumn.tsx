@@ -41,7 +41,7 @@ export interface PracticeColumnProps {
 /**
  * The practice's column (spec §3, D3; U2): its acts in their order — one under the other on a phone and in the index, a
  * grid of panels in the overview — reordered by drag (pointer and keyboard, as the dossier's acts); «Giurisprudenza»
- * follows them (§3.3). Outside the index it takes the practice's reveal (`takeReveal`, once, gotcha 14) and scrolls the
+ * follows them (§3.3). Outside the index it takes the practice's reveal (`takeReveal`, once, gotcha 14) and brings the
  * revealed row into view: the row is already open, the store opened it in the same step. The index draws no row to
  * open: `ReadingRow` takes the reveal there and opens the row's subject beside.
  */
@@ -61,8 +61,9 @@ export function PracticeColumn({ practiceId, onViewPdf, onCrossReference, layout
     if (!taken) return;
     const rows = columnRef.current?.querySelectorAll<HTMLElement>('[data-practice-row]') ?? [];
     const row = Array.from(rows).find((el) => el.dataset.practiceRow === taken.rowKey);
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    row?.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+    // At once and only if the row is out of view (LC132): the act's arrows come one after the other, and the browser's
+    // smooth scroll took 450–500 ms each time. The same for every reveal (a search that landed, a find match, the way back).
+    row?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
   }, [revealKey, isIndex, practiceId, takeReveal]);
 
   const sensors = useSensors(
