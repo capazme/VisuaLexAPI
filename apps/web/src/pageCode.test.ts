@@ -34,7 +34,8 @@ describe('the pages loaded with their route (P1)', () => {
     expect(pageCodeFor('/crediti')).toBe(PAGE_CODE.credits);
     expect(pageCodeFor('/collega-app')).toBe(PAGE_CODE.connectAiApp);
     expect(pageCodeFor('/work/scadenziario')).toBe(PAGE_CODE.opus);
-    // Ricerca and the sign-in page are in the first chunk; Gymnasium and Academia have their own.
+    expect(pageCodeFor('/learn/ripasso')).toBe(PAGE_CODE.learn);
+    // Ricerca and the sign-in page are in the first chunk; Academia has its own.
     expect(pageCodeFor('/')).toBeNull();
     expect(pageCodeFor('/login')).toBeNull();
     expect(pageCodeFor('/forumx')).toBeNull();
@@ -43,6 +44,8 @@ describe('the pages loaded with their route (P1)', () => {
   it('are fetched for a section change from the same modules, so the change (T1) finds Opus and the Forum there', () => {
     expect(SECTION_HOME_CODE.opus).toBe(PAGE_CODE.opus);
     expect(SECTION_HOME_CODE.forum).toBe(PAGE_CODE.forum);
+    // Learn's home view; its frame is in the first chunk (LC133).
+    expect(SECTION_HOME_CODE.gymnasium).toBe(PAGE_CODE.learn);
   });
 
   it('are imported statically nowhere, so none comes back into the first chunk', () => {
@@ -51,6 +54,7 @@ describe('the pages loaded with their route (P1)', () => {
       'components/features/bulletin/BulletinBoardPage', 'components/features/bulletin/ForumCommunityPage',
       'components/features/documents/DocumentReviewPage', 'components/features/rassegne/RassegneSearchPage', 'pages/CreditsPage', 'features/connections/ConnectAiAppPage',
       'components/features/planner/OpusPage', 'components/features/planner/OpusViews',
+      'components/features/studia/ReviewHome',
       // A folder's index that would re-export one of them (the connections had one, with «Collega un'app AI»).
       'features/connections',
     ]);

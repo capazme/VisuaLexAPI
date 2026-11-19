@@ -32,6 +32,7 @@ import { provenance } from '../rassegne/rassegnaFilters';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 import { useOpenSettings } from '../settings/settingsRoute';
 import { focusLanding } from '../../../utils/focusPage';
+import { whenIdle } from '../../../lib/idle';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -206,6 +207,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
   const isDesktop = useIsDesktop();
   const still = Boolean(useReducedMotion());
+  // LC133: the band's rows drawn ahead, hidden and inert, once the page is idle: the first ⌘K paid their mount (~90 ms).
+  // Its reads stay on `isOpen` (`useAliasCatalog`, `useRassegneForTopic`): nothing is fetched for the hidden band.
+  const [prepared, setPrepared] = useState(false);
+  useEffect(() => whenIdle(() => setPrepared(true)), []);
+  // Opened before the page was idle: kept from then on, so the flag never changes while the band closes.
+  if (isOpen && !prepared) setPrepared(true);
 
   // Which way the step moved, for its slide: forward slides in from the right, back from the left.
   // Adjusted during render (own state, no effect). A step changed while the palette is closed (the reset)
@@ -608,6 +615,28 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   const bandRef = useRef<HTMLDivElement>(null);
   const fieldBoxRef = useRef<HTMLDivElement>(null);
+  // Opened, cmdk's choice is the first row. Its rows mounting chose it; drawn ahead (LC133) none mounts, so it is set here.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const first = bandRef.current?.querySelector('[cmdk-item]:not([aria-disabled="true"])')?.getAttribute('data-value');
+    if (first) setChosenRow(first);
+  }, [isOpen]);
+  // The field names the chosen row to a screen reader (LC133): cmdk sets `aria-activedescendant` only from its arrows, never
+  // from a controlled value (ours), so the first row and the row after a reopening went unsaid. Its rows redraw on their
+  // own, after this menu's render: their mark is watched.
+  useEffect(() => {
+    const band = bandRef.current;
+    if (!isOpen || !band) return undefined;
+    const name = () => {
+      const id = band.querySelector('[cmdk-item][data-selected="true"]')?.id;
+      if (id) boxRef.current?.setAttribute('aria-activedescendant', id);
+      else boxRef.current?.removeAttribute('aria-activedescendant');
+    };
+    name();
+    const watch = new MutationObserver(name);
+    watch.observe(band, { subtree: true, attributes: true, attributeFilter: ['data-selected'] });
+    return () => watch.disconnect();
+  }, [isOpen]);
   // A click outside the field and the band closes it, as the veil's did; the page under takes the click as well. So does
   // the focus going out to the page, by Tab (Papiniano, #599): the same «outside».
   useEffect(() => {
@@ -726,7 +755,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             <Search aria-hidden className={ISLAND_LENS} />
             <Command.Input
               ref={boxRef}
-              autoFocus
+              // Drawn ahead in the hidden band, it takes no focus; opened, `Expand` gives it (LC133).
+              autoFocus={isOpen}
               value={inputValue}
               onValueChange={(value) => {
                 // A change of the words drops a wait: a new Enter is needed, even back on the same words.
@@ -1249,7 +1279,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         place.slot,
       )}
       {/* The band: under the bars, it grows and pushes the page down; no veil, nothing over the page (L-75). */}
-      <Expand open={isOpen} followContent={false} timing={SEARCH_TIMING} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
+      <Expand open={isOpen} keepMounted={prepared} followContent={false} timing={SEARCH_TIMING} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
         <div className={cn('border-b border-slate-200 dark:border-slate-800', overBar && 'pt-[calc(3.5rem+env(safe-area-inset-top))]')}>
           <div
             style={{ ['--palette-max-h' as string]: isDesktop

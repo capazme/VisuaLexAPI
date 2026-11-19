@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useLocation, useOutlet } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { ViewSlide } from '../../layout/ViewSlide';
-import { LessonFrame } from './LessonFrame';
+import { LearnLoading, LessonFrame } from './LessonFrame';
 import { StudyStrip } from './progress/StudyStrip';
 import { useProgress } from './progress/useProgress';
 
@@ -70,8 +70,10 @@ export function StudiaPage() {
     >
       {/* A view, not an address: a card opened in «Le mie schede», or a course in «Percorsi», stays in its view. */}
       <ViewSlide view={pathname.split('/')[2] ?? ''} order={VIEW_ORDER}>
+        {/* Only the view waits for its code (LC133): the frame and its title are drawn with the page's first frame. A
+            change of view is the router's transition, so this boundary, once shown, keeps the view left meanwhile. */}
         {underStrip(pathname) && <AreaStrip />}
-        {outlet}
+        <Suspense fallback={<LearnLoading />}>{outlet}</Suspense>
       </ViewSlide>
     </PageFrame>
   );

@@ -32,7 +32,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useServiceHealth } from '../../hooks/useServiceHealth';
 import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { PluginSlot } from '../../plugins/PluginSlot';
-import { spring } from '../../lib/motion';
+import { REPEAT_OPEN, ease, spring } from '../../lib/motion';
 import { SECTIONS, sectionForPath } from '../../features/sections/sections';
 import { sectionStore } from '../../features/sections/useSection';
 import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
@@ -352,6 +352,8 @@ export function Layout() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          // With the drawer, on its time (LC133): Framer's default was 300 ms.
+          transition={{ duration: REPEAT_OPEN.duration / 1000, ease: ease.drawer }}
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={closeDrawer}
         />

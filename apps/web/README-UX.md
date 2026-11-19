@@ -670,12 +670,14 @@ frequente, meno si muove:
 | Gesto | Movimento | Esempi |
 |-------|-----------|--------|
 | Un tasto | Nessuno: il cambiamento è lì nello stesso frame | Una lettera in ⌘K, le frecce in un elenco |
-| Un'azione ripetuta | Al massimo 150–200 ms, senza molla e senza cascata | ⌘K (180 in apertura, 120 in chiusura), `Expand` (200/150), le notifiche (200/150), il pulsante occupato (subito) |
-| Un cambio di posto | 180 ms | `PageFade`, `ViewSlide` (12 px di lato solo tra elenco e dettaglio), il cambio di sezione |
+| Un'azione ripetuta | Al massimo 150–200 ms, senza molla e senza cascata | ⌘K (180 in apertura, 120 in chiusura), `Expand` (200/150), le notifiche (200/150), il menu del telefono (200/150), il pulsante occupato o disattivato (subito, in entrata e in uscita) |
+| Un cambio di posto | 180 ms | `PageFade`, `ViewSlide` (12 px di lato solo tra elenco e dettaglio), il cambio di sezione, «Apri accanto» nella pratica |
 
-I momenti rari (le conferme, i premi di Gymnasium, il primo disegno di una pagina) tengono i loro tempi. Con «Riduci
-movimento» restano le sole dissolvenze: quelle dell'isola e di `Expand` con i tempi di prima, quella di `ViewSlide`
-con i 180 ms lineari di `PageFade`. Ogni tempo è un token di `src/lib/motion.ts`: il guard
+Un cambiamento, un movimento: ciò che arriva dopo un'attesa nata con un cambio di pagina o di vista (`Arrive`) entra
+solo in dissolvenza, perché il cambio si è già mosso. I momenti rari (le conferme, i premi di Gymnasium, il primo
+disegno di una pagina) tengono i loro tempi. Con «Riduci movimento» restano le sole dissolvenze, mai più lente del
+movimento: ⌘K e le notifiche con i loro tempi (180/120 e 200/150), `Expand` con quelli di prima, `ViewSlide` con i
+180 ms lineari di `PageFade`. Ogni tempo è un token di `src/lib/motion.ts`: il guard
 `src/styleRules.guard.test.ts` rifiuta le durate scritte a mano.
 
 ---

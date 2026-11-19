@@ -13,6 +13,7 @@ vi.mock('../../hooks/useForumNotifications', () => ({
 
 import { Sidebar, SIDEBAR_SMALL_TEXT, SIDEBAR_TOGGLE_TEXT } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
+import { REPEAT_CLOSE, REPEAT_OPEN } from '../../lib/motion';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
 import { plannerStore } from '../features/planner/plannerStore';
@@ -640,6 +641,23 @@ describe('Sidebar — the user menu (spec D2)', () => {
       </MemoryRouter>,
     );
     expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+  });
+
+  it('slides the phone\'s drawer as a repeated action: in on REPEAT_OPEN, out on REPEAT_CLOSE; the rail has no times of its own (LC133)', () => {
+    const at = (isOpen: boolean, layout: 'drawer' | 'rail') => (
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={isOpen} serviceHealth={serviceHealth} {...handlers} layout={layout} />
+      </MemoryRouter>
+    );
+    const { container, rerender } = render(at(false, 'drawer'));
+    const aside = () => container.querySelector('aside')!;
+    expect(aside().style.transitionDuration).toBe(`${REPEAT_CLOSE.duration}ms`);
+    rerender(at(true, 'drawer'));
+    expect(aside().style.transitionDuration).toBe(`${REPEAT_OPEN.duration}ms`);
+    expect(aside().style.transitionTimingFunction).toBe(REPEAT_OPEN.easing);
+    expect(aside().className).not.toMatch(/duration-\(--dur-scene\)/);
+    rerender(at(true, 'rail'));
+    expect(aside().style.transitionDuration).toBe('');
   });
 
   it('keeps «Segnala un problema» in the user menu from md too: the rail has no bug at its foot (LC92)', () => {

@@ -18,6 +18,11 @@ vi.mock('../hooks/useTour', () => ({
   holdTours: vi.fn(),
 }))
 
+// jsdom has no idle time: what waits for it (`whenIdle`, ⌘K's band drawn ahead, LC133) would run on its fallback timer in
+// the middle of a test and take its time from it (a cold boot's pratica went past its 5 s, LC135). It never comes under
+// test; a test of what it starts takes `whenIdle` in its own file and runs it when it says.
+vi.mock('../lib/idle', () => ({ whenIdle: () => () => {} }))
+
 // Cleanup after each test
 afterEach(async () => {
   cleanup()

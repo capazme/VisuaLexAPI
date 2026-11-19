@@ -26,7 +26,7 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
   keepMounted?: boolean;
   /** Open, its height follows its content (default). Off where the content changes at a key (⌘K's band, LC129): it changes at once. */
   followContent?: boolean;
-  /** Its two ways' times with motion: a repeated action's by default (`REPEAT_OPEN`, `REPEAT_CLOSE`); ⌘K's band its island's. */
+  /** Its two ways' times: a repeated action's by default (`REPEAT_OPEN`, `REPEAT_CLOSE`); ⌘K's band its island's. Given, they are the fades' under reduced motion too (LC133). */
   timing?: { open: KeyframeAnimationOptions; close: KeyframeAnimationOptions };
   children: ReactNode;
 }
@@ -42,8 +42,9 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
  * field, whose keyboard would rise over the page on a phone (LC105). On closing it goes back to what opened it. Esc
  * inside closes it.
  */
-export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, followContent = true, timing: ways = REPEAT, className, children, onKeyDown, ...rest }: ExpandProps) {
+export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, followContent = true, timing: given, className, children, onKeyDown, ...rest }: ExpandProps) {
   // Still drawn while it closes; derived during render where no animation will run (react-hooks/set-state-in-effect).
+  const ways = given ?? REPEAT;
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
   if (!open && mounted && !canAnimate()) setMounted(false);
@@ -99,9 +100,9 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
     // Under reduced motion the closing is the app's own fade (`index.css`: 150 ms): the island's 220 ms ease-out had the
     // content gone in a third of it and the space standing empty for the rest, read as a delay (Papiniano, #599). The
     // opening keeps the island's time: a shorter fade there showed a row's late content settling (46 px in Fonti).
-    // With motion, the frequency rule's times (LC132).
+    // With motion, the frequency rule's times (LC132); times given by the owner (⌘K's) hold for the fade too (LC133).
     const reduced = prefersReducedMotion();
-    const timing = reduced ? (open ? ISLAND_OPEN : REDUCED_FADE) : open ? ways.open : ways.close;
+    const timing = reduced && !given ? (open ? ISLAND_OPEN : REDUCED_FADE) : open ? ways.open : ways.close;
     const fill: FillMode = open ? 'none' : 'forwards';
     const fade = inner.animate([{ opacity: fromOpacity }, { opacity: open ? 1 : 0 }], { ...timing, fill });
     const anims = [fade];

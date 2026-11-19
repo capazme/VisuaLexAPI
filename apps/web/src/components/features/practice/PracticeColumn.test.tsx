@@ -59,11 +59,76 @@ describe('PracticeColumn (spec §3)', () => {
     render(column(practiceId));
     act(() => { s().revealPracticeArticle(practiceId, l24Id, '7'); });
     expect(s().pendingReveal).toBeNull();
-    expect(scrolled).toHaveLength(1);
     expect(scrolled[0].getAttribute('data-practice-row')).toBe(rowKey);
     // At once, and only if it is out of view (LC132): never the browser's smooth scroll at every arrow.
     expect(scrollArgs[0]).toEqual({ block: 'nearest', behavior: 'auto' });
+    // Then its article, so that the row comes in whole when it fits (LC133).
+    expect(scrolled[1]?.id).toBe(scrolled[0].querySelector('[aria-expanded][aria-controls]')?.getAttribute('aria-controls'));
+    expect(scrollArgs[1]).toEqual({ block: 'nearest', behavior: 'auto' });
     expect(screen.getByTestId('reader')).toBeInTheDocument();
+  });
+
+  it('a row whose article does not fit under its heading comes to the top, at once; one that fits is brought in whole (LC133)', () => {
+    const { practiceId, l24Id } = setUp();
+    render(column(practiceId));
+    // 1440×600: the heading near the bottom edge (558), the article laid out under it at its full height already.
+    let articleBottom = 1400;
+    const box = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const own = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.hasAttribute('data-practice-row')) return box(558, 600);
+      const row = this.closest('[data-practice-row]');
+      const text = row?.querySelector('[aria-expanded][aria-controls]')?.getAttribute('aria-controls');
+      if (text && this.id === text) return box(600, articleBottom);
+      return own.call(this);
+    });
+    vi.stubGlobal('innerHeight', 600);
+    act(() => { s().revealPracticeArticle(practiceId, l24Id, '7'); });
+    expect(scrollArgs).toEqual([{ block: 'start', behavior: 'auto' }]);
+    expect(scrolled[0]).toHaveAttribute('data-practice-row');
+
+    scrolled = [];
+    scrollArgs = [];
+    articleBottom = 900;
+    act(() => { s().revealPracticeArticle(practiceId, l24Id, '5'); });
+    expect(scrollArgs).toEqual([{ block: 'nearest', behavior: 'auto' }, { block: 'nearest', behavior: 'auto' }]);
+    vi.unstubAllGlobals();
+  });
+
+  it('decides again when the row\'s real size is known: its space opened, its text arrived late; never once the user scrolls (LC133)', () => {
+    const observed: Array<() => void> = [];
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { observed.push(callback); }
+      observe() {}
+      disconnect() { observed.length = 0; }
+    });
+    const { practiceId, l24Id } = setUp();
+    render(column(practiceId));
+    // At the reveal the row is closed at the bottom edge: its heading alone (500–544) and no text yet.
+    let textBottom = 544;
+    const box = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const own = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.hasAttribute('data-practice-row')) return box(500, 544);
+      const text = this.closest('[data-practice-row]')?.querySelector('[aria-expanded][aria-controls]')?.getAttribute('aria-controls');
+      if (text && this.id === text) return box(544, textBottom);
+      return own.call(this);
+    });
+    vi.stubGlobal('innerHeight', 600);
+    act(() => { s().revealPracticeArticle(practiceId, l24Id, '7'); });
+    expect(scrollArgs.every((arg) => (arg as ScrollIntoViewOptions).block === 'nearest')).toBe(true);
+    // The text arrives, 90 ms after the space opened: 544 → 1200, the row taller than the window. It comes to the top.
+    scrollArgs = [];
+    textBottom = 1200;
+    act(() => observed.forEach((callback) => callback()));
+    expect(scrollArgs).toEqual([{ block: 'start', behavior: 'auto' }]);
+    // The user scrolls: the row is theirs, a later change moves nothing.
+    scrollArgs = [];
+    fireEvent.wheel(window);
+    textBottom = 1500;
+    act(() => observed.forEach((callback) => callback()));
+    expect(scrollArgs).toEqual([]);
+    vi.unstubAllGlobals();
   });
 
   it('a reveal already waiting when the column mounts is taken too', () => {
@@ -71,7 +136,9 @@ describe('PracticeColumn (spec §3)', () => {
     s().revealPracticeArticle(practiceId, ccId, '2043');
     render(column(practiceId));
     expect(s().pendingReveal).toBeNull();
-    expect(scrolled).toHaveLength(1);
+    // The row, then its article (LC133).
+    expect(scrolled[0]).toHaveAttribute('data-practice-row');
+    expect(scrolled).toHaveLength(2);
   });
 
   it("leaves another practice's reveal alone", () => {

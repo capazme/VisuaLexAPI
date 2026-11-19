@@ -52,7 +52,9 @@ describe('the level bar (Gymnasium XP spec §4, G1c)', () => {
   it('presses a new level in, and under reduced motion draws it at rest, still announced', async () => {
     localStorage.setItem(SEEN, JSON.stringify({ xp: 90, livello: 1 }));
     const { unmount } = render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
-    expect(screen.getByText('Livello 2').style.opacity).toBe('0');
+    // Pressed in, but there from the first frame: no fade from nothing, no delay (LC133).
+    expect(screen.getByText('Livello 2').style.opacity).not.toBe('0');
+    expect(screen.getByText('Livello 2').style.transform).toMatch(/scale/);
     unmount();
     motion.reduce = true;
     localStorage.setItem(SEEN, JSON.stringify({ xp: 90, livello: 1 }));
