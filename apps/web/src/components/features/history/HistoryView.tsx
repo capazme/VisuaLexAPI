@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { Search, ArrowRight, Trash2, Zap, FolderPlus, MoreVertical, Plus, X } from 'lucide-react';
+import { Loader2, Search, ArrowRight, Trash2, Zap, FolderPlus, MoreVertical, Plus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
@@ -20,8 +20,6 @@ import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
 import { Input } from '../../ui/Input';
 import { Toast } from '../../ui/Toast';
-import { Arrive } from '../../ui/Arrive';
-import { HistoryListSkeleton } from '../../ui/Skeleton';
 
 // Humanized group label: today/yesterday/weekday-this-week/full-date.
 // Group key stays YYYY-MM-DD (ISO) for stable insertion order; only the
@@ -339,9 +337,11 @@ export function HistoryView() {
                     scroll context so the action dropdown isn't clipped. Sticky date
                     headers attach to the page's scroller, under the phone's bar. */}
                 <div className="p-3 md:p-6">
-                    {/* The rows' place held while they are read, and their entrance (LC98, LC119). */}
-                    <Arrive loading={loading} placeholder={<><p role="status" className="sr-only">Apro la cronologia…</p><HistoryListSkeleton /></>}>
-                    {filteredHistory.length === 0 && history.length > 0 ? (
+                    {loading ? (
+                        <div className="p-8 text-center">
+                            <Loader2 className="animate-spin mx-auto text-primary-500" size={24} />
+                        </div>
+                    ) : filteredHistory.length === 0 && history.length > 0 ? (
                         <EmptyState
                             variant="search"
                             title="Nessuna corrispondenza"
@@ -504,7 +504,6 @@ export function HistoryView() {
                             ))}
                         </div>
                     )}
-                    </Arrive>
                 </div>
             </div>
 
