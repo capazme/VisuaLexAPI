@@ -475,22 +475,18 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(work.isConnected).toBe(false);
   });
 
-  it('fades in the new section\'s entries only, never the Corpus ones above them (T1)', () => {
-    // jsdom has no Web Animations: the spy records which elements fade in.
+  it('draws the new section\'s entries at once, with no cascade (T1, LC129)', () => {
+    // jsdom has no Web Animations: the spy records what moves.
     const animate = vi.fn();
     Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
     try {
       renderSidebar('/');
-      expect(animate).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
-      // The switcher's own menu moves too (S6); the navigation's entries are what this counts.
+      // The switcher's own menu moves (S6); nothing in the navigation does.
       const nav = document.getElementById('tour-sidebar')!;
-      const faded = (animate.mock.contexts as HTMLElement[]).filter((el) => nav.contains(el));
-      expect(faded.length).toBeGreaterThan(0);
-      const forum = screen.getByRole('group', { name: 'Forum' });
-      for (const entry of faded) expect(forum).toContainElement(entry);
-      expect(faded).toContain(screen.getByRole('link', { name: 'Community' }));
+      expect((animate.mock.contexts as HTMLElement[]).filter((el) => nav.contains(el))).toEqual([]);
+      expect(screen.getByRole('link', { name: 'Community' })).toBeInTheDocument();
     } finally {
       delete (Element.prototype as Partial<Element>).animate;
     }
