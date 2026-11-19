@@ -210,6 +210,7 @@ export function BulletinBoardPage() {
 
   // Edit handler
   const handleEdit = (env: SharedEnvironment) => {
+    closeSpaces();
     setEditingEnv(env);
   };
 
@@ -371,8 +372,20 @@ export function BulletinBoardPage() {
     }
   };
 
+  /** The spaces of the tabs (L-73): one open at a time, none left open in a tab for the next visit. */
+  const closeSpaces = () => {
+    setSuggestingTo(null);
+    setEditingEnv(null);
+    setImportingEnv(null);
+    setReportingEnvId(null);
+    setReviewingSuggestion(null);
+    setEditingSuggestion(null);
+    setAliasConflict(null);
+  };
+
   // Handle import click
   const handleImportClick = (env: SharedEnvironment) => {
+    closeSpaces();
     setImportingEnv(env);
   };
 
@@ -388,11 +401,13 @@ export function BulletinBoardPage() {
 
   // Handle report
   const handleReport = (id: string) => {
+    closeSpaces();
     setReportingEnvId(id);
   };
 
   // Handle suggest
   const handleSuggest = (env: SharedEnvironment) => {
+    closeSpaces();
     setSuggestingTo(env);
   };
 
@@ -413,7 +428,10 @@ export function BulletinBoardPage() {
     setShowPublishModal(false);
     showToast(message, 'success');
     void fetchEnvironments(1);
-    if (activeTab === 'my') void fetchMyEnvironments();
+    // Published from the empty list, its button goes with the list: the focus goes to the header's.
+    if (activeTab === 'my') void fetchMyEnvironments().then(() => {
+      if (document.activeElement === document.body) document.getElementById('tour-forum-publish')?.focus({ preventScroll: true });
+    });
   };
 
   // Handle search submit
@@ -429,7 +447,7 @@ export function BulletinBoardPage() {
       line="I dossier di studio pubblicati dalla comunità"
       section="forum"
       action={
-        <Button id="tour-forum-publish" onClick={() => setShowPublishModal(true)} icon={<Upload size={16} aria-hidden />}>
+        <Button id="tour-forum-publish" onClick={() => setShowPublishModal(true)} aria-expanded={showPublishModal} icon={<Upload size={16} aria-hidden />}>
           Pubblica un dossier
         </Button>
       }
@@ -437,10 +455,25 @@ export function BulletinBoardPage() {
 
       {/* The tabs: short labels on a phone, whole from `sm` (S7a). */}
       {/* A space left open in one tab does not wait in it for the next visit. */}
-      <ForumTabs active={activeTab} onChange={(tab) => { setActiveTab(tab); setSuggestingTo(null); setEditingEnv(null); }} pendingCount={pendingCount} />
+      {/* «Pubblica un dossier» and an old link's import open here, under the header, in the page (LC138, L-73). */}
+      <PublishDossierPicker open={showPublishModal} onClose={() => setShowPublishModal(false)} onPublished={handlePublishComplete} />
+      <SharedLinkImport onRecovered={handleStudyDossiersAdded} />
+
+      <ForumTabs active={activeTab} onChange={(tab) => { setActiveTab(tab); closeSpaces(); }} pendingCount={pendingCount} />
 
       {/* The view of the chosen tab, shifting the way the mark moved (U1). */}
       <SegmentedTabPanel panelId={FORUM_PANEL_ID} order={FORUM_TAB_ORDER} value={activeTab} className="flex flex-col gap-6">
+        {/* «Aggiungi ai miei dossier» and «Segnala» open at the top of the tab the card is in, in the page (LC138, L-73). */}
+        {activeTab !== 'suggestions' && (
+          <AddToMyDossiersDialog
+            sharedEnvironment={importingEnv}
+            onClose={() => setImportingEnv(null)}
+            onAdded={(report) => { if (importingEnv) handleImportComplete(importingEnv, report); }}
+          />
+        )}
+        {activeTab !== 'suggestions' && (
+          <ReportModal environmentId={reportingEnvId} onClose={() => setReportingEnvId(null)} onReported={handleReportComplete} />
+        )}
         {/* «Suggerisci contenuto» opens here, at the top of Explore, in the page (LC114, L-73). */}
         {activeTab === 'explore' && (
           <SuggestContentPanel environment={suggestingTo} onClose={() => setSuggestingTo(null)} onSuggested={handleSuggestComplete} />
@@ -509,32 +542,6 @@ export function BulletinBoardPage() {
           />
         )}
       </SegmentedTabPanel>
-
-      {/* Modals */}
-      {showPublishModal && (
-        <PublishDossierPicker
-          onClose={() => setShowPublishModal(false)}
-          onPublished={handlePublishComplete}
-        />
-      )}
-
-      <SharedLinkImport onRecovered={handleStudyDossiersAdded} />
-
-      {importingEnv && (
-        <AddToMyDossiersDialog
-          sharedEnvironment={importingEnv}
-          onClose={() => setImportingEnv(null)}
-          onAdded={(report) => handleImportComplete(importingEnv, report)}
-        />
-      )}
-
-      {reportingEnvId && (
-        <ReportModal
-          environmentId={reportingEnvId}
-          onClose={() => setReportingEnvId(null)}
-          onReported={handleReportComplete}
-        />
-      )}
 
       {reviewingSuggestion && (
         <SuggestionReviewDialog

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 import { VersionHistoryModal } from './VersionHistoryModal';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment, SharedEnvironmentVersion } from '../../../types';
@@ -89,5 +90,31 @@ describe('VersionHistoryModal', () => {
       expect(sharedEnvironmentService.restoreVersion).toHaveBeenCalledWith('env-1', 'v-2');
     });
     expect(onRestored).toHaveBeenCalledWith(restoredEnv);
+  });
+
+  // LC138 (L-73): in the page above the cards, not a window; the restore keeps its confirmation (L-74).
+  it('opens as a region that takes the focus; Esc closes it and gives the focus back', async () => {
+    vi.mocked(sharedEnvironmentService.getVersions).mockResolvedValue(versions);
+    function Host() {
+      const [shown, setShown] = useState<SharedEnvironment | null>(null);
+      return (
+        <>
+          <button type="button" onClick={() => setShown(env)}>Versioni</button>
+          <VersionHistoryModal environment={shown} onClose={() => setShown(null)} onRestored={() => {}} />
+        </>
+      );
+    }
+    render(<Host />);
+    const command = screen.getByRole('button', { name: 'Versioni' });
+    command.focus();
+    fireEvent.click(command);
+    const region = screen.getByRole('region', { name: 'Cronologia versioni' });
+    expect(region).toHaveFocus();
+    expect(region).toHaveTextContent('«Ambiente test» · versione attuale v3');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.getByText('v2')).toBeInTheDocument());
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(command).toHaveFocus();
   });
 });

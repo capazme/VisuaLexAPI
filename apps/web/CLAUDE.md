@@ -2605,7 +2605,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   dossier pubblici» (danger confirmation, «Eliminare la copia pubblicata?»);
   each reads the dossier again (`refreshDossier`). `PublishDossierDialog` (in the page since LC125, L-73: an `Expand`
   under the header that `DossierDetailView` holds, not closed while the server works; its form is `PublishDossierForm`,
-  which the Forum's `PublishDossierPicker` still holds in a `ui/Modal`) asks title,
+  which the Forum's `PublishDossierPicker` holds too, in its own `Expand` since LC138) asks title,
   description, category (`utils/forumCategories.ts`, the one list) and tags, reads the marks once, at
   opening, from the server (`publicationMarks.ts`: `loadPdfMarks`, never the browser's partial cache; a
   decision's anchors only when their words are still in its current text, `travellingSelection`, what is
@@ -3301,13 +3301,15 @@ meant to stay split; add new features as new files, not inside the shells:
   pressed or typed in, 8 for what holds things; no duration by hand. `bulletin/forum.guard.test.ts` refuses a bare
   `<button>`, `<select>` or `<input>` without `bare-button: <reason>` on the line above, the old local looks
   (`FILTER_BUTTON`, `INPUT`, `ACTION`, `LINK`), a 6, 10 or 16 px radius, a written duration and a new window over the
-  content; the dialogs still there (L-73) are listed and left out of the style checks. While
+  content but the confirmations (L-74: the archive's «Elimina», «Ripristina versione», a published copy's and a
+  discussion's «Elimina»); the suggestions' windows still there (L-73) are listed and left out of the style checks. While
   Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
   on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
   card that comes leaves a smaller shift upwards). The search's hint is «Cerca un dossier…» (whole at 768 with the
   sidebar, where the search is 226 px), its name «Cerca nei dossier pubblici». «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own form,
-  `PublishDossierForm`, in the picker's window until the Forum's PR; the Forum never publishes a workspace); «Modifica» on a published dossier
+  `PublishDossierForm`, in the same space; LC138, L-73: an `Expand` under the Forum's header, not closed while the
+  server works; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentPanel`, in the page since LC114, L-73: an `Expand` at the top of «I miei pubblicati», the
   common fields, not closed while the save travels) edits its name, description, category and tags only — what it
   holds changes from the dossier. «Suggerisci contenuto» on another's card (`SuggestContentPanel`, LC114, L-73: it
@@ -3315,7 +3317,12 @@ meant to stay split; add new features as new files, not inside the shells:
   «Chiudi» or «Annulla» close it and the focus goes back to the card's menu; a space left open closes with its tab.
   Its rows' checkboxes (`EnvironmentContentViewer`) are `role="checkbox"` named «Seleziona «…»», a dossier's chevron
   «Apri/Chiudi «…»» with `aria-expanded`. After «Elimina» in a discussion that stays (emptied, or a reply or comment
-  gone) the focus lands on the discussion's title. Content becomes the user's dossiers di studio through one dialog, `StudyImportDialog` (the
+  gone) the focus lands on the discussion's title. Since LC138 (L-73) the Forum's other windows open in the page as
+  `ForumSpace`s (an `Expand` with its title and «Chiudi»; Esc and «Chiudi» wait while the server works): «Segnala»
+  (`ReportModal`) and «Aggiungi ai miei dossier» at the top of the card's tab, «Versioni» (`VersionHistoryModal`) above
+  «I miei pubblicati»' cards, an old link's import under the header (drawn open, it takes no focus). The suggestions'
+  review and editing (`SuggestionReviewDialog`, `EditSuggestionDialog`, `AddItemsDialog`, `AliasConflictDialog`) are
+  still windows, for the next PR. Content becomes the user's dossiers di studio through one form, `StudyImportDialog` (the
   dossiers listed, notes and highlights as switches, one server request, never an existing dossier changed;
   the toast is `studyImportSentence`): «Ai miei dossier» on a card (`AddToMyDossiersDialog`, `POST
   /shared-environments/:id/download`, then `forum_download` unless the item is the user's own), an environment

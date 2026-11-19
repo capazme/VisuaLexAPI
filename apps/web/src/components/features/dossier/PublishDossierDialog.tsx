@@ -69,8 +69,8 @@ type Load = { status: 'loading' } | { status: 'ready'; marks: Map<string, PdfMar
 /**
  * «Pubblica nel Forum» from the dossier, in the page (LC125, L-73): a space under the header (`Expand`), never over the
  * content. The focus lands on the space, never in a field; Esc closes it, but not while the server works, and the focus
- * goes back to the command. The form is `PublishDossierForm`; the Forum's own «Pubblica un dossier» still holds it in a
- * window (`PublishDossierPicker`), for the Forum's PR.
+ * goes back to the command. The form is `PublishDossierForm`; the Forum's own «Pubblica un dossier» holds it in its
+ * space (`PublishDossierPicker`, LC138).
  */
 export function PublishDossierDialog({ open, className, ...form }: Props & { open: boolean; className?: string }) {
   const headingId = useId();

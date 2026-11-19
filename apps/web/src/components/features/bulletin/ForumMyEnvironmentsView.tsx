@@ -76,8 +76,18 @@ export function ForumMyEnvironmentsView({
     );
   }
 
+  const shownVersions = versionsEnv && (restored[versionsEnv.id] ?? versionsEnv);
   return (
     <>
+      {/* «Cronologia versioni» opens here, above the cards, in the page (LC138, L-73). */}
+      <VersionHistoryModal
+        environment={shownVersions}
+        onClose={() => setVersionsEnv(null)}
+        onRestored={(updated) => {
+          setRestored((prev) => ({ ...prev, [updated.id]: updated }));
+          setVersionsEnv(null);
+        }}
+      />
       <p className="text-sm text-slate-500 dark:text-slate-400">
         {environments.length} {environments.length === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
       </p>
@@ -103,16 +113,6 @@ export function ForumMyEnvironmentsView({
         })}
       </div>
 
-      {versionsEnv && (
-        <VersionHistoryModal
-          environment={restored[versionsEnv.id] ?? versionsEnv}
-          onClose={() => setVersionsEnv(null)}
-          onRestored={(updated) => {
-            setRestored((prev) => ({ ...prev, [updated.id]: updated }));
-            setVersionsEnv(null);
-          }}
-        />
-      )}
     </>
   );
 }
