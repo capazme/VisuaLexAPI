@@ -45,7 +45,7 @@ export const FIELD_CONTROL = [
   FIELD_SURFACE, 'text-ink-900 dark:text-ink-50',
   'placeholder:text-ink-500 dark:placeholder:text-ink-400',
   'hover:border-ink-300 dark:hover:border-ink-700 focus:border-toga-500 dark:focus:border-toga-400',
-  'transition-colors duration-150 ease-out',
+  'transition-colors duration-(--dur-press) ease-out',
   FOCUS_RING,
   'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-ink-100 dark:disabled:bg-ink-800',
   // In the dark theme the browser's own parts (a date's calendar, a time's clock, a select's list) are drawn dark.

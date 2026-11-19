@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import type { HTMLAttributes } from 'react';
 import { cn } from '../../lib/utils';
+import { CARD_RADIUS, CONTROL_RADIUS } from './controlStyles';
 
 export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'text' | 'circular' | 'rectangular';
@@ -20,7 +21,7 @@ export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
     const variantStyles = {
       text: 'h-4 rounded',
       circular: 'rounded-full',
-      rectangular: 'rounded-lg',
+      rectangular: CONTROL_RADIUS,
     };
 
     const dimensions = {
@@ -114,11 +115,11 @@ export function DossierListSkeleton({ count = 3, className }: { count?: number; 
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+          className={cn('p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900', CARD_RADIUS)}
         >
           <div className="flex items-start gap-3">
             {/* Icon */}
-            <Skeleton variant="rectangular" width={40} height={40} className="rounded-lg" />
+            <Skeleton variant="rectangular" width={40} height={40} />
 
             {/* Content */}
             <div className="flex-1 space-y-2">
@@ -148,7 +149,7 @@ export function HistoryListSkeleton({ count = 5, className }: { count?: number; 
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+          className={cn('p-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900', CARD_RADIUS)}
         >
           <div className="flex items-center gap-3">
             {/* Icon */}

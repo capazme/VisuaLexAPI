@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { CARD_RADIUS } from './controlStyles';
 import { Z_INDEX } from '../../constants/zIndex';
 import { useDialogFocus } from './useDialogFocus';
 import { dur, ease } from '../../lib/motion';
@@ -220,7 +221,7 @@ export function Modal({
                 aria-describedby={descriptionId}
                 onClick={(e) => e.stopPropagation()}
                 className={cn('w-full pointer-events-auto max-h-[90vh] flex flex-col', sizeStyles[size], className)}
-                surfaceClassName="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800"
+                surfaceClassName={cn('bg-white dark:bg-slate-900 shadow-lg border border-slate-200 dark:border-slate-800', CARD_RADIUS)}
               >
                 {body}
               </IslandSurface>

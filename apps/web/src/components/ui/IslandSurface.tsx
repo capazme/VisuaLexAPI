@@ -3,6 +3,7 @@ import { usePresence } from 'framer-motion';
 import { cn } from '../../lib/utils';
 import { ISLAND_CLOSE, ISLAND_OPEN } from '../../lib/motion';
 import { ISLAND_SURFACE } from '../../utils/searchFieldControl';
+import { CARD_RADIUS } from './controlStyles';
 import { now, useReducedMotionLive } from './islandMotion';
 
 /**
@@ -113,8 +114,8 @@ export function IslandSurface({
   within = false,
   settle = false,
   className,
-  surfaceClassName = cn('rounded-2xl shadow-lg', ISLAND_SURFACE),
-  contentClassName = 'relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl',
+  surfaceClassName = cn('shadow-lg', CARD_RADIUS, ISLAND_SURFACE),
+  contentClassName = cn('relative flex min-h-0 flex-1 flex-col overflow-hidden', CARD_RADIUS),
   children,
   ...rest
 }: IslandSurfaceProps) {
