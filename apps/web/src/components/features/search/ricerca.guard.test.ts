@@ -38,7 +38,7 @@ describe('Search and reader, no bare controls', () => {
     const bare = STYLED.flatMap((name) => {
       const source = read(name).split('\n');
       return source.flatMap((line, at) => {
-        if (!/<(button|select|input)\b/.test(line)) return [];
+        if (!/<(button|select|input|motion\.button)\b/.test(line)) return [];
         return /bare-(button|select|input): \S/.test(source[at - 1] ?? '') ? [] : [`${name}:${at + 1}: ${line.trim()}`];
       });
     });

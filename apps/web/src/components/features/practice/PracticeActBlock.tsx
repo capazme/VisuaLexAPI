@@ -50,7 +50,8 @@ export interface PracticeActBlockProps {
  * The act's tools (R3): quiet buttons, neutral, the icon and (from `lg`) the word — no colour of their own, as the
  * article's actions; 36 px, on a computer only (a phone has them in «⋯»). The 44 px below `md` is for a narrow window.
  */
-const ACT_TOOL = 'vlx-hover-tile min-w-11 gap-1.5 px-2 md:min-w-0';
+// A locked «Studio» keeps the pointer, so its tooltip still says why.
+const ACT_TOOL = 'vlx-hover-tile min-w-11 gap-1.5 px-2 md:min-w-0 disabled:pointer-events-auto';
 /** The act's «⋯»: `IconButton`'s square on the same quiet look. */
 const ACT_MENU = cn(buttonClassName('quiet'), 'vlx-hover-tile min-w-11 px-0 md:min-w-9');
 

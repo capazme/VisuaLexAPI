@@ -35,7 +35,7 @@ export function NotesHighlightsButtons({
 }: NotesHighlightsButtonsProps) {
     if (labelled) {
         // `Button`'s quiet look with the reading row's open state, as `ReadingToolbar`'s tools.
-        const word = 'vlx-hover-tile min-w-11 gap-1.5 px-2.5 md:min-w-0 aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white';
+        const word = 'vlx-hover-tile min-w-11 gap-1.5 px-2.5 md:min-w-0 disabled:pointer-events-auto aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white';
         const count = (n: number) => n > 0 && <span className="tabular-nums text-slate-500 dark:text-slate-400">{n}</span>;
         // The count read apart from the word: «Note, 2», not «Note2».
         const named = (word: string, n: number) => (n > 0 ? `${word}, ${n}` : undefined);
@@ -87,7 +87,7 @@ export function NotesHighlightsButtons({
                 aria-expanded={isNotesOpen}
                 aria-haspopup="dialog"
                 aria-label={notesName}
-                className={cn("relative",
+                className={cn("relative disabled:pointer-events-auto",
                     isNotesOpen
                         ? "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
                         : notesCount > 0
@@ -112,7 +112,7 @@ export function NotesHighlightsButtons({
                 aria-expanded={isHighlightsOpen}
                 aria-haspopup="dialog"
                 aria-label={highlightsName}
-                className={cn("relative",
+                className={cn("relative disabled:pointer-events-auto",
                     isHighlightsOpen
                         ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400"
                         : highlightsCount > 0

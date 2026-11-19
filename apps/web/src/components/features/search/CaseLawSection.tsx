@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 import type { NormaVisitata } from '../../../types';
 import { cn } from '../../../lib/utils';
@@ -70,6 +70,7 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
  */
 export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: CaseLawSectionProps) {
   const panelId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(() => readOpen(tabId));
   const [searched, setSearched] = useState(false);
   const desktop = useIsDesktop();
@@ -118,9 +119,10 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
       <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
         {/* bare-button: the section's heading, the accordion's whole row (its name and the chevron at the far end). */}
         <button
+          ref={toggleRef}
           type="button"
           aria-expanded={open}
-          aria-controls={panelId}
+          aria-controls={open ? panelId : undefined}
           onClick={toggle}
           className={cn(
             'flex w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
@@ -132,8 +134,8 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
         </button>
       </h3>
 
-      {/* The section opens in the page under its heading (LC113, `Expand`): Esc inside closes it, the focus back on it. */}
-      <Expand id={panelId} open={open} onClose={toggle}>
+      {/* The section opens in the page under its heading (LC113, `Expand`); the focus stays on the heading. */}
+      <Expand id={panelId} open={open} initialFocusRef={toggleRef}>
           <CaseLawFiltersContext.Provider value={provided}>
           <div className="mt-3 space-y-6">
             {/* One set of controls for every block; on a phone they sit behind «Filtri» */}

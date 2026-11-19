@@ -90,7 +90,8 @@ export interface ReadingToolbarProps {
 
 /** A tool's pressed and open states, on `Button`'s quiet look; square on a phone, where only the icon shows. */
 const TOOL_STATES = cn(
-    'vlx-hover-tile min-w-11 gap-1.5 px-2.5 md:min-w-0',
+    // A switched-off tool keeps the pointer, so its tooltip still says why (`Button` drops it when disabled).
+    'vlx-hover-tile min-w-11 gap-1.5 px-2.5 md:min-w-0 disabled:pointer-events-auto',
     'aria-expanded:bg-ink-300/70 aria-expanded:text-slate-900 aria-pressed:bg-ink-300/70 aria-pressed:text-slate-900',
     'dark:aria-pressed:bg-ink-700/60 dark:aria-pressed:text-white dark:aria-expanded:bg-ink-700/60 dark:aria-expanded:text-white',
 );

@@ -24,7 +24,8 @@ export function DiscussionButton({ isOpen, onToggle, name, lockedReason }: Discu
             aria-expanded={isOpen}
             aria-haspopup="dialog"
             aria-label={name}
-            className={cn('relative', isOpen && TOOL_PRESSED)}
+            // Switched off, it keeps the pointer: its tooltip says why.
+            className={cn('relative disabled:pointer-events-auto', isOpen && TOOL_PRESSED)}
             title={lockedReason ? `${name}: ${lockedReason}` : name}
             disabled={Boolean(lockedReason)}
             icon={<MessageCircle aria-hidden />}

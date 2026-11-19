@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Paperclip, Loader2 } from 'lucide-react';
+import { ArrowRight, Paperclip } from 'lucide-react';
+import { Button } from '../../ui/Button';
 import { cn } from '../../../lib/utils';
-import { FOCUS_RING } from '../../../constants/interactions';
 import type { AnnexMetadata } from '../../../types';
 import { spring } from '../../../lib/motion';
 
@@ -124,31 +124,9 @@ export function AnnexSuggestion({
           </div>
 
           {/* Action Button */}
-          <motion.button
-            onClick={handleSwitch}
-            disabled={isLoading}
-            whileTap={{ scale: 0.97 }}
-            className={cn(
-              // The action in ink, as every primary action (Y1).
-              "relative flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-md text-xs font-bold md:min-h-0",
-              "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700",
-              "transition-[background-color,opacity] duration-(--dur-pop)",
-              FOCUS_RING,
-              isLoading && "opacity-80 cursor-wait"
-            )}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Carico...</span>
-              </>
-            ) : (
-              <>
-                <span>Vai</span>
-                <ArrowRight size={14} />
-              </>
-            )}
-          </motion.button>
+          <Button type="button" size="sm" onClick={handleSwitch} loading={isLoading} icon={isLoading ? undefined : <ArrowRight size={14} aria-hidden />} className="flex-row-reverse text-xs font-bold">
+            {isLoading ? 'Carico...' : 'Vai'}
+          </Button>
         </motion.div>
       )}
     </AnimatePresence>

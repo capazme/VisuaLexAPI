@@ -9,8 +9,10 @@ export const TOOL_PRESSED = cn(TOOLBAR_TOGGLE_ON, 'hover:bg-primary-50 hover:tex
 
 /**
  * The look of a reading toolbar's toggle button (discussions, find in text, the decision's key passages): `IconButton`'s
- * small square (44 px on a phone, 32 from md), tinted while its panel is open. `extra` adds classes after the base ones.
+ * small square (44 px on a phone, 32 from md, wider with a count), tinted while its panel is open. `extra` adds classes after the base ones.
  */
 export function toolbarToggleClass(isOpen: boolean, extra?: string): string {
-    return cn(buttonClassName('quiet', 'sm'), 'min-w-11 px-0 md:min-w-8', extra, isOpen && TOOL_PRESSED);
+    // Square for an icon alone (the minimum width wins), the padding kept for an icon with a count. A disabled one
+    // keeps the pointer, so its tooltip still says why.
+    return cn(buttonClassName('quiet', 'sm'), 'min-w-11 px-1.5 md:min-w-8 disabled:pointer-events-auto', extra, isOpen && TOOL_PRESSED);
 }
