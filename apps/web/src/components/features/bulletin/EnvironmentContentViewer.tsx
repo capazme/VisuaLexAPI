@@ -1,5 +1,6 @@
 import { annotationTargetLabel } from './annotationLabels';
 import { useState, useMemo, useCallback } from 'react';
+import { cn } from '../../../lib/utils';
 import {
   FolderOpen,
   Zap,
@@ -27,9 +28,13 @@ interface TabConfig {
   countKey: keyof DetailedEnvironmentStats;
 }
 
+/** A row's checkbox and chevron (LC114): 44 px to touch on a phone, 32 from md, the icon centred; the margin gives back
+ *  the row's own padding, so a row grows only by what it lacks. */
+const TOUCH_BOX = '-my-1.5 grid min-h-11 min-w-11 shrink-0 place-items-center md:min-h-8 md:min-w-8';
+
 const TABS: TabConfig[] = [
-  { id: 'dossiers', label: 'Dossiers', icon: <FolderOpen size={14} />, countKey: 'dossiers' },
-  { id: 'quickNorms', label: 'QuickNorms', icon: <Zap size={14} />, countKey: 'quickNorms' },
+  { id: 'dossiers', label: 'Dossier', icon: <FolderOpen size={14} />, countKey: 'dossiers' },
+  { id: 'quickNorms', label: 'Norme rapide', icon: <Zap size={14} />, countKey: 'quickNorms' },
   { id: 'aliases', label: 'Alias', icon: <Tag size={14} />, countKey: 'customAliases' },
   { id: 'annotations', label: 'Note', icon: <MessageSquare size={14} />, countKey: 'annotations' },
   { id: 'highlights', label: 'Evidenziazioni', icon: <Highlighter size={14} />, countKey: 'highlights' },
@@ -151,6 +156,7 @@ export function EnvironmentContentViewer({
       : activeTab;
 
   // `name`: what the row is (a dossier's name, a note's text), for the checkbox's own (LC114: it had none).
+  // The drawing stays small; the box to touch is 44 px on a phone and 32 from md (`TOUCH_BOX`).
   const renderCheckbox = (type: TabType, id: string, name: string) => {
     if (!selectable) return null;
     const checked = isSelected(type, id);
@@ -162,7 +168,7 @@ export function EnvironmentContentViewer({
         aria-checked={checked}
         aria-label={`Seleziona «${name.length > 60 ? `${name.slice(0, 60)}…` : name}»`}
         onClick={(e) => { e.stopPropagation(); toggleSelection(type, id); }}
-        className="mr-2 flex-shrink-0 hover:text-primary-600 dark:hover:text-primary-400"
+        className={cn(TOUCH_BOX, 'hover:text-primary-600 dark:hover:text-primary-400')}
       >
         {checked ? (
           <CheckSquare size={16} className="text-primary-600 dark:text-primary-400" />
@@ -193,7 +199,7 @@ export function EnvironmentContentViewer({
                 aria-expanded={expandedDossiers.has(dossier.id)}
                 aria-label={`${expandedDossiers.has(dossier.id) ? 'Chiudi' : 'Apri'} «${dossier.name}»`}
                 onClick={(e) => { e.stopPropagation(); toggleDossierExpand(dossier.id); }}
-                className="mr-1.5 text-slate-500"
+                className={cn(TOUCH_BOX, 'text-slate-500')}
               >
                 {expandedDossiers.has(dossier.id) ? (
                   <ChevronDown size={14} />

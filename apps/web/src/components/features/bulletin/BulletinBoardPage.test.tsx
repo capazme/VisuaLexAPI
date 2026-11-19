@@ -110,6 +110,13 @@ describe('BulletinBoardPage - «Suggerisci contenuto» in the page', () => {
     expect(chevron).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(chevron);
     expect(within(region).getByRole('button', { name: 'Chiudi «Contratti»' })).toHaveAttribute('aria-expanded', 'true');
+    // 44 px to touch on a phone, 32 from md; the drawing inside stays small.
+    for (const control of [box, within(region).getByRole('button', { name: 'Chiudi «Contratti»' })]) {
+      expect(control).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-8', 'md:min-w-8');
+    }
+    // The viewer's tabs in Italian.
+    expect(within(region).getByRole('button', { name: /^Dossier\b/ })).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: /^Norme rapide/ })).toBeInTheDocument();
     appStore.setState({ dossiers: [] });
   });
 
