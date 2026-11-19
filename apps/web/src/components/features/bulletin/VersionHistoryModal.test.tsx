@@ -117,4 +117,19 @@ describe('VersionHistoryModal', () => {
     expect(screen.queryByRole('region')).toBeNull();
     expect(command).toHaveFocus();
   });
+
+  it('keeps the space and its focus when the restore is refused, so Esc still closes it', async () => {
+    vi.mocked(sharedEnvironmentService.getVersions).mockResolvedValue(versions);
+    vi.mocked(sharedEnvironmentService.restoreVersion).mockRejectedValue(new Error('Ripristino non riuscito'));
+    const onClose = vi.fn();
+    render(<VersionHistoryModal environment={env} onClose={onClose} onRestored={() => {}} />);
+    await waitFor(() => expect(screen.getByText('v2')).toBeInTheDocument());
+    fireEvent.click(screen.getAllByText('Ripristina')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Ripristina versione' }));
+    const region = screen.getByRole('region', { name: 'Cronologia versioni' });
+    await waitFor(() => expect(region).toHaveFocus());
+    expect(await screen.findByText('Ripristino non riuscito')).toBeInTheDocument();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalled();
+  });
 });

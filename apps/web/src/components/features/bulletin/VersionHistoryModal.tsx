@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { History, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -19,20 +19,22 @@ interface VersionHistoryModalProps {
  * window). «Ripristina» keeps its confirmation, grown from the button (`ConfirmDialog`, L-74).
  */
 export function VersionHistoryModal({ environment, onClose, onRestored }: VersionHistoryModalProps) {
+  const spaceId = useId();
   return (
     <ForumSpace
+      id={spaceId}
       value={environment}
       onClose={onClose}
       icon={<History size={20} aria-hidden className="shrink-0" />}
       title="Cronologia versioni"
       line={(env) => `«${env.title}» · versione attuale v${env.currentVersion}`}
     >
-      {(env) => <VersionList environment={env} onRestored={onRestored} />}
+      {(env) => <VersionList environment={env} spaceId={spaceId} onRestored={onRestored} />}
     </ForumSpace>
   );
 }
 
-function VersionList({ environment, onRestored }: { environment: SharedEnvironment; onRestored: (updated: SharedEnvironment) => void }) {
+function VersionList({ environment, spaceId, onRestored }: { environment: SharedEnvironment; spaceId: string; onRestored: (updated: SharedEnvironment) => void }) {
   const [versions, setVersions] = useState<SharedEnvironmentVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +146,8 @@ function VersionList({ environment, onRestored }: { environment: SharedEnvironme
         confirmLabel="Ripristina versione"
         onConfirm={() => confirmVersion && handleRestore(confirmVersion)}
         onCancel={() => setConfirmVersion(null)}
+        // Confirmed, every «Ripristina» waits: the focus goes to the space, where Esc still closes it.
+        focusBack={() => document.getElementById(spaceId)}
       />
     </>
   );
