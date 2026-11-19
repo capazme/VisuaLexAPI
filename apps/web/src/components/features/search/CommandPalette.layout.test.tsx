@@ -243,6 +243,38 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     expect(shut.options).toMatchObject(ISLAND_CLOSE);
   });
 
+  it('takes the keys from the first frame of the opening: the field has the focus before the island grows, no letter lost (LC129)', async () => {
+    asDesktop(true);
+    recordAnimations();
+    const user = userEvent.setup();
+    pillInBar();
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    // The island has not started yet (it waits for the mount's long frames): the field takes the keys all the same.
+    expect(runs.find((run) => run.el === shapeOf())).toBeUndefined();
+    const box = screen.getByRole('combobox');
+    expect(box).toHaveFocus();
+    // Typed where the focus is, as a hand right after ⌘K.
+    await user.keyboard('proc');
+    expect(box).toHaveValue('proc');
+  });
+
+  it('the band does not move while one types: its height changes at once, no row slides (LC129)', () => {
+    asDesktop(true);
+    recordAnimations();
+    pillInBar();
+    const observed: Element[] = [];
+    vi.stubGlobal('ResizeObserver', class { observe(el: Element) { observed.push(el); } unobserve() {} disconnect() {} });
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    // The band's own measure (its content's box) is not watched: it does not follow the rows.
+    expect(observed).not.toContain(band().firstElementChild);
+    const before = runs.length;
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'proc' } });
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    expect(runs.slice(before)).toEqual([]);
+  });
+
   it('closes back into the pill, and shows the pill again only as the field lands', async () => {
     asDesktop(true);
     recordAnimations();
@@ -425,19 +457,14 @@ describe('CommandPalette — «Scegli l\'atto»', () => {
     expect(screen.getByRole('option', { name: 'Codice di procedura civile · c.p.c.' })).toBeInTheDocument();
   });
 
-  it('draws the letters the box matched in the app\'s ink, and a row leaving is no option any more (R2)', () => {
+  it('draws the letters the box matched in the app\'s ink, and a row filtered away is gone at once (R2, LC129)', () => {
     asDesktop(true);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    // One change, then a look in the same tick: the rows filtered away are still fading.
+    // One change, then a look in the same tick: nothing fades out, the list is already the new one.
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'proc' } });
     const row = screen.getAllByRole('option').find((o) => o.textContent === 'Codice di procedura civile · c.p.c.')!;
     expect(row.querySelector('.text-toga-700')).toHaveTextContent(/^proc$/);
-    // A row filtered away, while it fades: hidden, and never Enter's.
-    const leaving = screen.getAllByRole('option', { hidden: true }).find((o) => o.textContent === 'Codice civile · c.c.');
-    expect(leaving).toBeDefined();
-    expect(leaving).toHaveAttribute('aria-hidden', 'true');
-    expect(leaving).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).not.toContain('Codice civile · c.c.');
+    expect(screen.queryAllByRole('option', { hidden: true }).map((o) => o.textContent)).not.toContain('Codice civile · c.c.');
   });
 
   it('is narrowed by the field while it is typed', async () => {
