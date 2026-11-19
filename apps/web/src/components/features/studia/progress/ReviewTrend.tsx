@@ -268,7 +268,7 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
           </p>
         </div>
         {/* LC112: the common tabs, small (`SegmentedTabs size="sm"`), over the chart's panel. */}
-        <SegmentedTabs size="sm" label="Periodo" tabs={TREND_PERIODS} value={period} onChange={choosePeriod} panelId={panelId} />
+        <SegmentedTabs size="sm" label="Periodo" tabs={TREND_PERIODS} value={period} onChange={choosePeriod} panelId={panelId} tabClassName="min-h-11 md:min-h-8" />
       </div>
 
       <div ref={boxRef} id={panelId} role="tabpanel" aria-labelledby={`${panelId}-tab-${period}`} className="min-w-0">
@@ -438,8 +438,9 @@ export function ReviewTrendSkeleton({ note }: { note?: string } = {}) {
     // As tall as the chart will be on this card: 190 px under 520 px of card, 230 above (a container query).
     <div aria-hidden={note ? undefined : true} className="@container grid gap-4">
       <div aria-hidden className="flex flex-wrap items-end justify-between gap-3">
-        <div className={cn('h-[3.75rem] w-44', header)} />
-        <div className={cn('h-11 w-52 md:h-9', header)} />
+        {/* The total and its words: the words on two lines on a narrow card. */}
+        <div className={cn('h-20 w-44 @min-[480px]:h-[3.75rem]', header)} />
+        <div className={cn('h-12 w-52 md:h-9', header)} />
       </div>
       {note ? (
         <div className="grid h-[190px] place-items-center rounded-md border border-dashed border-slate-300 px-4 text-center @min-[520px]:h-[230px] dark:border-slate-700">

@@ -367,6 +367,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               tabs={(Object.keys(TIPO_LABEL) as TipoScheda[]).map((id) => ({ id, label: TIPO_LABEL[id] }))}
               value={tipo}
               onChange={setTipo}
+              // As tall as the fields beside it (LC112): 36 px on a computer, 44 below md.
+              size="sm"
               tabClassName="flex-1 px-3"
             />
           ) : (

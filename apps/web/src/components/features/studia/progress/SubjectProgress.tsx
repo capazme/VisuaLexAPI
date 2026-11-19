@@ -14,8 +14,12 @@ export interface SubjectProgressProps {
   onSelect: (materia: Materia | undefined) => void;
 }
 
-/** A subject's card at its least, and its placeholder's height (LC112): the block keeps its height as the answer comes. */
-export const SUBJECT_CARD_HEIGHT = 'min-h-36';
+/**
+ * A subject's card at its least, and its placeholder's height (LC112): the block keeps its height as the answer comes.
+ * 166 px, the card with real counts (its header and its states each on two lines at a phone's width): 144 left the
+ * placeholders of five cards 110 px short at 390 px (Papiniano).
+ */
+export const SUBJECT_CARD_HEIGHT = 'min-h-[10.375rem]';
 
 const reviews = (n: number) => (n === 0 ? 'Nessun ripasso negli ultimi 30 giorni' : `${formatCount(n)} ${n === 1 ? 'ripasso' : 'ripassi'} negli ultimi 30 giorni`);
 

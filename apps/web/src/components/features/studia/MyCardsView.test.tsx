@@ -647,6 +647,22 @@ describe('«Le mie schede», a new card', () => {
     expect(command).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('keeps what was typed when Esc closes it: opened again, the draft is there', async () => {
+    const user = userEvent.setup();
+    renderView();
+    const command = await screen.findByRole('button', { name: '+ Nuova scheda' });
+    await user.click(command);
+    const region = await screen.findByRole('region', { name: 'Nuova scheda' });
+    await user.type(within(region).getByLabelText('Domanda'), 'Quando?');
+    region.focus();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Nuova scheda' })).toBeNull());
+    expect(command).toHaveFocus();
+    await user.click(command);
+    const again = await screen.findByRole('region', { name: 'Nuova scheda' });
+    expect(within(again).getByLabelText('Domanda')).toHaveValue('Quando?');
+  });
+
   it('closes the reference field with Esc, not the page\'s space around it', async () => {
     const user = userEvent.setup();
     renderView();

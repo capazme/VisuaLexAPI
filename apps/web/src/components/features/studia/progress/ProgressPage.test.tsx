@@ -152,7 +152,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     progress.mockImplementation(() => new Promise((resolve) => (settle = resolve)));
     renderPage();
     const subjects = screen.getByRole('region', { name: 'Per materia' });
-    const held = subjects.querySelectorAll(`.${SUBJECT_CARD_HEIGHT}`);
+    const held = subjects.querySelectorAll(`.${CSS.escape(SUBJECT_CARD_HEIGHT)}`);
     expect(held).toHaveLength(5);
     // The summary's placeholder has its two rows: the streak and the goal, and the level under them.
     const summary = screen.getByRole('region', { name: 'Riepilogo' });

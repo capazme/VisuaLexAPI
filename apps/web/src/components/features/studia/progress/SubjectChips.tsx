@@ -40,7 +40,9 @@ export function SubjectChips({ selected, onSelect }: SubjectChipsProps) {
         value={selected ?? ALL}
         onChange={(id) => onSelect(id === ALL ? undefined : (id as Materia))}
         className="w-max"
-        tabClassName="whitespace-nowrap"
+        // 44 px at every width, as before (the `sm` row's segments are 40 on a phone, 32 from md); never squeezed in the
+        // scrolling row.
+        tabClassName="min-h-11 shrink-0 whitespace-nowrap"
       />
     </div>
   );
