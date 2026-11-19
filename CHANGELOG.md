@@ -12,6 +12,15 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.57.0] - 2026-11-19
+
+Common motion timings across the app, and a rule on how often something may move. Web only, no migration.
+MERL-T stays off.
+
+### Interface
+
+- The animations share the same timings, and a frequency rule keeps motion for what happens rarely (LC132).
+
 ## [1.56.0] - 2026-11-19
 
 «Accedi» without a flash or a jump, and the animations that did not help removed. Web only, no migration.
