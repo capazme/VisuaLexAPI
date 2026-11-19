@@ -1,29 +1,15 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import {
-    useFloating,
-    useDismiss,
-    useRole,
-    useInteractions,
-    FloatingPortal,
-    FloatingFocusManager,
-    autoUpdate,
-    flip,
-    offset,
-    shift,
-    size,
-} from '@floating-ui/react';
+import { useState, useMemo, useRef } from 'react';
 import { StickyNote, X, BookOpen, Download } from 'lucide-react';
 import type { Annotation } from '../../../types';
-import { cn } from '../../../lib/utils';
-import { Z_INDEX } from '../../../constants/zIndex';
-import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Textarea } from '../../ui/Textarea';
 import { NoteCard } from './NoteCard';
+import { ReaderSpace } from './ReaderSpace';
 import { useNoteEditing } from '../../../hooks/useNoteEditing';
-import { getTransformOrigin } from '../../../utils/floatingOrigin';
 
 export interface NotesPeekPanelProps {
     isOpen: boolean;
-    anchorEl: HTMLElement | null;
     annotations: Annotation[];
     articleLabel: string;
     noteAnchor: { anchorText: string; startOffset: number; scopedArticleId: string } | null;
@@ -38,123 +24,30 @@ export interface NotesPeekPanelProps {
     emptyText?: string;
 }
 
-export function NotesPeekPanel(props: NotesPeekPanelProps) {
-    const isDesktop = useIsDesktop();
-    if (!props.isOpen) return null;
-    return isDesktop ? <DesktopPeek {...props} /> : <MobileSheet {...props} />;
-}
-
-type BodyProps = Omit<NotesPeekPanelProps, 'anchorEl'> & {
-    isDesktop?: boolean;
-};
-
-// ───────────────────────── DESKTOP POPOVER ─────────────────────────
-
-function DesktopPeek({ anchorEl, onClose, ...rest }: NotesPeekPanelProps) {
-    // Pass the anchor through `elements.reference` so the FIRST render already
-    // has a valid position. Setting it in a useLayoutEffect leaves the initial
-    // frame with a null reference — the floating div then renders at document
-    // (0,0). On a long, scrolled article that's above the viewport, so the
-    // panel looks like it jumped to the top of the page (or disappeared).
-    const { refs, floatingStyles, context, placement } = useFloating({
-        open: true,
-        onOpenChange: (open) => { if (!open) onClose(); },
-        placement: 'bottom-end',
-        elements: { reference: anchorEl },
-        middleware: [
-            offset(8),
-            flip({ fallbackPlacements: ['top-end', 'bottom', 'top'] }),
-            shift({ padding: 16 }),
-            size({
-                apply({ availableHeight, elements }) {
-                    Object.assign(elements.floating.style, {
-                        maxHeight: `${Math.max(280, Math.min(520, availableHeight - 16))}px`,
-                    });
-                },
-                padding: 16,
-            }),
-        ],
-        whileElementsMounted: autoUpdate,
-    });
-
-    const dismiss = useDismiss(context, { outsidePress: true, escapeKey: true });
-    const role = useRole(context, { role: 'dialog' });
-    const { getFloatingProps } = useInteractions([dismiss, role]);
-
+/**
+ * «Note» under the reading toolbar (LC139, L-73; it was a popover on a computer and a sheet on a phone): the notes on
+ * the article or the decision, edited and removed in place, and a new one. The focus lands on the space, never in the
+ * field; Esc and «Chiudi» close it and the focus goes back to the toolbar's button.
+ */
+export function NotesPeekPanel({ isOpen, onClose, articleLabel, annotations, ...rest }: NotesPeekPanelProps) {
     return (
-        <FloatingPortal>
-            <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
-                <div
-                    // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
-                    ref={refs.setFloating}
-                    style={floatingStyles}
-                    {...getFloatingProps()}
-                    className={Z_INDEX.citationPreview}
-                >
-                    {/*
-                        Inner wrapper owns the enter animation (which itself
-                        uses `transform`). Keeping it separate from the outer
-                        element prevents the zoom-in-95 keyframes from
-                        overwriting floating-ui's positioning transform —
-                        without this split the popover visibly slides from
-                        (0,0) to its anchored position each time it opens.
-                    */}
-                    <div
-                        style={{ transformOrigin: getTransformOrigin(placement) }}
-                        className={cn(
-                            'w-[360px] flex flex-col rounded-xl shadow-md border border-slate-200 dark:border-slate-700',
-                            'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
-                        )}
-                    >
-                        <PeekBody onClose={onClose} {...rest} isDesktop />
-                    </div>
-                </div>
-            </FloatingFocusManager>
-        </FloatingPortal>
+        <ReaderSpace
+            open={isOpen}
+            onClose={onClose}
+            title={`Note su ${articleLabel}`}
+            line={annotations.length > 0 ? `${annotations.length} ${annotations.length === 1 ? 'nota' : 'note'}` : undefined}
+            icon={<StickyNote size={16} aria-hidden className="shrink-0 text-amber-500" />}
+            className="max-w-xl"
+        >
+            <PeekBody onClose={onClose} annotations={annotations} {...rest} />
+        </ReaderSpace>
     );
 }
 
-// ───────────────────────── MOBILE BOTTOM SHEET ─────────────────────────
-
-function MobileSheet({ onClose, ...rest }: NotesPeekPanelProps) {
-    // Close on Escape even on mobile (useful for external keyboards).
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
-
-    return (
-        <FloatingPortal>
-            <div
-                className={cn('fixed inset-0 bg-black/30 animate-in fade-in duration-150', Z_INDEX.citationPreview)}
-                onClick={onClose}
-                aria-hidden
-            />
-            <div
-                role="dialog"
-                aria-modal="true"
-                className={cn(
-                    'fixed inset-x-0 bottom-0 flex flex-col rounded-t-2xl shadow-lg',
-                    'bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800',
-                    'max-h-[70vh] animate-in slide-in-from-bottom duration-200',
-                    Z_INDEX.citationPreview,
-                )}
-            >
-                <div className="flex justify-center pt-2 pb-1">
-                    <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
-                </div>
-                <PeekBody onClose={onClose} {...rest} />
-            </div>
-        </FloatingPortal>
-    );
-}
-
-// ───────────────────────── SHARED BODY ─────────────────────────
+type BodyProps = Omit<NotesPeekPanelProps, 'isOpen' | 'articleLabel'>;
 
 function PeekBody({
     annotations,
-    articleLabel,
     noteAnchor,
     onClose,
     onAddNote,
@@ -167,7 +60,14 @@ function PeekBody({
 }: BodyProps) {
     const { editingId, editingText, setEditingText, startEdit, commitEdit, cancelEdit } = useNoteEditing(annotations, onUpdateNote);
     const [composerText, setComposerText] = useState('');
+    // A button pressed that goes (a note removed) or turns off («Salva», the field emptied) would drop the focus to the
+    // page, where Esc no longer reaches the space: it goes to the list, or stays in the field.
+    const listRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<HTMLTextAreaElement>(null);
+    const removeNote = (id: string) => {
+        onRemoveNote(id);
+        listRef.current?.focus();
+    };
     const [ownerFilter, setOwnerFilter] = useState<'all' | 'own' | 'imported'>('all');
 
     const visibleNotes = useMemo(() => {
@@ -176,18 +76,12 @@ function PeekBody({
         return annotations;
     }, [annotations, ownerFilter]);
 
-    // Autofocus composer when an anchor is passed in (user arrived via
-    // "Aggiungi nota" from the selection popup) — skip otherwise to
-    // avoid stealing focus from the article.
-    useEffect(() => {
-        if (noteAnchor) composerRef.current?.focus();
-    }, [noteAnchor]);
-
     const submitComposer = () => {
         const trimmed = composerText.trim();
         if (!trimmed) return;
         onAddNote(trimmed);
         setComposerText('');
+        composerRef.current?.focus();
     };
 
     const { anchoredNotes, freeNotes } = groupByAnchor(visibleNotes);
@@ -196,62 +90,19 @@ function PeekBody({
 
     return (
         <>
-            <header className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-2 min-w-0">
-                    <StickyNote size={16} className="text-amber-500 shrink-0" />
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                        Note su {articleLabel}
-                    </h3>
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400 shrink-0">
-                        {annotations.length}
-                    </span>
-                </div>
-                <div className="flex items-center gap-0.5 shrink-0">
-                    <button
-                        onClick={onExportTxt}
-                        disabled={annotations.length === 0}
-                        className={cn(
-                            "p-1 rounded-md transition-colors",
-                            annotations.length === 0
-                                ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
-                                : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200",
-                        )}
-                        title={annotations.length === 0 ? "Nessuna nota da esportare" : "Esporta in .txt"}
-                        aria-label="Esporta note in .txt"
-                    >
-                        <Download size={14} />
-                    </button>
-                    <button
-                        onClick={onClose}
-                        className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                        title="Chiudi (Esc)"
-                        aria-label="Chiudi pannello note"
-                    >
-                        <X size={16} />
-                    </button>
-                </div>
-            </header>
+            <div className="mb-2 flex flex-wrap items-center gap-1">
+                {hasImported && (['all', 'own', 'imported'] as const).map((key) => (
+                    <Button key={key} size="sm" variant={ownerFilter === key ? 'primary' : 'quiet'} aria-pressed={ownerFilter === key} onClick={() => setOwnerFilter(key)}>
+                        {key === 'all' ? 'Tutte' : key === 'own' ? 'Mie' : 'Importate'}
+                    </Button>
+                ))}
+                <Button size="sm" variant="quiet" className="ml-auto" onClick={onExportTxt} disabled={annotations.length === 0}>
+                    <Download size={14} aria-hidden />
+                    Esporta in .txt
+                </Button>
+            </div>
 
-            {hasImported && (
-                <div className="flex gap-1 px-3 pt-2 pb-1 border-b border-slate-100 dark:border-slate-800">
-                    {(['all', 'own', 'imported'] as const).map((key) => (
-                        <button
-                            key={key}
-                            onClick={() => setOwnerFilter(key)}
-                            className={cn(
-                                'px-2 py-1 rounded text-xs transition-colors',
-                                ownerFilter === key
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
-                            )}
-                        >
-                            {key === 'all' ? 'Tutte' : key === 'own' ? 'Mie' : 'Importate'}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div ref={listRef} tabIndex={-1} className="max-h-[50vh] space-y-3 overflow-y-auto py-1 outline-none">
                 {visibleNotes.length === 0 && (
                     <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-6">
                         {annotations.length === 0
@@ -270,7 +121,7 @@ function PeekBody({
                         onChangeEdit={setEditingText}
                         onCommitEdit={commitEdit}
                         onCancelEdit={cancelEdit}
-                        onRemove={onRemoveNote}
+                        onRemove={removeNote}
                     />
                 )}
 
@@ -284,32 +135,27 @@ function PeekBody({
                         onChangeEdit={setEditingText}
                         onCommitEdit={commitEdit}
                         onCancelEdit={cancelEdit}
-                        onRemove={onRemoveNote}
+                        onRemove={removeNote}
                     />
                 )}
             </div>
 
-            <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="mt-2 space-y-2 border-t border-slate-200 pt-3 dark:border-slate-800">
                 {noteAnchor && (
                     <div className="flex items-center gap-2 px-2.5 py-1.5 bg-amber-100/70 dark:bg-amber-900/30 rounded-md text-xs border border-amber-300/60 dark:border-amber-800/40">
                         <StickyNote size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
                         <span className="italic flex-1 truncate text-amber-800 dark:text-amber-300">
                             Ancorata a: &ldquo;{noteAnchor.anchorText}&rdquo;
                         </span>
-                        <button
-                            onClick={onClearAnchor}
-                            className="p-0.5 rounded text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors"
-                            title="Rimuovi ancoraggio"
-                            aria-label="Rimuovi ancoraggio"
-                        >
-                            <X size={12} />
-                        </button>
+                        <IconButton size="sm" variant="quiet" onClick={onClearAnchor} title="Rimuovi ancoraggio" aria-label="Rimuovi ancoraggio" icon={<X aria-hidden />} />
                     </div>
                 )}
 
                 <div className="flex items-end gap-2">
-                    <textarea
+                    <div className="min-w-0 flex-1">
+                    <Textarea
                         ref={composerRef}
+                        aria-label={noteAnchor ? 'Nota ancorata' : 'Nuova nota'}
                         value={composerText}
                         onChange={(e) => setComposerText(e.target.value)}
                         onKeyDown={(e) => {
@@ -320,24 +166,18 @@ function PeekBody({
                         }}
                         placeholder={noteAnchor ? 'Scrivi la nota ancorata…' : 'Aggiungi una nota…'}
                         rows={2}
-                        className="flex-1 text-sm resize-none rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400"
+                        className="resize-none"
                     />
-                    <button
-                        onClick={submitComposer}
-                        disabled={!composerText.trim()}
-                        className="self-stretch px-3 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 active:bg-amber-700 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
+                    </div>
+                    <Button variant="primary" onClick={submitComposer} disabled={!composerText.trim()}>
                         Salva
-                    </button>
+                    </Button>
                 </div>
 
                 {onOpenStudyMode && (
-                    <button
-                        onClick={() => { onOpenStudyMode(); onClose(); }}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
-                    >
-                        <BookOpen size={13} /> Apri in Modalità Studio
-                    </button>
+                    <Button variant="quiet" size="sm" className="w-full" onClick={() => { onOpenStudyMode(); onClose(); }}>
+                        <BookOpen size={14} aria-hidden /> Apri in Modalità Studio
+                    </Button>
                 )}
             </div>
         </>

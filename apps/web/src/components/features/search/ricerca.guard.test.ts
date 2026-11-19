@@ -14,16 +14,20 @@ const files = DIRS.flatMap((dir) => (readdirSync(join(FEATURES, dir), { recursiv
   .sort();
 const read = (name: string) => readFileSync(join(FEATURES, name), 'utf8');
 /**
- * The windows over the content still here (L-73): their own PRs bring them into the page, so this one leaves them as
- * they are, out of the checks of style below. The glosses' side view is the exception the brief names (its select and
- * its motion), with the report's question it shares with the Forum.
+ * The windows over the content still here (L-73), for the PRs after LC139 (which brought the toolbar's «Note»,
+ * «Evidenziazioni», «Copia», «Esporta» and «Testo alla data» into the page). The first four are left out of the checks of
+ * style below; the others were already in them.
  */
-const WINDOWS = [
-  'practice/CorpusPracticesDialog.tsx', 'practice/PracticeDossierPicker.tsx',
-  'search/ArticleDiscussionPanel.tsx', 'search/BlockAnnotationsSheet.tsx', 'search/NoteComposerSheet.tsx', 'search/NotesPeekPanel.tsx',
-  'search/TextAtDateDialog.tsx', 'search/discussionControls.tsx',
-];
-const STYLED = files.filter((name) => !WINDOWS.includes(name) || ['search/ArticleDiscussionPanel.tsx', 'search/discussionControls.tsx'].includes(name));
+const UNSTYLED = ['practice/CorpusPracticesDialog.tsx', 'practice/PracticeDossierPicker.tsx', 'search/BlockAnnotationsSheet.tsx', 'search/NoteComposerSheet.tsx'];
+const WINDOWS = [...UNSTYLED, 'search/ArticleDiscussionPanel.tsx', 'search/FindWindow.tsx', 'search/MoveProposalBar.tsx', 'search/UpdateNotePopover.tsx'];
+/** The confirmations that stay (L-74), grown from their button. */
+const CONFIRMATIONS = ['search/discussionControls.tsx'];
+/**
+ * Over the page by choice, each with why: ⌘K's island grows from its pill (L-75); the glosses' margin is a portal into a
+ * slot of the page, in its flow; the save to a practice's notice is a notification (L-74).
+ */
+const ALLOWED = ['search/CommandPalette.tsx', 'search/ArticleTabContent.tsx', 'practice/usePracticeSaveActions.tsx'];
+const STYLED = files.filter((name) => !UNSTYLED.includes(name));
 
 // LC113: the search and the reader speak the common components' language, as Pratiche (LC106), Opus (LC110) and Learn
 // (LC112). A bare `<button>`, `<select>` or `<input>` stays only with its reason written on the line above
@@ -37,9 +41,12 @@ describe('Search and reader, the common components', () => {
     expect(local).toEqual([]);
   });
 
-  // L-73: nothing over the content. The windows are today's; no new one comes in.
+  // L-73, LC139: nothing over the content but the confirmations and what is allowed. No dialog role, veil, portal,
+  // popover or sheet comes in.
   it('opens no new window over the content', () => {
-    const windows = files.filter((name) => /\.tsx$/.test(name) && /(?<!\[)role="dialog"|fixed inset-0|<(Modal|ConfirmDialog|Sheet)\b/.test(read(name)));
-    expect(windows).toEqual([...WINDOWS].sort());
+    const windows = files.filter((name) => /\.tsx$/.test(name) && (
+      /(?<!\[)role=["{']*(alert)?dialog|role: '(alert)?dialog'|fixed inset-0|createPortal|FloatingPortal|<(Modal|ConfirmDialog|Sheet|WireConfirm)\b/.test(read(name))
+    ));
+    expect(windows).toEqual([...WINDOWS, ...CONFIRMATIONS, ...ALLOWED].sort());
   });
 });

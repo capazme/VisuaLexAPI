@@ -166,7 +166,7 @@ function shortFrom(isoDate: string | null | undefined): string | undefined {
   return day ? `In vigore ${withPreposition('dal', `${Number(day[3])}/${Number(day[2])}/${day[1]}`)}` : undefined;
 }
 
-function chipFor(validity: ArticleValidity): VersionChip {
+function chipFor(validity: ArticleValidity, requestedDay?: string): VersionChip {
   // The days in full, as a lawyer writes them (R3): «dal 1° gennaio 2005», «dall'8 agosto».
   const from = validity.valid_from ? withPreposition('dal', formatDateForCitation(validity.valid_from)) : '';
   const to = validity.valid_to ? withPreposition('al', formatDateForCitation(validity.valid_to)) : '';
@@ -183,8 +183,11 @@ function chipFor(validity: ArticleValidity): VersionChip {
       };
     case 'abrogated':
       return { tone: 'abrogated', label: from ? `Abrogato ${from}` : 'Abrogato', title };
-    case 'not_yet':
-      return { tone: 'not_yet', label: 'Non ancora esistente', title };
+    case 'not_yet': {
+      // The day asked for stays in the row, which keeps the reader's place (LC139): «Al 1° gennaio 1935 l’articolo non esisteva».
+      const at = requestedDay ? withPreposition('al', formatDateForCitation(requestedDay)) : '';
+      return { tone: 'not_yet', label: at ? `${at[0].toUpperCase()}${at.slice(1)} l’articolo non esisteva` : 'Non ancora esistente', title };
+    }
   }
 }
 
@@ -209,7 +212,7 @@ function bannerFor(
       title: 'Articolo non ancora esistente',
       body: `Questo articolo non esisteva${asOf ? ` ${withPreposition('al', formatDateForCitation(asOf))}` : ''}.`
         + (firstDay ? ` È in vigore ${withPreposition('dal', formatDateForCitation(firstDay))}.` : ''),
-      actions: firstDay ? ['open_next_day', 'pick_date'] : ['pick_date'],
+      actions: firstDay ? ['go_current', 'open_next_day', 'pick_date'] : ['go_current', 'pick_date'],
       ...(firstDay ? { nextDay: firstDay } : {}),
     };
   }
@@ -314,7 +317,7 @@ export function describeVersion(
   const notYet = validity?.state === 'not_yet';
   const canCite = !notYet && !unreliable;
 
-  const chip = validity ? chipFor(validity) : null;
+  const chip = validity ? chipFor(validity, requestedDay) : null;
   const banner = validity ? bannerFor(validity, requestedDay, canCite) : null;
   // A later text announced only beside today's: a text asked for by date or as the original says nothing of it; a
   // change the web does not know (G-357 adds more), or none, says nothing; a text the source puts in force after today

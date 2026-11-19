@@ -110,12 +110,12 @@ describe('ArticleTabContent — the search gestures go to the host (LC52 c2)', (
   it('«Testo alla data»', async () => {
     hosted(article(CURRENT, { versione: 'vigente', data_versione: '' }));
     fireEvent.click(screen.getByRole('button', { name: 'In vigore dal 28 dicembre 2025' }));
-    const dialog = screen.getByRole('dialog', { name: 'Testo alla data' });
+    const dialog = screen.getByRole('region', { name: 'Testo alla data' });
     fireEvent.change(within(dialog).getByLabelText('Data'), { target: { value: '2007-12-29' } });
     fireEvent.click(within(dialog).getByRole('button', { name: /Mostra il testo/ }));
     expect(hostSearch).toHaveBeenCalledWith(expect.objectContaining({ version_date: '2007-12-29', annex: '2' }));
     expect(triggerSearch).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Testo alla data' })).not.toBeInTheDocument());
   });
 
   it('the text of the first day an article existed', () => {

@@ -1,7 +1,7 @@
 import { useContext, useRef, type Ref } from 'react';
 import { StatusLineEnd } from './statusLineEnd';
 import type { ArticleData } from '../../../types';
-import { ExternalLink, Zap, FolderPlus, Copy, Link2, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, Link2, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search, StickyNote, Highlighter } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { Button } from '../../ui/Button';
@@ -188,6 +188,9 @@ export function ReadingToolbar({
         }] : []),
         ...(compact ? [] : [
             ...(phone ? [
+                // The phone's row has no «Note» and «Evidenziazioni» (LC139): their spaces open from here.
+                { label: isNotesPeekOpen ? 'Chiudi le note' : 'Note', icon: StickyNote, onSelect: onToggleNotes, disabled: Boolean(lockedReason), description: lockedReason },
+                { label: isHighlightsPeekOpen ? 'Chiudi le evidenziazioni' : 'Evidenziazioni', icon: Highlighter, onSelect: onToggleHighlightsPeek, disabled: Boolean(lockedReason), description: lockedReason },
                 { label: 'Modalità studio', icon: BookOpen, onSelect: () => onOpenStudyMode?.(), disabled: Boolean(lockedReason) || !onOpenStudyMode, description: lockedReason },
                 ...(url ? [{ label: 'Apri la fonte', icon: ExternalLink, onSelect: () => { window.open(url, '_blank', 'noopener,noreferrer'); } }] : []),
             ] : []),

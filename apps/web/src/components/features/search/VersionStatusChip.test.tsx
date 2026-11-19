@@ -15,7 +15,8 @@ describe('VersionStatusChip', () => {
         render(<VersionStatusChip chip={chip()} onClick={() => {}} />);
         const button = screen.getByRole('button', { name: 'Testo storico · dal 25 dicembre 2003 al 29 dicembre 2007' });
         expect(button).toHaveAttribute('title', expect.stringContaining('fa fede la Gazzetta Ufficiale'));
-        expect(button).toHaveAttribute('aria-haspopup', 'dialog');
+        // «Testo alla data» opens in the page (LC139, L-73): no window to announce.
+        expect(button).not.toHaveAttribute('aria-haspopup');
     });
 
     it('is words in `text-sm`, not a pill, and keeps its 44px touch target (R3)', () => {

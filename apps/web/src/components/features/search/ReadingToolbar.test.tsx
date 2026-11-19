@@ -161,12 +161,19 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         ]);
     });
 
-    it('the phone\'s «⋯» adds Study Mode and the source, which its row does not show', () => {
-        const { container } = setup({ find: { isOpen: false, onToggle: vi.fn() }, url: 'https://example.org/art' });
-        expect(entryNames(openMore(phoneRow(container)))).toEqual([
-            'Aggiungi alle norme rapide', 'Cerca nel testo', 'Copia', 'Modalità studio', 'Apri la fonte',
+    it('the phone\'s «⋯» adds the notes, the highlights, Study Mode and the source, which its row does not show', () => {
+        const props = setup({ find: { isOpen: false, onToggle: vi.fn() }, url: 'https://example.org/art' });
+        const { container } = props;
+        const menu = openMore(phoneRow(container));
+        expect(entryNames(menu)).toEqual([
+            'Aggiungi alle norme rapide', 'Cerca nel testo', 'Copia', 'Note', 'Evidenziazioni', 'Modalità studio', 'Apri la fonte',
             'Condividi link', 'Esporta…', 'Testo alla data…', 'Confronta con…', 'Cambia il significato dei colori',
         ]);
+        // LC139: their spaces open from here on a phone.
+        fireEvent.click(within(menu).getByRole('menuitem', { name: 'Note' }));
+        expect(props.onToggleNotes).toHaveBeenCalledTimes(1);
+        fireEvent.click(within(openMore(phoneRow(container))).getByRole('menuitem', { name: 'Evidenziazioni' }));
+        expect(props.onToggleHighlightsPeek).toHaveBeenCalledTimes(1);
     });
 
     it('runs each entry\'s action', () => {
