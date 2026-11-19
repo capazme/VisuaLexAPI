@@ -175,8 +175,12 @@ describe('DecisionEntryView', () => {
     const e = openEntry(CIVILE);
     const { container } = render(entryView(e, CIVILE));
     await screen.findByText(/Sez\. III civile/);
-    fireEvent.click(container.querySelector('.citation-hover')!);
-    expect(s().searchTrigger).toMatchObject({ article: '2043', besideId: e.practiceId });
+    // the text is drawn before the effects run (under load the scheduler yields between them): click
+    // until the citation links listen; a click before that does nothing
+    await waitFor(() => {
+      fireEvent.click(container.querySelector('.citation-hover')!);
+      expect(s().searchTrigger).toMatchObject({ article: '2043', besideId: e.practiceId });
+    });
     expect(s().readingBackStack).toEqual([{
       practiceId: e.practiceId, subject: { kind: 'decision', decisionId: e.decisionId }, place: 'table',
       label: 'Cass. civ., sez. III, n. 99999/2024',
@@ -329,7 +333,8 @@ describe('DecisionEntryView — the Cronologia (once per opening, carry-over rul
     const e = openEntry(CIVILE);
     const first = render(entryView(e, CIVILE));
     await screen.findByText(/Sez\. III civile/);
-    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+    // the record is an effect: it may run after the text is drawn
+    await waitFor(() => expect(addDecisionToHistory).toHaveBeenCalledTimes(1));
     expect(addDecisionToHistory).toHaveBeenCalledWith('cassazione:civile:99999:2024');
     await waitFor(() => expect(e.entry()?.historyRecordedKey).toBe('cassazione:civile:99999:2024'));
     // the row closed (the view unmounts) and opened again, or a reload
@@ -345,7 +350,8 @@ describe('DecisionEntryView — the Cronologia (once per opening, carry-over rul
     const e = openEntry(CIVILE);
     const first = render(entryView(e, CIVILE));
     await screen.findByText(/Sez\. III civile/);
-    expect(addDecisionToHistory).toHaveBeenCalledTimes(1);
+    // the record is an effect: it may run after the text is drawn
+    await waitFor(() => expect(addDecisionToHistory).toHaveBeenCalledTimes(1));
     first.unmount();
     act(() => { s().removePracticeDecision(e.practiceId, e.decisionId); });
     const again = openEntry(CIVILE);
