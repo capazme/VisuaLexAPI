@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { AlertTriangle, Send, ThumbsUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
 
 /**
  * The discussions' own controls, drawn by the panel under an article (`ArticleDiscussionPanel`) and by the Forum's
@@ -25,15 +27,18 @@ export function VoteButton({ voted, count, label, onVote, own = false }: { voted
     );
   }
   return (
-    <button
+    <Button
       type="button"
+      variant="quiet"
+      size="sm"
       onClick={onVote}
       aria-label={`${label}, ${count} ${count === 1 ? 'voto' : 'voti'}`}
       aria-pressed={voted}
-      className={cn('inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1 text-xs md:px-2', TOUCH, voted ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800')}
+      icon={<ThumbsUp size={13} aria-hidden />}
+      className={cn('shrink-0 gap-1 px-3 md:px-2', voted && 'bg-primary-100 text-primary-700 hover:bg-primary-100 dark:bg-primary-900/40 dark:text-primary-300')}
     >
-      <ThumbsUp size={13} aria-hidden /> {count}
-    </button>
+      {count}
+    </Button>
   );
 }
 
@@ -51,8 +56,8 @@ export function ReplyForm({ onSend, placeholder = 'Scrivi una risposta…', send
   };
   return (
     <form onSubmit={event => void submit(event)} className="mt-3 flex gap-2">
-      <textarea value={body} onChange={event => setBody(event.target.value)} required rows={2} placeholder={placeholder} aria-label={placeholder} className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm" />
-      <button type="submit" aria-label={sendLabel} className="inline-flex min-h-11 min-w-11 items-center justify-center self-end rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 p-2 text-white md:min-h-0 md:min-w-0"><Send size={14} aria-hidden /></button>
+      <textarea value={body} onChange={event => setBody(event.target.value)} required rows={2} placeholder={placeholder} aria-label={placeholder} className="min-w-0 flex-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm" />
+      <IconButton type="submit" variant="primary" size="sm" aria-label={sendLabel} icon={<Send aria-hidden />} className="self-end" />
     </form>
   );
 }
@@ -72,18 +77,18 @@ export function ReportButton({ onReport, label, inline = false }: { onReport: ()
   const question = 'La segnalazione arriva ai moderatori, che decidono se nascondere il contenuto.';
   return (
     <>
-      <button ref={trigger} type="button" onClick={(event) => { setAskFrom(event.currentTarget); setAsking(true); }} aria-label={label} aria-expanded={inline ? asking : undefined} className={cn('inline-flex items-center gap-1 px-2 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 md:px-0', TOUCH)}>
-        <AlertTriangle size={12} aria-hidden /> Segnala
-      </button>
+      <Button ref={trigger} type="button" variant="quiet" size="sm" onClick={(event) => { setAskFrom(event.currentTarget); setAsking(true); }} aria-label={label} aria-expanded={inline ? asking : undefined} icon={<AlertTriangle size={12} aria-hidden />} className="gap-1 px-2 text-slate-500 hover:bg-transparent hover:text-red-600 dark:text-slate-400 dark:hover:bg-transparent dark:hover:text-red-400">
+        Segnala
+      </Button>
       {/* `inline` (the article's margin, L-73): the question under the row, in the page, not a dialog over it. The
           parent row wraps, so it takes a line of its own. */}
       {inline && asking && (
-        <div role="group" aria-label="Segnalare ai moderatori?" className="basis-full rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+        <div role="group" aria-label="Segnalare ai moderatori?" className="basis-full rounded-[8px] border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
           <p>{question}</p>
           <div className="mt-2 flex justify-end gap-2">
             {/* 44 px to touch at every width: the question is in the margin, on a phone too. */}
-            <button type="button" onClick={() => answer(false)} className="min-h-11 min-w-11 px-2 text-slate-600 dark:text-slate-300">Annulla</button>
-            <button type="button" onClick={() => answer(true)} className="min-h-11 min-w-11 rounded-md bg-red-600 px-2.5 font-semibold text-white hover:bg-red-700">Segnala</button>
+            <Button type="button" variant="quiet" size="lg" onClick={() => answer(false)} className="min-w-11 px-2 text-xs">Annulla</Button>
+            <Button type="button" variant="danger" size="lg" onClick={() => answer(true)} className="min-w-11 px-2.5 text-xs font-semibold">Segnala</Button>
           </div>
         </div>
       )}

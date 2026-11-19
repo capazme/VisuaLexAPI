@@ -507,7 +507,7 @@ describe('ArticleDiscussionPanel', () => {
       await renderPanel(decisionThread());
       expect(screen.getAllByText(/risarcimento del danno/).length).toBeGreaterThan(0);
       expect(screen.getByText(/visibili solo all’autore e agli amministratori/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Mostra a tutti' })).toHaveClass('min-h-[44px]');
+      expect(screen.getByRole('button', { name: 'Mostra a tutti' })).toHaveClass('min-h-11');
     });
 
     it('shows everyone the quotation once released', async () => {
@@ -659,9 +659,9 @@ describe('ArticleDiscussionPanel', () => {
     it('gives the head\'s order, «Nuova glossa» and «Chiudi glosse» 44 px to touch on a phone, their size from md', async () => {
       vi.mocked(articleDiscussionService.list).mockResolvedValue({ data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
       render(<ArticleDiscussionPanel anchor={dummyAnchor} isOpen={true} onClose={vi.fn()} />);
-      expect(await screen.findByRole('combobox')).toHaveClass('min-h-11', 'md:min-h-0');
-      expect(screen.getByRole('button', { name: /Nuova glossa/ })).toHaveClass('min-h-11', 'md:min-h-0');
-      expect(screen.getByRole('button', { name: 'Chiudi glosse' })).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-0', 'md:min-w-0');
+      expect(await screen.findByRole('combobox')).toHaveClass('min-h-11', 'md:min-h-8');
+      expect(screen.getByRole('button', { name: /Nuova glossa/ })).toHaveClass('min-h-11', 'md:min-h-8');
+      expect(screen.getByRole('button', { name: 'Chiudi glosse' })).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-9', 'md:min-w-9');
     });
 
     it('counts the replies as the Forum does: not the comments under them', async () => {
