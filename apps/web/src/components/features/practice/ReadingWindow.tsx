@@ -58,7 +58,7 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTo
       aria-label={title}
       data-testid="reading-window"
       data-window-id={besideRef.id}
-      className="flex h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-0 flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+      className="flex h-full focus:outline-none min-w-0 flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
     >
       <header
         data-reading-window-header

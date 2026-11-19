@@ -59,7 +59,7 @@ export const RassegnaResult = forwardRef<HTMLLIElement, Props>(function Rassegna
   const cut = start > 0 || passo.testo.length > LONG;
 
   return (
-    <li ref={ref} tabIndex={-1} className={cn('space-y-2 py-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-sm')}>
+    <li ref={ref} tabIndex={-1} className="space-y-2 py-4 focus:outline-none">
       <div className="space-y-0.5">
         <p className="text-xs text-slate-600 dark:text-slate-400">{provenance(passo)}</p>
         {passo.autori.length > 0 && <p className="text-xs italic text-slate-500 dark:text-slate-400">di {passo.autori.join(', ')}</p>}

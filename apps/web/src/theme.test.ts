@@ -819,6 +819,28 @@ describe('the section change (T1)', () => {
     }
   }, 30000);
 
+  it('draws no ring on what the script focuses but no one operates, and keeps it on the controls (LC143)', async () => {
+    const css = await compile(FOCUS_RING.split(' '));
+    const at = css.indexOf('[tabindex="-1"]:not(');
+    expect(at).toBeGreaterThan(-1);
+    const rule = css.slice(at, css.indexOf('}', at));
+    // Not on a control the script focuses (a menu's entries, a button): those keep the ring.
+    for (const control of ['button', 'a', '[role="menuitem"]', '[role="option"]', '[role="tab"]']) expect(rule).toContain(control);
+    expect(rule).toMatch(/outline:\s*none/);
+    expect(rule).toMatch(/--tw-ring-shadow:\s*0 0 #0000/);
+    expect(rule).toMatch(/--tw-ring-offset-shadow:\s*0 0 #0000/);
+    // Outside every layer, so it wins over `focus-visible:ring-2` (in the utilities layer).
+    for (const layer of css.matchAll(/@layer [\w-]+\s*\{/g)) {
+      let depth = 0;
+      let end = layer.index! + layer[0].length - 1;
+      for (; end < css.length; end += 1) {
+        if (css[end] === '{') depth += 1;
+        else if (css[end] === '}' && (depth -= 1) === 0) break;
+      }
+      expect(at < layer.index! || at > end, layer[0]).toBe(true);
+    }
+  }, 30000);
+
   it('compiles the mark\'s colour change, 200 ms, and stills it under reduced motion', async () => {
     const css = await compile(['transition-colors', 'duration-200', 'ease-out', 'motion-reduce:transition-none']);
     expect(css).toMatch(/\.duration-200\s*\{[^}]*transition-duration:\s*200ms/);
