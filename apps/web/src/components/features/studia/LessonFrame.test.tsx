@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { LessonFrame, LessonLoading } from './LessonFrame';
+import { LearnLoading, LessonFrame, LessonLoading } from './LessonFrame';
 
 /** The app's shell lives in `#root`, as `main.tsx` mounts it. */
 function renderFrame() {
@@ -107,5 +107,21 @@ describe('LessonLoading', () => {
     expect(screen.getByText('Carico il modulo…')).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(await screen.findByText('Il percorso')).toBeInTheDocument();
+  });
+});
+
+// LC112: Learn opened by its address came in some 210 ms after a «Caricamento…» that only flashed.
+describe('LearnLoading', () => {
+  it('says nothing for 300 ms, then «Caricamento…»', () => {
+    vi.useFakeTimers();
+    try {
+      render(<LearnLoading />);
+      act(() => vi.advanceTimersByTime(299));
+      expect(screen.queryByText('Caricamento…')).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.getByText('Caricamento…')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
