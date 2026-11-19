@@ -12,6 +12,10 @@ vi.mock('framer-motion', async (importOriginal) => ({
   useReducedMotion: () => motionPref.reduced,
 }));
 
+// The page's idle time, when the test says (`setup.ts` gives none): the band drawn ahead (LC133).
+const idle = vi.hoisted(() => ({ runs: [] as Array<() => void> }));
+vi.mock('../../../lib/idle', () => ({ whenIdle: (run: () => void) => { idle.runs.push(run); return () => {}; } }));
+
 import { CommandPalette } from './CommandPalette';
 import { SEARCH_CLOSE, SEARCH_OPEN } from '../../../lib/motion';
 import { appStore } from '../../../store/useAppStore';
@@ -269,8 +273,8 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     pillInBar();
     const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(document.querySelector('[data-palette-band]')).toBeNull();
-    // jsdom has no requestIdleCallback: the 200 ms fallback.
-    await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
+    // The page goes idle.
+    act(() => idle.runs.splice(0).forEach((run) => run()));
     const ahead = document.querySelector<HTMLElement>('[data-palette-band]')!;
     expect(ahead).not.toBeNull();
     expect(ahead.hidden).toBe(true);
