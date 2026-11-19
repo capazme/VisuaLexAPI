@@ -148,6 +148,20 @@ describe('Expand', () => {
     }
   });
 
+  it('with `followContent` off, does not follow its content: it changes at once (LC129, ⌘K\'s band)', () => {
+    let notify: (() => void) | null = null;
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class { constructor(cb: () => void) { notify = cb; } observe() {} disconnect() {} } as unknown as typeof ResizeObserver;
+    try {
+      const { rerender } = render(<Expand open={false} followContent={false}><p>Righe</p></Expand>);
+      rerender(<Expand open followContent={false}><p>Righe</p></Expand>);
+      expect(notify).toBeNull();
+      expect(heights()).toHaveLength(1);
+    } finally {
+      globalThis.ResizeObserver = original;
+    }
+  });
+
   it('open and at rest, follows content arriving later from the height it had, not from the new one (LC86)', () => {
     let notify: () => void = () => {};
     const original = globalThis.ResizeObserver;

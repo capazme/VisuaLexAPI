@@ -168,16 +168,12 @@ describe('AuthPage: two tabs on one page', () => {
     expect(within(panel()).getByLabelText('Email')).toHaveValue('avv@studio.it');
   });
 
-  it('the first field still disabled while the user is read takes the focus once enabled', () => {
+  it('keeps «Accedi» and its fields enabled while the session is checked on mounting: only a sign-in disables them (LC131)', () => {
+    // The check `useAuth` runs on mounting drew the button at half opacity for a frame, then faded it in.
     authLoading = true;
-    const { rerenderSame } = renderAuth('/register');
-    fireEvent.click(tab('Accedi'));
-    const email = within(panel()).getByLabelText('Email');
-    expect(email).toBeDisabled();
-    expect(email).not.toHaveFocus();
-    authLoading = false;
-    rerenderSame();
-    expect(email).toHaveFocus();
+    renderAuth('/login');
+    expect(within(panel()).getByRole('button', { name: 'Accedi' })).toBeEnabled();
+    expect(within(panel()).getByLabelText('Email')).toBeEnabled();
   });
 
   it('opens «Registrati» from an address written in capitals', () => {

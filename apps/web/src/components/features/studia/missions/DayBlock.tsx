@@ -59,8 +59,7 @@ function DayLine({ day, subject }: { day: Progressi | null; subject?: string }) 
  * The day block (G8), first on «Oggi» and on a phone the first thing under the bar: the day, what is on today in
  * large type, what it costs and where it comes from, and «Inizia il ripasso», the page's one primary button.
  * With nothing left, «Hai finito per oggi.» and the next day; narrowed to a subject, that subject's; with no card at
- * all, how to begin; a failed read says so and keeps the start. It enters with the sidebar's light cascade
- * (`fadeInEntries`, opacity only) once its content is first drawn, never under reduced motion.
+ * all, how to begin; a failed read says so and keeps the start.
  */
 export function DayBlock({
   day, dayFailed, action, actionFailed, stops, onRetry, materia, subject, onAllSubjects, onStart, onOpenSettings, settingsPanel,

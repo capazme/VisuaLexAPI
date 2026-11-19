@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const account = vi.hoisted(() => ({ devMode: false }));
@@ -312,8 +312,8 @@ describe('SectionSwitcher (spec S3)', () => {
       expect(screen.queryByRole('menu')).toBeNull();
     });
 
-    it('draws one check, on the section chosen at once, and closes by itself a moment after the choice', async () => {
-      // With the Web Animations API (stubbed: each animation ends at once) the menu stays for the check to arrive.
+    it('draws one check, on the section chosen at once, and rolls up at once after the choice', async () => {
+      // With the Web Animations API (stubbed: each animation ends at once).
       const animate = vi.fn(function (this: Element) {
         const finish: (() => void)[] = [];
         queueMicrotask(() => finish.forEach((f) => f()));
@@ -339,8 +339,7 @@ describe('SectionSwitcher (spec S3)', () => {
       }
     });
 
-    it('closes 200 ms after the first frame drawn after the choice, rolling up', () => {
-      vi.useFakeTimers();
+    it('rolls up at the choice, with no wait (LC129)', () => {
       const animate = vi.fn(() => ({ cancel: vi.fn(), reverse: vi.fn(), finished: new Promise(() => {}), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
       Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
       try {
@@ -349,13 +348,9 @@ describe('SectionSwitcher (spec S3)', () => {
         const menu = screen.getByRole('menu');
         const rolledUp = () => animate.mock.contexts.some((el, i) => el === menu && String((animate.mock.calls[i] as unknown as Keyframe[][])[0][1].clipPath).includes('100%'));
         fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
-        act(() => vi.advanceTimersByTime(32 + 190));
-        expect(rolledUp()).toBe(false);
-        act(() => vi.advanceTimersByTime(30));
         expect(rolledUp()).toBe(true);
       } finally {
         delete (Element.prototype as Partial<Element>).animate;
-        vi.useRealTimers();
       }
     });
 

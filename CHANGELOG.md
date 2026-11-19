@@ -12,6 +12,17 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.56.0] - 2026-11-19
+
+«Accedi» without a flash or a jump, and the animations that did not help removed. Web only, no migration.
+MERL-T stays off.
+
+### Interface
+
+- «Accedi» opens without a flash or a jump; with a saved session the form stays usable while the session is
+  checked (LC131).
+- The animations that did not help are removed (LC129).
+
 ## [1.55.0] - 2026-11-19
 
 «Scadenze» becomes «Attività», and the change of page never shows two pages at once. Web only, no migration.

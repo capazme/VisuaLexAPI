@@ -787,21 +787,17 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       expect([...fill.classList].filter((c) => /^(transition|duration|ease|animate|delay)/.test(c))).toEqual([]);
     });
 
-    it('runs its head ahead in stone and lets the ink catch up on a spring, under 400 ms (S2)', async () => {
+    it('widens one ink in one transition, `dur.pop`: no second layer on a spring, no tremble (LC129)', async () => {
       const user = userEvent.setup();
       renderSession([card('a'), card('b')]);
       await screen.findByText('Domanda a?');
       const fill = screen.getByTestId('lesson-progress-fill');
-      const head = bar().querySelector('.vlx-lesson-head')!;
-      expect(head).toHaveClass('motion-safe:transition-[width]', 'motion-safe:duration-(--dur-pop)');
-      // The motion tokens (LC112): 70 ms and `--dur-scene`'s 320, still under 400.
-      expect(fill).toHaveClass('motion-safe:delay-[70ms]', 'motion-safe:duration-(--dur-scene)', 'motion-safe:ease-(--ease-catch)');
-      // The ink is drawn over the head: it comes after it.
-      expect(head.compareDocumentPosition(fill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(fill).toHaveClass('motion-safe:transition-[width]', 'motion-safe:duration-(--dur-pop)', 'motion-safe:ease-out');
+      expect([...fill.classList].some((c) => /delay|ease-catch/.test(c))).toBe(false);
+      expect(bar().querySelector('.vlx-lesson-head')).toBeNull();
       await show();
       await user.click(screen.getByRole('button', { name: /Bene/ }));
       await screen.findByText('Domanda b?');
-      expect(head).toHaveStyle({ width: '50%' });
       expect(fill).toHaveStyle({ width: '50%' });
     });
 

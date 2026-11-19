@@ -302,7 +302,6 @@ export function HistoryView() {
     return (
         <PageFrame
             title="Cronologia"
-            className="animate-in fade-in duration-(--dur-pop)"
             action={
                 <>
                     <div id="tour-history-search" className="min-w-0 flex-1 md:w-64 md:flex-none">

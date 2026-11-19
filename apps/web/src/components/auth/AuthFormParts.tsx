@@ -4,9 +4,10 @@ import { IconButton } from '../ui/IconButton';
 import { CARD_RADIUS } from '../ui/controlStyles';
 import { cn } from '../../lib/utils';
 
+/** Drawn under the submit button, so nothing above it moves when it appears (LC131). */
 export function FormError({ id, message }: { id: string; message: string }) {
   return (
-    <div id={id} role="alert" className={cn('mb-6 flex items-start gap-3 border border-red-200 bg-red-50 p-3.5 animate-in fade-in slide-in-from-top-2 dark:border-red-900/50 dark:bg-red-950/40', CARD_RADIUS)}>
+    <div id={id} role="alert" className={cn('flex items-start gap-3 border border-red-200 bg-red-50 p-3.5 animate-in fade-in dark:border-red-900/50 dark:bg-red-950/40', CARD_RADIUS)}>
       <AlertCircle aria-hidden="true" size={18} className="mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
       <p className="text-sm text-red-700 dark:text-red-300">{message}</p>
     </div>

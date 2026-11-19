@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Command, useCommandState } from 'cmdk';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, useIsPresent, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { BookOpen, ChevronDown, ChevronRight, Gavel, Library, List, Search, Settings2, SlidersHorizontal, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { dur, ease, spring } from '../../../lib/motion';
+import { dur, ease } from '../../../lib/motion';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -85,56 +85,32 @@ function keepKeys(event: ReactKeyboardEvent) {
   if (LIST_KEYS.has(event.key) && !(event.target as HTMLElement).hasAttribute('cmdk-input')) event.stopPropagation();
 }
 
-/** What the box holds: the chosen row's tint slides only between rows of one list, never from a row a
- *  letter typed has just filtered away. */
-const ChosenRowScope = createContext('');
-
 /**
- * The tint under the row the keyboard (or the pointer) has chosen. One element, carried from row to row
- * (`layoutId`), so the choice slides instead of jumping; under reduced motion it is drawn in place.
+ * The tint under the row the keyboard (or the pointer) has chosen: it is where the key is, in the same frame, with no
+ * slide (LC129: a motion on every arrow delayed the reading).
  */
-function RowHighlight({ value, still }: { value: string; still: boolean }) {
+function RowHighlight({ value }: { value: string }) {
   const chosen = useCommandState((state) => state.value?.toLowerCase() === value.toLowerCase());
-  const scope = useContext(ChosenRowScope);
   if (!chosen) return null;
   // A stone tile, as the sidebar's active row (LC32: no edge bar beside it, the anti-slop review).
-  const tint = 'absolute inset-0 -z-10 rounded-md bg-ink-200 dark:bg-ink-700';
-  return still
-    ? <span aria-hidden className={tint} />
-    : <motion.span aria-hidden layoutId={`command-palette-chosen-row:${scope}`} transition={spring.snappy} className={tint} />;
+  return <span aria-hidden className="absolute inset-0 -z-10 rounded-md bg-ink-200 dark:bg-ink-700" />;
 }
 
 /**
- * A row of the menu (R2): while the box filters, the rows left slide to their places (`layout`) and those filtered out
- * fade away, popped out of the list (`AnimatePresence mode="popLayout"` around a list's rows) — and a row leaving is
- * `disabled` for cmdk, so Enter never picks a row no longer there. Under reduced motion nothing moves.
+ * A row of the menu (R2). While the box filters, the list changes at once: no row slides to its place, none fades in
+ * or out (LC129: they moved at every letter, while one types and reads).
  */
-function PaletteRow({ ref, value, onSelect, still, entering = false, className, children }: {
+function PaletteRow({ ref, value, onSelect, className, children }: {
   ref?: Ref<HTMLDivElement>;
   value: string;
   onSelect: () => void;
-  still: boolean;
-  /** In a list that filters: it fades in when a letter brings it back. */
-  entering?: boolean;
   className?: string;
   children: ReactNode;
 }) {
-  const present = useIsPresent();
   return (
-    // Leaving, it is not an option any more: not for Enter (`disabled`), not for a screen reader (`aria-hidden`).
-    <Command.Item asChild value={value} onSelect={onSelect} disabled={!present} aria-hidden={!present || undefined}>
-      <motion.div
-        ref={ref}
-        layout={still ? false : 'position'}
-        initial={entering && !still ? { opacity: 0 } : false}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0, transition: { duration: dur.press } }}
-        transition={{ layout: spring.snappy, opacity: { duration: dur.press } }}
-        className={cn(ROW, className)}
-      >
-        <RowHighlight value={value} still={still} />
-        {children}
-      </motion.div>
+    <Command.Item ref={ref} value={value} onSelect={onSelect} className={cn(ROW, className)}>
+      <RowHighlight value={value} />
+      {children}
     </Command.Item>
   );
 }
@@ -900,7 +876,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // row per act, each opening as it is; for a regional law the API's sentence, with nothing to run (G-577).
   const readAsRow = readAs ? (
     <Command.Group className="shrink-0 pt-2">
-      <PaletteRow value="lettura del campo" onSelect={readAs.run} still={still} className="min-h-[56px] gap-3 text-base">
+      <PaletteRow value="lettura del campo" onSelect={readAs.run} className="min-h-[56px] gap-3 text-base">
         <readAs.icon size={18} aria-hidden className="shrink-0 text-toga-700 dark:text-toga-300" />
         <span className="min-w-0 flex-1 truncate">
           <span className="font-medium text-ink-900 dark:text-ink-50">{readAs.text}</span>
@@ -916,7 +892,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           const act = display ?? formatParsedCitation({ ...citation, article: undefined });
           const text = citation.article ? `art. ${citation.article}, ${act}` : act;
           return (
-            <PaletteRow key={text} value={`scelta ${text}`} onSelect={() => searchCitation(citation)} still={still} className="min-h-[56px] gap-3 text-base">
+            <PaletteRow key={text} value={`scelta ${text}`} onSelect={() => searchCitation(citation)} className="min-h-[56px] gap-3 text-base">
               <Zap size={18} aria-hidden className="shrink-0 text-toga-700 dark:text-toga-300" />
               <span className="min-w-0 flex-1 truncate font-medium text-ink-900 dark:text-ink-50">{text}</span>
             </PaletteRow>
@@ -945,16 +921,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           heading={group.heading}
           className={GROUP_WITH_HEADING}
         >
-          <AnimatePresence initial={false} mode="popLayout">
+          <>
             {group.acts.map((act) => (
-              <PaletteRow key={act.value} value={`atto ${act.value}`} onSelect={() => handleSelectAct(act.value)} still={still} entering>
+              <PaletteRow key={act.value} value={`atto ${act.value}`} onSelect={() => handleSelectAct(act.value)}>
                 <span className="min-w-0 flex-1 line-clamp-2">
                   <span className="text-ink-900 dark:text-ink-50"><Matched text={act.name} query={inputValue} /></span>
                   {act.abbreviation && <span className={SUBTLE}> · <Matched text={act.abbreviation} query={inputValue} /></span>}
                 </span>
               </PaletteRow>
             ))}
-          </AnimatePresence>
+          </>
         </Command.Group>
       ))}
     </div>
@@ -986,9 +962,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           {quickNorms.length === 0 ? (
             <p className={QUIET_LINE}>Nessun preferito: «Aggiungi alle norme rapide», nel menu ⋯ di un articolo, lo porta qui</p>
           ) : (
-            <AnimatePresence initial={false} mode="popLayout">
+            <>
               {visibleQuickNorms.map((qn) => (
-                <PaletteRow key={qn.id} value={`preferito ${qn.id}`} onSelect={() => handleSelectQuickNorm(qn.id)} still={still} entering>
+                <PaletteRow key={qn.id} value={`preferito ${qn.id}`} onSelect={() => handleSelectQuickNorm(qn.id)}>
                   <Zap size={14} aria-hidden className="shrink-0 fill-amber-500 text-amber-600 dark:text-amber-400" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-ink-900 dark:text-ink-50"><Matched text={qn.label} query={inputValue} /></span>
@@ -996,10 +972,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                   </span>
                 </PaletteRow>
               ))}
-            </AnimatePresence>
+            </>
           )}
           {hiddenQuickNorms > 0 && (
-            <PaletteRow value="preferiti tutti" onSelect={handleOpenQuickNormsManager} still={still} className="text-toga-700 dark:text-toga-300">
+            <PaletteRow value="preferiti tutti" onSelect={handleOpenQuickNormsManager} className="text-toga-700 dark:text-toga-300">
               Tutti i preferiti ({quickNorms.length})
             </PaletteRow>
           )}
@@ -1014,9 +990,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               +{presetEntries.length} già pronti{presetHint && `: ${presetHint}…`}
             </p>
           )}
-          <AnimatePresence initial={false} mode="popLayout">
+          <>
           {visibleAliases.map((alias) => (
-            <PaletteRow key={alias.id} value={`alias ${alias.id}`} onSelect={() => handleSelectAlias(alias)} still={still} entering>
+            <PaletteRow key={alias.id} value={`alias ${alias.id}`} onSelect={() => handleSelectAlias(alias)}>
               <Tag size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={alias.trigger} query={inputValue} /></span>
@@ -1024,12 +1000,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               </span>
             </PaletteRow>
           ))}
-          </AnimatePresence>
+          </>
           {/* The door to the manager. Rendered whatever the user owns, on purpose: gated on owning an
               alias, it hid the only way to make the first one. A row of the list, so typing «alias»
               finds it. */}
           {showAliasDoor && (
-            <PaletteRow value="alias gestisci crea scorciatoie" onSelect={handleOpenAliasManager} still={still} className="text-toga-700 dark:text-toga-300">
+            <PaletteRow value="alias gestisci crea scorciatoie" onSelect={handleOpenAliasManager} className="text-toga-700 dark:text-toga-300">
               {hasAliases ? <Settings2 size={14} aria-hidden className="shrink-0" /> : null}
               <span className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
                 {hasAliases ? `Gestisci alias${hiddenAliases > 0 ? ` (${sortedAliases.length})` : ''}` : 'Crea un alias'}
@@ -1042,9 +1018,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       {/* Presets — only while the user is typing, under their own heading. */}
       {visiblePresets.length > 0 && (
         <Command.Group heading="In dotazione · non devi crearli" className={GROUP_WITH_HEADING}>
-          <AnimatePresence initial={false} mode="popLayout">
+          <>
           {visiblePresets.map(([trigger, preset]) => (
-            <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)} still={still} entering>
+            <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)}>
               <Library size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={trigger} query={inputValue} /></span>
@@ -1056,14 +1032,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               </span>
             </PaletteRow>
           ))}
-          </AnimatePresence>
+          </>
         </Command.Group>
       )}
     </div>
   );
 
   // ── The body of each step ───────────────────────────────────────────────────────────────────────
-  // `relative`: a row filtered out pops out of the list (`popLayout`, absolute) against its own column, which clips it.
   const scrollColumn = isDesktop ? 'relative min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'relative pb-2';
   // «A portata di mano» has rows: something saved at rest, or a match while typing.
   const atHandHasRows = typed
@@ -1078,7 +1053,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       {/* A topic, not a decision or a norm: its own line, over the two columns */}
       {topic && (
         <Command.Group className="shrink-0 pt-2">
-          <PaletteRow value={`cerca-sentenze ${topic}`} onSelect={handleSearchTopic} still={still}>
+          <PaletteRow value={`cerca-sentenze ${topic}`} onSelect={handleSearchTopic}>
             <Gavel size={14} aria-hidden className="shrink-0 text-emerald-700 dark:text-emerald-400" />
             <span className="min-w-0 flex-1 truncate font-medium">
               Cerca "{topic}" nelle sentenze della Cassazione
@@ -1094,7 +1069,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       {topic && rassegnePage && (
         <Command.Group heading="Rassegne" className={cn('shrink-0', GROUP_WITH_HEADING)}>
           {rassegnePage.items.slice(0, 3).map((passo) => (
-            <PaletteRow key={passo.id} value={`rassegna ${passo.id}`} onSelect={() => handleOpenRassegne(passo.id)} still={still}>
+            <PaletteRow key={passo.id} value={`rassegna ${passo.id}`} onSelect={() => handleOpenRassegne(passo.id)}>
               <BookOpen size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
                 <span className={cn('block truncate text-xs', SUBTLE)}>{provenance(passo).split(' › ')[0]}</span>
@@ -1102,7 +1077,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               </span>
             </PaletteRow>
           ))}
-          <PaletteRow value="rassegne tutti i passi" onSelect={() => handleOpenRassegne()} still={still}>
+          <PaletteRow value="rassegne tutti i passi" onSelect={() => handleOpenRassegne()}>
             <List size={14} aria-hidden className={ROW_ICON} />
             <span className="min-w-0 flex-1 font-medium">Tutti i passi</span>
             <span className={cn('shrink-0 text-xs', SUBTLE)}>{rassegnePage.total.toLocaleString('it-IT')}</span>
@@ -1230,7 +1205,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   );
 
   const content = (
-    <ChosenRowScope.Provider value={inputValue}>
     <Command
       id="command-menu-root"
       label="Menu di ricerca"
@@ -1272,7 +1246,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         place.slot,
       )}
       {/* The band: under the bars, it grows and pushes the page down; no veil, nothing over the page (L-75). */}
-      <Expand open={isOpen} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
+      <Expand open={isOpen} followContent={false} initialFocusRef={boxRef} role="region" aria-label="Menu di ricerca" data-palette-band="">
         <div className={cn('border-b border-slate-200 dark:border-slate-800', overBar && 'pt-[calc(3.5rem+env(safe-area-inset-top))]')}>
           <div
             style={{ ['--palette-max-h' as string]: isDesktop
@@ -1292,16 +1266,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               </>
             ) : (
               // On a phone the field stays at the top and the rest scrolls under it.
-              <motion.div layoutScroll className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {body}
                 {filtersBlock}
-              </motion.div>
+              </div>
             )}
           </div>
         </div>
       </Expand>
     </Command>
-    </ChosenRowScope.Provider>
   );
 
   return content;
