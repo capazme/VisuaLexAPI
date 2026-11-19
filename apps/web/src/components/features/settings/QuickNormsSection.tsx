@@ -9,6 +9,13 @@ import type { SearchParams, QuickNorm } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { getActTypesByGroup } from '../../../constants/actTypes';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
+import { CARD_RADIUS } from '../../ui/controlStyles';
+import { buttonClassName } from '../../ui/buttonStyles';
 
 type InputMode = 'url' | 'manual';
 
@@ -129,65 +136,38 @@ export function QuickNormsSection() {
           <div id="tour-qn-add" className="space-y-4">
             <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Aggiungi una norma</h4>
 
-            {/* Mode Toggle */}
-            <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-              <button
-                onClick={() => setInputMode('manual')}
-                className={cn(
-                  'flex-1 flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
-                  inputMode === 'manual'
-                    ? 'bg-white shadow-sm text-slate-900 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                    : 'text-slate-600 dark:text-slate-400'
-                )}
-              >
-                <FileText size={16} />
-                Manuale
-              </button>
-              <button
-                onClick={() => setInputMode('url')}
-                className={cn(
-                  'flex-1 flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
-                  inputMode === 'url'
-                    ? 'bg-white shadow-sm text-slate-900 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
-                    : 'text-slate-600 dark:text-slate-400'
-                )}
-              >
-                <Link size={16} />
-                Da un link
-              </button>
-            </div>
+            <SegmentedTabs
+              size="sm"
+              label="Come aggiungere la norma"
+              value={inputMode}
+              onChange={setInputMode}
+              tabs={[
+                { id: 'manual', label: <><FileText size={16} aria-hidden /> Manuale</> },
+                { id: 'url', label: <><Link size={16} aria-hidden /> Da un link</> },
+              ]}
+              className="w-full"
+              tabClassName="flex-1"
+            />
 
             {/* URL Input */}
             {inputMode === 'url' && (
               <div className="space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={urlInput}
-                    onChange={(e) => {
-                      setUrlInput(e.target.value);
-                      setUrlError(null);
-                    }}
-                    placeholder="Incolla link di Normattiva…"
-                    className={cn(
-                      'min-w-0 flex-1 min-h-[44px] md:min-h-0 px-4 py-2.5 rounded-xl text-sm',
-                      'bg-slate-50 dark:bg-slate-800 border',
-                      urlError
-                        ? 'border-red-300 dark:border-red-700'
-                        : 'border-slate-200 dark:border-slate-700',
-                      'focus:outline-none focus:ring-2 focus:ring-primary-500/30'
-                    )}
-                  />
-                  <button
-                    onClick={handleUrlParse}
-                    className="min-h-[44px] md:min-h-0 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors"
-                  >
-                    Importa
-                  </button>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => {
+                        setUrlInput(e.target.value);
+                        setUrlError(null);
+                      }}
+                      placeholder="Incolla link di Normattiva…"
+                      aria-label="Link di Normattiva"
+                      error={urlError ?? undefined}
+                    />
+                  </div>
+                  <Button type="button" onClick={handleUrlParse}>Importa</Button>
                 </div>
-                {urlError && (
-                  <p className="text-sm text-red-500">{urlError}</p>
-                )}
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Esempio: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art1
                 </p>
@@ -198,86 +178,28 @@ export function QuickNormsSection() {
             {inputMode === 'manual' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                      Tipo di atto
-                    </label>
-                    <select
-                      value={actType}
-                      onChange={(e) => setActType(e.target.value)}
-                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                    >
-                      {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
-                        <optgroup key={group} label={group}>
-                          {acts.map(at => (
-                            <option key={at.value} value={at.value}>{at.label}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                      Articolo
-                    </label>
-                    <input
-                      type="text"
-                      value={article}
-                      onChange={(e) => setArticle(e.target.value)}
-                      placeholder="es. 2043"
-                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                    />
-                  </div>
+                  <Select label="Tipo di atto" value={actType} onChange={(e) => setActType(e.target.value)}>
+                    {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
+                      <optgroup key={group} label={group}>
+                        {acts.map(at => (
+                          <option key={at.value} value={at.value}>{at.label}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </Select>
+                  <Input label="Articolo" type="text" value={article} onChange={(e) => setArticle(e.target.value)} placeholder="es. 2043" />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                      Numero dell’atto <span className="text-slate-400">(facoltativo)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={actNumber}
-                      onChange={(e) => setActNumber(e.target.value)}
-                      placeholder="es. 241"
-                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                      Data <span className="text-slate-400">(facoltativa)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={actDate}
-                      onChange={(e) => setActDate(e.target.value)}
-                      placeholder="aaaa-mm-gg"
-                      className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                    />
-                  </div>
+                  <Input label="Numero dell’atto (facoltativo)" type="text" value={actNumber} onChange={(e) => setActNumber(e.target.value)} placeholder="es. 241" />
+                  <Input label="Data (facoltativa)" type="text" value={actDate} onChange={(e) => setActDate(e.target.value)} placeholder="aaaa-mm-gg" />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                    Nome <span className="text-slate-400">(facoltativo)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={customLabel}
-                    onChange={(e) => setCustomLabel(e.target.value)}
-                    placeholder="es. Risarcimento del danno"
-                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                  />
-                </div>
+                <Input label="Nome (facoltativo)" type="text" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="es. Risarcimento del danno" />
 
-                <button
-                  onClick={handleAddQuickNorm}
-                  disabled={!actType || !article}
-                  className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
-                >
-                  <Plus size={18} />
+                <Button type="button" className="w-full" icon={<Plus size={16} aria-hidden />} onClick={handleAddQuickNorm} disabled={!actType || !article}>
                   Aggiungi alle norme rapide
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -300,45 +222,37 @@ export function QuickNormsSection() {
                   <div
                     key={qn.id}
                     id={index === 0 ? 'tour-quicknorms-item' : undefined}
-                    className="group flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className={cn('group flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors', CARD_RADIUS)}
                   >
                     {editingId === qn.id ? (
                       // Edit mode
                       <>
                         <Star className="w-4 h-4 text-amber-500 shrink-0" />
                         <div className="flex-1 flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={editLabel}
-                            onChange={(e) => setEditLabel(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit();
-                              // Esc gives up the change and stays on the page, before the page's own Esc goes back.
-                              if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit(); }
-                            }}
-                            className="min-w-0 flex-1 min-h-[44px] md:min-h-0 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
-                            autoFocus
-                          />
-                          <button
-                            onClick={handleSaveEdit}
-                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg text-green-600"
-                            title="Salva"
-                          >
-                            <Check size={16} />
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
-                            title="Annulla"
-                          >
-                            <X size={16} />
-                          </button>
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              type="text"
+                              value={editLabel}
+                              onChange={(e) => setEditLabel(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEdit();
+                                // Esc gives up the change and stays on the page, before the page's own Esc goes back.
+                                if (e.key === 'Escape') { e.preventDefault(); handleCancelEdit(); }
+                              }}
+                              aria-label="Nome della norma rapida"
+                              autoFocus
+                            />
+                          </div>
+                          <IconButton icon={<Check size={16} />} onClick={handleSaveEdit} aria-label="Salva" title="Salva" />
+                          <IconButton icon={<X size={16} />} onClick={handleCancelEdit} aria-label="Annulla" title="Annulla" />
                         </div>
                       </>
                     ) : (
                       // View mode
                       <>
+                        {/* bare-button: the whole row is the norm to open, its words and its counts. */}
                         <button
+                          type="button"
                           onClick={() => handleUseQuickNorm(qn)}
                           className="flex-1 flex items-center gap-3 text-left"
                         >
@@ -363,31 +277,20 @@ export function QuickNormsSection() {
 
                         {/* In sight at every width: a phone has no pointer to bring them out, the keyboard neither. */}
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleStartEdit(qn)}
-                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg text-slate-500 hover:text-primary-600"
-                            title="Rinomina"
-                          >
-                            <Pencil size={16} />
-                          </button>
+                          <IconButton icon={<Pencil size={16} />} onClick={() => handleStartEdit(qn)} aria-label="Rinomina" title="Rinomina" />
                           {qn.sourceUrl && (
                             <a
                               href={qn.sourceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
+                              className={cn(buttonClassName('quiet'), 'min-w-11 px-0 md:min-w-9')}
+                              aria-label="Apri su Normattiva"
                               title="Apri su Normattiva"
                             >
-                              <ExternalLink size={16} />
+                              <ExternalLink size={16} aria-hidden />
                             </a>
                           )}
-                          <button
-                            onClick={() => removeQuickNorm(qn.id)}
-                            className="grid min-h-[44px] min-w-[44px] place-items-center md:min-h-0 md:min-w-0 p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-500 hover:text-red-600"
-                            title="Rimuovi"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <IconButton icon={<Trash2 size={16} />} onClick={() => removeQuickNorm(qn.id)} aria-label="Rimuovi" title="Rimuovi" className="hover:text-red-600 dark:hover:text-red-400" />
                         </div>
                       </>
                     )}

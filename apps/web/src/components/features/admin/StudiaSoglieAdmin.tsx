@@ -6,9 +6,11 @@ import * as adminService from '../../../services/adminService';
 import type { StudiaSoglie, StudiaSoglieEffetto, StudiaSoglieSettings } from '../../../services/adminService';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
+import { CARD_RADIUS } from '../../ui/controlStyles';
 import { Toast } from '../../ui/Toast';
 
-const PANEL = 'rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800';
+/** A box that holds things: `Card`'s 8 px corners (`CARD_RADIUS`). */
+const PANEL = cn('border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800', CARD_RADIUS);
 
 /** A whole number as typed, or null: the field may hold any text while the admin types. */
 const wholeNumber = (text: string): number | null => (/^\d+$/.test(text.trim()) ? Number(text) : null);
@@ -126,7 +128,7 @@ export function StudiaSoglieAdmin() {
         <h3 id={headingId} className="text-base font-semibold text-gray-900 dark:text-white">Soglie di validazione</h3>
         <div role="alert" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
           <p>Non riesco a leggere le soglie. Riprova.</p>
-          <Button variant="outline" size="sm" className={TOUCH_TARGET_RESPONSIVE} onClick={() => setRound((value) => value + 1)}>
+          <Button variant="outline" className={TOUCH_TARGET_RESPONSIVE} onClick={() => setRound((value) => value + 1)}>
             Riprova
           </Button>
         </div>
@@ -196,7 +198,7 @@ export function StudiaSoglieAdmin() {
       </div>
 
       {saveFailed && (
-        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
           <p>{saveFailed}</p>
         </div>
       )}
