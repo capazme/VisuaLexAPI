@@ -87,13 +87,12 @@ export function ConfirmDialog({
       growFrom={from.source}
       footer={
         <>
-          <Button ref={cancelRef} variant="ghost" size="sm" onClick={onCancel}>
+          <Button ref={cancelRef} variant="ghost" onClick={onCancel}>
             {cancelLabel}
           </Button>
           <Button
             ref={confirmRef}
             variant={variant === 'danger' ? 'danger' : 'primary'}
-            size="sm"
             onClick={onConfirm}
           >
             {confirmLabel}

@@ -143,7 +143,8 @@ export type SettingsSection = 'aspetto' | 'colori' | 'norme-rapide' | 'alias' | 
     | 'amministrazione' | 'dati' | 'merlt' | 'app-collegate' | 'segnala' | 'informazioni';
 
 export interface AppSettings {
-    theme: 'light' | 'dark';
+    /** `system` follows the device's light or dark (LC115). */
+    theme: 'light' | 'dark' | 'system';
     fontSize: 'small' | 'medium' | 'large' | 'xlarge';
     fontFamily: 'sans' | 'serif' | 'mono';
     focusMode: boolean;

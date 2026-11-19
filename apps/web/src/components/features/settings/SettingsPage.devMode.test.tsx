@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const auth = vi.fn();
@@ -60,12 +60,17 @@ describe('Impostazioni — «Modalità sviluppo»', () => {
         <SettingsPage />
       </MemoryRouter>,
     );
-    for (const name of [/Chiaro/, /Scuro/, /Rivedi la guida iniziale/, /Pannello Admin/]) {
-      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    // LC115: the theme and the sizes are the small segmented choice (44 on a phone, 32 inside a 36 px row from md),
+    // the buttons `Button` (44 on a phone, 36 from md).
+    for (const name of [/Chiaro/, /Scuro/, /Di sistema/]) {
+      expect(screen.getByRole('radio', { name })).toHaveClass('min-h-11', 'md:min-h-8');
     }
-    const sizes = screen.getByRole('group', { name: 'Dimensione testo' }).querySelectorAll('button');
-    expect(sizes).toHaveLength(4);
-    for (const size of sizes) expect(size).toHaveClass('h-11', 'w-11', 'md:h-8', 'md:w-8');
+    for (const name of [/Rivedi la guida iniziale/, /Pannello Admin/]) {
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-11', 'md:min-h-9');
+    }
+    const sizes = within(screen.getByRole('radiogroup', { name: 'Dimensione testo' })).getAllByRole('radio');
+    expect(sizes.map((size) => size.textContent)).toEqual(['APiccolo', 'AMedio', 'AGrande', 'AMolto grande']);
+    for (const size of sizes) expect(size).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-8', 'md:min-w-8');
   });
 
   it('shows the switch on when the mode is on', () => {

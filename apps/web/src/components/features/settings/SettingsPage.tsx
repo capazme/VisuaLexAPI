@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef, useCallback, type MouseEvent, type ReactNode } from 'react';
-import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Download, Trash2, ArrowLeft } from 'lucide-react';
+import { Moon, Sun, Monitor, HelpCircle, Shield, Info, GitBranch, GitCommit, Download, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { useAuth } from '../../../hooks/useAuth';
 import { useTour } from '../../../hooks/useTour';
 import { cn } from '../../../lib/utils';
-import { FIELD_TEXT, FOCUS_RING } from '../../../constants/interactions';
+import { FOCUS_RING } from '../../../constants/interactions';
 import { Expand } from '../../ui/Expand';
+import { BackLink } from '../../ui/BackLink';
+import { Button } from '../../ui/Button';
+import { Input } from '../../ui/Input';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
+import { Switch } from '../../ui/Switch';
+import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
 import { PageFrame } from '../../layout/PageFrame';
 import { accountService } from '../../../services/accountService';
 import { ConnectedAppsSection } from '../../../features/connections/ConnectedAppsSection';
@@ -48,6 +54,8 @@ interface VersionInfo {
 
 // An anchor scrolled to stops under the phone's bar (the scroller's `scroll-padding-top`) with the page's air.
 const PART = 'scroll-mt-4';
+/** «Elimina l’account…»: a quiet button in the red of danger (a functional colour). */
+const DANGER_QUIET = 'w-full text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-300 dark:hover:bg-red-950/30 dark:hover:text-red-200';
 
 /** A part of the page: its anchor (`#dati`) and what it holds. */
 function Part({ id, children }: { id: SettingsSection; children: ReactNode }) {
@@ -274,6 +282,12 @@ export function SettingsPage() {
         }
     };
 
+    const THEME_OPTIONS: Array<{ id: 'light' | 'dark' | 'system'; label: ReactNode }> = [
+        { id: 'light', label: <><Sun size={16} aria-hidden /> Chiaro</> },
+        { id: 'dark', label: <><Moon size={16} aria-hidden /> Scuro</> },
+        { id: 'system', label: <><Monitor size={16} aria-hidden /> Di sistema</> },
+    ];
+
     const FONT_SIZE_OPTIONS: Array<{ value: 'small' | 'medium' | 'large' | 'xlarge'; label: string; sizeClass: string }> = [
         { value: 'small', label: 'Piccolo', sizeClass: 'text-[11px]' },
         { value: 'medium', label: 'Medio', sizeClass: 'text-xs' },
@@ -314,14 +328,7 @@ export function SettingsPage() {
 
     return (
         <div ref={root} className="flex flex-col gap-4 pb-12 [&_h1:focus]:outline-none [&_h2:focus]:outline-none [&_h3:focus]:outline-none [&_h4:focus]:outline-none [&_section:focus]:outline-none">
-            <button
-                type="button"
-                onClick={goBack}
-                aria-keyshortcuts="Escape"
-                className={cn('inline-flex min-h-[44px] w-fit items-center gap-1.5 rounded-lg px-2 -ml-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:min-h-0 md:py-1.5 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING)}
-            >
-                <ArrowLeft size={16} aria-hidden /> Indietro
-            </button>
+            <BackLink onBack={goBack} aria-keyshortcuts="Escape" />
             <PageFrame title="Impostazioni" titleId="impostazioni-title">
                 <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-12">
                     {/* The index: a list at the top below lg, a column that stays in sight from lg. */}
@@ -364,88 +371,51 @@ export function SettingsPage() {
                     <div className="min-w-0 max-w-2xl space-y-10">
                 <Part id="aspetto">
                 <div className="space-y-6">
-                {/* Theme - iOS-style Segmented Control */}
+                {/* LC115: the app's segmented choice, with the device's own theme beside the two fixed ones. */}
                 <div>
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Tema</h3>
-                    <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl grid grid-cols-2 gap-1">
-                        <button
-                            onClick={() => updateSettings({ theme: 'light' })}
-                            aria-pressed={settings.theme === 'light'}
-                            className={cn(
-                                "flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
-                                settings.theme === 'light'
-                                    ? "bg-white shadow-sm text-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                            )}
-                        >
-                            <Sun size={16} /> Chiaro
-                        </button>
-                        <button
-                            onClick={() => updateSettings({ theme: 'dark' })}
-                            aria-pressed={settings.theme === 'dark'}
-                            className={cn(
-                                "flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
-                                settings.theme === 'dark'
-                                    ? "bg-white shadow-sm text-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                            )}
-                        >
-                            <Moon size={16} /> Scuro
-                        </button>
-                    </div>
+                    <SegmentedTabs
+                        size="sm"
+                        label="Tema"
+                        value={settings.theme}
+                        onChange={(theme) => updateSettings({ theme })}
+                        tabs={THEME_OPTIONS}
+                        className="w-full"
+                        tabClassName="flex-1"
+                    />
                 </div>
 
                 {/* Typography */}
                 <div>
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Tipografia</h3>
                     <div className="space-y-3">
-                        {/* Under `sm` the label over its four 44 px buttons, as the row below: beside them they shrank at 320 px. */}
-                        <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg sm:flex-row sm:items-center sm:justify-between">
+                        {/* Under `sm` the label over its choice, as the row below: beside it the row shrank at 320 px. */}
+                        <div className={cn('flex flex-col gap-2 bg-slate-50 p-2 sm:flex-row sm:items-center sm:justify-between dark:bg-slate-800', CARD_RADIUS)}>
                             <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Dimensione</span>
-                            <div className="flex gap-1" role="group" aria-label="Dimensione testo">
-                                {FONT_SIZE_OPTIONS.map(({ value, label, sizeClass }) => (
-                                    <button
-                                        key={value}
-                                        onClick={() => updateSettings({ fontSize: value })}
-                                        aria-pressed={settings.fontSize === value}
-                                        title={label}
-                                        className={cn(
-                                            // 44 px on a phone (M1), 32 from md.
-                                            "h-11 w-11 md:h-8 md:w-8 flex items-center justify-center rounded font-bold transition-colors",
-                                            sizeClass,
-                                            settings.fontSize === value
-                                                ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white"
-                                                : "hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-                                        )}
-                                    >
-                                        A
-                                    </button>
-                                ))}
-                            </div>
+                            <SegmentedTabs
+                                size="sm"
+                                label="Dimensione testo"
+                                value={settings.fontSize}
+                                onChange={(fontSize) => updateSettings({ fontSize })}
+                                tabs={FONT_SIZE_OPTIONS.map(({ value, label, sizeClass }) => ({
+                                    id: value,
+                                    label: <><span aria-hidden className={cn('font-bold', sizeClass)}>A</span><span className="sr-only">{label}</span></>,
+                                }))}
+                                tabClassName="min-w-11 md:min-w-8"
+                            />
                         </div>
 
-                        {/* Under `sm` the label over its buttons, which share the row in three 44 px thirds (Bill): beside
-                            them the longer label pushed the row past a 320 px window. */}
-                        <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg sm:flex-row sm:items-center sm:justify-between">
+                        <div className={cn('flex flex-col gap-2 bg-slate-50 p-2 sm:flex-row sm:items-center sm:justify-between dark:bg-slate-800', CARD_RADIUS)}>
                             <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Carattere dell’interfaccia</span>
-                            <div className="grid grid-cols-3 gap-1 sm:flex" role="group" aria-label="Carattere dell’interfaccia">
-                                {FONT_FAMILY_OPTIONS.map(({ value, label, fontClass }) => (
-                                    <button
-                                        key={value}
-                                        onClick={() => updateSettings({ fontFamily: value })}
-                                        aria-pressed={settings.fontFamily === value}
-                                        className={cn(
-                                            "min-h-[44px] px-3 py-1.5 rounded text-xs border transition-colors sm:min-h-0",
-                                            fontClass,
-                                            settings.fontFamily === value
-                                                ? "border-primary-500 bg-white text-primary-600 dark:border-toga-400 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950"
-                                                : "border-transparent hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
-                                        )}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
+                            <SegmentedTabs
+                                size="sm"
+                                label="Carattere dell’interfaccia"
+                                value={settings.fontFamily}
+                                onChange={(fontFamily) => updateSettings({ fontFamily })}
+                                tabs={FONT_FAMILY_OPTIONS.map(({ value, label, fontClass }) => ({ id: value, label: <span className={fontClass}>{label}</span> }))}
+                                className="max-sm:w-full"
+                                tabClassName="max-sm:flex-1"
+                            />
                         </div>
                     </div>
                 </div>
@@ -471,27 +441,29 @@ export function SettingsPage() {
                 <Part id="dati">
                 <div>
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati e privacy</h3>
-                    <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                    <div className={cn('space-y-3 p-3', CARD_RADIUS, CONTROL_BORDER)}>
                         <p className="text-xs text-slate-500">Esporta una copia dei tuoi dati oppure elimina definitivamente l’account. Password e token non vengono inclusi nell’export.</p>
-                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-50 px-3 py-2 md:min-h-0 text-sm font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50 dark:bg-primary-950/30 dark:text-primary-300"><Download size={16} /> Esporta i miei dati</button>
-                        <button
+                        <Button type="button" variant="secondary" className="w-full" icon={<Download size={16} aria-hidden />} onClick={() => void handleExportAccount()} disabled={accountBusy}>Esporta i miei dati</Button>
+                        <Button
                             ref={deleteOpener}
                             type="button"
+                            variant="quiet"
+                            icon={<Trash2 size={16} aria-hidden />}
                             onClick={() => (deleteOpen ? closeDelete() : setDeleteOpen(true))}
                             aria-expanded={deleteOpen}
                             aria-controls="delete-account-form"
-                            className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 md:min-h-0 dark:text-red-300 dark:hover:bg-red-950/30"
+                            className={DANGER_QUIET}
                         >
-                            <Trash2 size={16} aria-hidden /> Elimina l’account…
-                        </button>
+                            Elimina l’account…
+                        </Button>
                         {/* In the page, under its button (L-73); its first field takes the focus, Esc and «Annulla» give it back. */}
                         <Expand id="delete-account-form" open={deleteOpen} onClose={closeDelete}>
                             <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400">L’account e i suoi dati vengono eliminati per sempre. Per confermare, la password e la frase «ELIMINA ACCOUNT».</p>
-                                <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
-                                <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
-                                <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="min-h-[44px] md:min-h-0 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
-                                <button type="button" onClick={closeDelete} className="w-full inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 dark:text-slate-300 dark:hover:bg-slate-800">Annulla</button>
+                                <Input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" />
+                                <Input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" />
+                                <Button type="button" variant="danger" className="w-full" icon={<Trash2 size={16} aria-hidden />} onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'}>Elimina definitivamente l’account</Button>
+                                <Button type="button" variant="quiet" className="w-full" onClick={closeDelete}>Annulla</Button>
                             </div>
                         </Expand>
                         {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
@@ -506,36 +478,12 @@ export function SettingsPage() {
                 {canUseDevMode && (
                     <Part id="sviluppo">
                         <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Sviluppo</h3>
-                        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <div className={cn('flex items-center justify-between gap-3 p-3', CARD_RADIUS, CONTROL_BORDER)}>
                             <div className="min-w-0">
                                 <p id="dev-mode-label" className="text-sm font-medium text-slate-700 dark:text-slate-200">Modalità sviluppo</p>
                                 <p className="text-xs text-slate-500">Mostra Assistente, Grafo e gli strumenti MERL-T ancora in prova, in barra laterale e sugli articoli.</p>
                             </div>
-                            {/* The button is the hit area (44 px on a phone); the track and the thumb are drawn inside it. */}
-                            <button
-                                type="button"
-                                role="switch"
-                                aria-checked={devMode}
-                                aria-labelledby="dev-mode-label"
-                                disabled={devModeBusy}
-                                onClick={() => void handleToggleDevMode()}
-                                className="group inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full disabled:opacity-50 md:min-h-0 focus-visible:outline-none"
-                            >
-                                <span
-                                    aria-hidden
-                                    className={cn(
-                                        "relative block h-6 w-11 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2",
-                                        devMode ? "bg-primary-600 dark:bg-toga-400" : "bg-slate-300 dark:bg-slate-600"
-                                    )}
-                                >
-                                    <span
-                                        className={cn(
-                                            "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
-                                            devMode && "translate-x-5 dark:bg-ink-950"
-                                        )}
-                                    />
-                                </span>
-                            </button>
+                            <Switch checked={devMode} onCheckedChange={() => void handleToggleDevMode()} disabled={devModeBusy} aria-labelledby="dev-mode-label" />
                         </div>
                         {devModeError && (
                             <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">Impossibile cambiare la modalità sviluppo. Riprova.</p>
@@ -547,13 +495,9 @@ export function SettingsPage() {
                 {isAdmin && (
                     <Part id="amministrazione">
                         <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Amministrazione</h3>
-                        <button
-                            onClick={() => navigate('/admin')}
-                            className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors text-sm font-medium"
-                        >
-                            <Shield size={16} />
+                        <Button type="button" variant="secondary" className="w-full" icon={<Shield size={16} aria-hidden />} onClick={() => navigate('/admin')}>
                             Pannello Admin
-                        </button>
+                        </Button>
                     </Part>
                 )}
 
@@ -572,32 +516,34 @@ export function SettingsPage() {
 
                 <Part id="aiuto">
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Aiuto</h3>
-                    <button
+                    <Button
                         type="button"
+                        variant="secondary"
+                        className="w-full"
+                        icon={<HelpCircle size={16} aria-hidden />}
                         onClick={() => {
                             // The guide opens over the page it was opened from, once that page is back.
                             goBack();
                             setTimeout(() => resetAndStartTour(), 300);
                         }}
-                        className="w-full flex min-h-[44px] md:min-h-0 items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
                     >
-                        <HelpCircle size={16} />
                         Rivedi la guida iniziale
-                    </button>
+                    </Button>
                 </Part>
 
                 <Part id="informazioni">
                 {/* Version Info */}
                 <div>
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Informazioni</h3>
-                    <button
+                    <Button
                         type="button"
+                        variant="secondary"
+                        className="w-full"
+                        icon={<Info size={16} aria-hidden />}
                         onClick={() => setShowInfo(!showInfo)}
                         aria-expanded={showInfo}
                         aria-controls="version-details"
-                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
                     >
-                        <Info size={16} />
                         {showInfo
                             ? 'Nascondi dettagli'
                             : versionLoading
@@ -606,13 +552,13 @@ export function SettingsPage() {
                                     ? 'Versione (errore)'
                                     : `Versione ${versionInfo?.version || '1.0.0'}`
                         }
-                    </button>
+                    </Button>
 
                     <Expand id="version-details" open={showInfo} onClose={() => setShowInfo(false)}>
                     {versionInfo && (
                         <div className="mt-3 space-y-3">
                             {/* Version & Git Info */}
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 text-xs">
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-[8px] space-y-2 text-xs">
                                 <div className="flex items-center justify-between">
                                     <span className="text-slate-500">Versione</span>
                                     <span className="font-mono font-medium text-primary-600 dark:text-primary-400">
@@ -639,7 +585,7 @@ export function SettingsPage() {
 
                             {/* Changelog */}
                             {versionInfo.changelog && versionInfo.changelog.length > 0 && (
-                                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs">
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-[8px] text-xs">
                                     <p className="text-slate-500 font-medium mb-2 flex items-center gap-1">
                                         <GitCommit size={12} /> Changelog
                                     </p>
@@ -670,16 +616,13 @@ export function SettingsPage() {
                     )}
 
                     {!versionInfo && (
-                        <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-500 text-center">
+                        <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-[8px] text-xs text-slate-500 text-center">
                             {versionLoading ? 'Caricamento…' : versionError ? (
                                 <div className="space-y-2">
                                     <p className="text-red-500">Impossibile caricare le informazioni</p>
-                                    <button
-                                        onClick={() => setVersionError(false)}
-                                        className="text-primary-500 hover:underline"
-                                    >
+                                    <Button type="button" variant="link" size="sm" onClick={() => setVersionError(false)}>
                                         Riprova
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : 'Caricamento…'}
                         </div>

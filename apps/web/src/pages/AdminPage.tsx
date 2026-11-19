@@ -21,24 +21,29 @@ import { StudiaTextsAdmin } from '../components/features/admin/StudiaTextsAdmin'
 import { PageFrame } from '../components/layout/PageFrame';
 import { BackLink } from '../components/ui/BackLink';
 import { Button } from '../components/ui/Button';
+import { IconButton } from '../components/ui/IconButton';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
+import { buttonClassName } from '../components/ui/buttonStyles';
 import { Expand } from '../components/ui/Expand';
 import { MenuButton, type MenuItem } from '../components/ui/MenuButton';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { notify } from '../components/ui/notifications/notifications';
 import { showUndoToast } from '../hooks/useUndoableAction';
-import { FIELD_TEXT, FOCUS_RING } from '../constants/interactions';
+import { FOCUS_RING } from '../constants/interactions';
 import { scrollParentOf } from '../utils/scrollParent';
 import { FORUM_CATEGORIES } from '../utils/forumCategories';
 import { cn } from '../lib/utils';
 
 type AdminSection = 'utenti' | 'problemi-segnalati' | 'pratiche-pubblicate' | 'pratiche-segnalate' | 'learn' | 'ingestione';
 
-const FIELD = cn('w-full min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 md:min-h-9 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT, FOCUS_RING);
-const SELECT = cn('min-h-11 rounded-lg border border-slate-200 bg-white px-2 md:min-h-9 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT, FOCUS_RING);
-const LABEL = 'block text-sm font-medium text-slate-700 dark:text-slate-300';
-const ICON_BUTTON = cn('inline-grid size-11 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50 md:size-9 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING);
-/** The «⋯» of a row. */
-const ROW_MENU = cn('inline-grid size-11 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 md:size-9 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100', FOCUS_RING);
+/** The «⋯» of a row: `IconButton`'s quiet look on `MenuButton`'s own trigger. */
+const ROW_MENU = cn(buttonClassName('quiet'), 'min-w-11 px-0 md:min-w-9');
+/** A native checkbox: in the dark theme the browser draws it dark too. */
+const CHECKBOX = 'size-4 rounded border-slate-300 dark:[color-scheme:dark]';
+/** A filter's menu in a part's heading row: as wide as its longest choice needs. */
+// 36 px narrower on a phone, so two menus and «Aggiorna» keep one row at 390.
+const FILTER = 'w-36 md:w-40';
 const LIST = 'divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800';
 const MUTED = 'text-xs text-slate-500 dark:text-slate-400';
 const COLUMN_HEAD = 'hidden gap-4 pb-2 text-xs font-medium text-slate-500 md:grid dark:text-slate-400';
@@ -81,9 +86,7 @@ function Part({ id, title, count, controls, children }: { id: AdminSection; titl
 
 function Refresh({ busy, onClick }: { busy: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} disabled={busy} aria-label="Aggiorna" title="Aggiorna" className={ICON_BUTTON}>
-      <RefreshCw size={16} aria-hidden className={busy ? 'animate-spin' : undefined} />
-    </button>
+    <IconButton icon={<RefreshCw size={16} aria-hidden className={busy ? 'animate-spin' : undefined} />} onClick={onClick} disabled={busy} aria-label="Aggiorna" title="Aggiorna" />
   );
 }
 
@@ -502,9 +505,9 @@ export function AdminPage() {
 
           <div className="min-w-0 space-y-12">
             {error && (
-              <div role="alert" className="flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+              <div role="alert" className="flex items-start justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
                 <p>{error}</p>
-                <button type="button" onClick={() => setError(null)} className={cn('shrink-0 font-medium underline-offset-2 hover:underline', FOCUS_RING)}>Chiudi</button>
+                <Button type="button" variant="link" className="shrink-0" onClick={() => setError(null)}>Chiudi</Button>
               </div>
             )}
 
@@ -517,7 +520,6 @@ export function AdminPage() {
                 <>
                   <Refresh busy={loading} onClick={() => void loadUsers()} />
                   <Button
-                    size="sm"
                     icon={<UserPlus size={16} aria-hidden />}
                     onClick={() => (createOpen ? closeCreate() : setCreateOpen(true))}
                     aria-expanded={createOpen}
@@ -533,28 +535,19 @@ export function AdminPage() {
               <Expand id="admin-new-user" open={createOpen} onClose={closeCreate}>
                 <form onSubmit={handleCreateUser} className="mb-4 space-y-4 border-t border-slate-200 pt-4 dark:border-slate-800">
                   <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-1">
-                      <label htmlFor="admin-new-email" className={LABEL}>Email</label>
-                      <input id="admin-new-email" type="email" autoComplete="off" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className={FIELD} required />
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="admin-new-username" className={LABEL}>Nome utente</label>
-                      <input id="admin-new-username" type="text" autoComplete="off" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} className={FIELD} required minLength={3} />
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="admin-new-password" className={LABEL}>Password</label>
-                      <input id="admin-new-password" type="password" autoComplete="new-password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className={FIELD} required minLength={8} aria-describedby="admin-new-user-password-rule" />
-                      <p id="admin-new-user-password-rule" className={MUTED}>{PASSWORD_RULE_HINT}</p>
-                    </div>
+                    <Input id="admin-new-email" label="Email" type="email" autoComplete="off" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} required />
+                    <Input id="admin-new-username" label="Nome utente" type="text" autoComplete="off" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} required minLength={3} />
+                    <Input id="admin-new-password" label="Password" type="password" autoComplete="new-password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} required minLength={8} helperText={PASSWORD_RULE_HINT} />
                   </div>
                   <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-slate-700 md:min-h-0 dark:text-slate-300">
-                    <input type="checkbox" checked={newUser.isAdmin} onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })} className="size-4 rounded border-slate-300" />
+                    {/* bare-input: a checkbox, which has no common component. */}
+                    <input type="checkbox" checked={newUser.isAdmin} onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })} className={CHECKBOX} />
                     Amministratore
                   </label>
                   {createError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{createError}</p>}
                   <div className="flex flex-wrap gap-2">
-                    <Button type="submit" size="sm" loading={createBusy}>Crea l’utente</Button>
-                    <Button type="button" size="sm" variant="quiet" onClick={closeCreate}>Annulla</Button>
+                    <Button type="submit" loading={createBusy}>Crea l’utente</Button>
+                    <Button type="button" variant="quiet" onClick={closeCreate}>Annulla</Button>
                   </div>
                 </form>
               </Expand>
@@ -585,25 +578,27 @@ export function AdminPage() {
                               {u.is_admin && <p className="text-slate-700 dark:text-slate-300">Amministratore</p>}
                               {studiaVisible && (
                                 <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-xs text-slate-600 md:min-h-7 dark:text-slate-400">
+                                  {/* bare-input: a checkbox, which has no common component. */}
                                   <input
                                     type="checkbox"
                                     checked={u.lingo_validatore}
                                     onChange={() => void updateUser(u.id, { lingoValidatore: !u.lingo_validatore })}
                                     disabled={actionLoading}
                                     aria-label={`Validatore di Learn: ${u.username}`}
-                                    className="size-4 rounded border-slate-300"
+                                    className={CHECKBOX}
                                   />
                                   Validatore di Learn
                                 </label>
                               )}
                               <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-xs text-slate-600 md:min-h-7 dark:text-slate-400">
+                                {/* bare-input: a checkbox, which has no common component. */}
                                 <input
                                   type="checkbox"
                                   checked={u.dev_mode_allowed ?? false}
                                   onChange={() => void updateUser(u.id, { devModeAllowed: !(u.dev_mode_allowed ?? false) })}
                                   disabled={actionLoading}
                                   aria-label={`Modalità sviluppo consentita: ${u.username}`}
-                                  className="size-4 rounded border-slate-300"
+                                  className={CHECKBOX}
                                 />
                                 Modalità sviluppo consentita
                               </label>
@@ -626,24 +621,22 @@ export function AdminPage() {
                           </div>
                           <Expand id={`admin-reset-${u.id}`} open={resetFor === u.id} onClose={closeReset}>
                             <form onSubmit={(e) => void handleResetPassword(e, u)} className="space-y-3 pb-4">
-                              <div className="max-w-sm space-y-1">
-                                <label htmlFor={`admin-reset-field-${u.id}`} className={LABEL}>Nuova password per {u.username}</label>
-                                <input
+                              <div className="max-w-sm">
+                                <Input
                                   id={`admin-reset-field-${u.id}`}
+                                  label={`Nuova password per ${u.username}`}
                                   type="password"
                                   autoComplete="new-password"
                                   value={newPassword}
                                   onChange={(e) => setNewPassword(e.target.value)}
-                                  className={FIELD}
                                   minLength={8}
-                                  aria-describedby="admin-reset-password-rule"
+                                  helperText={PASSWORD_RULE_HINT}
                                 />
-                                <p id="admin-reset-password-rule" className={MUTED}>{PASSWORD_RULE_HINT}</p>
                               </div>
                               {resetError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{resetError}</p>}
                               <div className="flex flex-wrap gap-2">
-                                <Button type="submit" size="sm" loading={resetBusy} disabled={!newPassword}>Imposta la password</Button>
-                                <Button type="button" size="sm" variant="quiet" onClick={closeReset}>Annulla</Button>
+                                <Button type="submit" loading={resetBusy} disabled={!newPassword}>Imposta la password</Button>
+                                <Button type="button" variant="quiet" onClick={closeReset}>Annulla</Button>
                               </div>
                             </form>
                           </Expand>
@@ -662,24 +655,26 @@ export function AdminPage() {
               count={shownFeedbacks.length || undefined}
               controls={
                 <>
-                  <select
-                    aria-label="Stato dei problemi"
-                    value={feedbackFilter.status || ''}
-                    onChange={(e) => setFeedbackFilter({ ...feedbackFilter, status: (e.target.value as FeedbackStatus) || undefined })}
-                    className={SELECT}
-                  >
-                    <option value="">Tutti gli stati</option>
-                    {(Object.keys(FEEDBACK_STATUS) as FeedbackStatus[]).map((s) => <option key={s} value={s}>{FEEDBACK_STATUS[s]}</option>)}
-                  </select>
-                  <select
-                    aria-label="Tipo di problema"
-                    value={feedbackFilter.type || ''}
-                    onChange={(e) => setFeedbackFilter({ ...feedbackFilter, type: (e.target.value as FeedbackType) || undefined })}
-                    className={SELECT}
-                  >
-                    <option value="">Tutti i tipi</option>
-                    {(Object.keys(FEEDBACK_TYPE) as FeedbackType[]).map((t) => <option key={t} value={t}>{FEEDBACK_TYPE[t]}</option>)}
-                  </select>
+                  <div className={FILTER}>
+                    <Select
+                      aria-label="Stato dei problemi"
+                      value={feedbackFilter.status || ''}
+                      onChange={(e) => setFeedbackFilter({ ...feedbackFilter, status: (e.target.value as FeedbackStatus) || undefined })}
+                    >
+                      <option value="">Tutti gli stati</option>
+                      {(Object.keys(FEEDBACK_STATUS) as FeedbackStatus[]).map((s) => <option key={s} value={s}>{FEEDBACK_STATUS[s]}</option>)}
+                    </Select>
+                  </div>
+                  <div className={FILTER}>
+                    <Select
+                      aria-label="Tipo di problema"
+                      value={feedbackFilter.type || ''}
+                      onChange={(e) => setFeedbackFilter({ ...feedbackFilter, type: (e.target.value as FeedbackType) || undefined })}
+                    >
+                      <option value="">Tutti i tipi</option>
+                      {(Object.keys(FEEDBACK_TYPE) as FeedbackType[]).map((t) => <option key={t} value={t}>{FEEDBACK_TYPE[t]}</option>)}
+                    </Select>
+                  </div>
                   <Refresh busy={feedbackLoading} onClick={() => void loadFeedbacks()} />
                 </>
               }
@@ -727,21 +722,24 @@ export function AdminPage() {
               controls={
                 <>
                   <form onSubmit={handleEnvSearch} role="search" className="flex items-center gap-2">
-                    <input
-                      type="search"
-                      value={envSearch}
-                      onChange={(e) => setEnvSearch(e.target.value)}
-                      placeholder="Cerca una pratica pubblicata…"
-                      aria-label="Cerca una pratica pubblicata"
-                      className={cn(FIELD, 'w-56')}
-                    />
-                    <Button type="submit" size="sm" variant="secondary">Cerca</Button>
+                    <div className="w-56">
+                      <Input
+                        type="search"
+                        value={envSearch}
+                        onChange={(e) => setEnvSearch(e.target.value)}
+                        placeholder="Cerca una pratica pubblicata…"
+                        aria-label="Cerca una pratica pubblicata"
+                      />
+                    </div>
+                    <Button type="submit" variant="secondary">Cerca</Button>
                   </form>
-                  <select aria-label="Stato delle pratiche pubblicate" value={envStatusFilter} onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')} className={SELECT}>
-                    <option value="all">Tutti</option>
-                    <option value="active">Attivi</option>
-                    <option value="withdrawn">Ritirati</option>
-                  </select>
+                  <div className={FILTER}>
+                    <Select aria-label="Stato delle pratiche pubblicate" value={envStatusFilter} onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')}>
+                      <option value="all">Tutti</option>
+                      <option value="active">Attivi</option>
+                      <option value="withdrawn">Ritirati</option>
+                    </Select>
+                  </div>
                   <Refresh busy={envLoading} onClick={() => void loadEnvironments(envPagination.page)} />
                 </>
               }
@@ -789,8 +787,8 @@ export function AdminPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
                       <p className={MUTED}>Pagina {envPagination.page} di {envPagination.pages}</p>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => void loadEnvironments(envPagination.page - 1)} disabled={envPagination.page <= 1 || envLoading}>Precedente</Button>
-                        <Button size="sm" variant="secondary" onClick={() => void loadEnvironments(envPagination.page + 1)} disabled={envPagination.page >= envPagination.pages || envLoading}>Successiva</Button>
+                        <Button variant="secondary" onClick={() => void loadEnvironments(envPagination.page - 1)} disabled={envPagination.page <= 1 || envLoading}>Precedente</Button>
+                        <Button variant="secondary" onClick={() => void loadEnvironments(envPagination.page + 1)} disabled={envPagination.page >= envPagination.pages || envLoading}>Successiva</Button>
                       </div>
                     </div>
                   )}
@@ -805,12 +803,14 @@ export function AdminPage() {
               count={reports.length || undefined}
               controls={
                 <>
-                  <select aria-label="Stato delle segnalazioni" value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value as ReportStatus | 'all')} className={SELECT}>
-                    <option value="pending">In attesa</option>
-                    <option value="reviewed">Esaminate</option>
-                    <option value="dismissed">Ignorate</option>
-                    <option value="all">Tutte</option>
-                  </select>
+                  <div className={FILTER}>
+                    <Select aria-label="Stato delle segnalazioni" value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value as ReportStatus | 'all')}>
+                      <option value="pending">In attesa</option>
+                      <option value="reviewed">Esaminate</option>
+                      <option value="dismissed">Ignorate</option>
+                      <option value="all">Tutte</option>
+                    </Select>
+                  </div>
                   <Refresh busy={reportsLoading} onClick={() => void loadReports()} />
                 </>
               }

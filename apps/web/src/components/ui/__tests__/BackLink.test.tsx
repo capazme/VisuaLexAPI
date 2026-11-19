@@ -61,7 +61,8 @@ describe('BackLink', () => {
   it('has Impostazioni\' look: 44 px on a phone, a background on hover', () => {
     renderAt('/');
     const back = screen.getByRole('button', { name: 'Indietro' });
-    expect(back).toHaveClass('min-h-[44px]', 'md:min-h-0', 'rounded-lg', 'hover:bg-slate-100');
+    // LC115: a control's 4 px corners (`CONTROL_RADIUS`), not 6.
+    expect(back).toHaveClass('min-h-[44px]', 'md:min-h-0', 'rounded-md', 'hover:bg-slate-100');
   });
 
   it('puts the focus on the title of the page reached', async () => {

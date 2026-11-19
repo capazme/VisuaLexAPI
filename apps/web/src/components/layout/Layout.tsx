@@ -23,6 +23,7 @@ import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 import { closeCompare, forgetCompareOpened, useCompare, useCompareOpened } from '../../hooks/useCompare';
 import { useTour } from '../../hooks/useTour';
+import { useResolvedTheme } from '../../hooks/useResolvedTheme';
 import { WelcomeGuide } from '../../features/welcome/WelcomeGuide';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
@@ -100,6 +101,7 @@ export function Layout() {
     toggleSearchPanel: s.toggleSearchPanel,
     openCommandPalette: s.openCommandPalette,
   })));
+  const theme = useResolvedTheme(settings.theme);
   // Impostazioni is a page (LC84): the sidebar's entries, «?» and every gear ask for it, and the layout goes there.
   const openSettings = useOpenSettings();
   useSettingsRequests();
@@ -219,7 +221,7 @@ export function Layout() {
   // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
   // address is read when the welcome ends, not when this callback was made.
   const { startTour, prepareTour, hasSeenTour, tryStartTour } = useTour({
-    theme: settings.theme as 'light' | 'dark',
+    theme,
     onComplete: (type) => {
       if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
     },
@@ -245,11 +247,11 @@ export function Layout() {
   useEffect(() => {
     const root = document.documentElement;
 
-    // Set theme
-    root.setAttribute('data-theme', settings.theme);
+    // Set theme: the one drawn, the system's when the choice is «di sistema»
+    root.setAttribute('data-theme', theme);
 
     // Toggle .dark class
-    if (settings.theme === 'dark') {
+    if (theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
@@ -260,10 +262,11 @@ export function Layout() {
     root.classList.remove('font-sans', 'font-serif', 'font-mono');
     root.classList.add(`font-${settings.fontFamily}`);
 
-  }, [settings]);
+  }, [settings, theme]);
 
+  // The sidebar's toggle turns the theme drawn the other way, leaving «di sistema» for a fixed choice.
   const toggleTheme = () => {
-    const newTheme = settings.theme === 'light' ? 'dark' : 'light';
+    const newTheme = theme === 'light' ? 'dark' : 'light';
     updateSettings({ theme: newTheme });
   };
 
@@ -364,7 +367,7 @@ export function Layout() {
       >
         {sidebarVisible && !settings.focusMode && (
           <Sidebar
-            theme={settings.theme}
+            theme={theme}
             toggleTheme={toggleTheme}
             isOpen={true}
             layout={desktopSidebar.layout}
@@ -383,7 +386,7 @@ export function Layout() {
       {!settings.focusMode && (
         <div ref={drawerRef} className="lg:hidden">
           <Sidebar
-            theme={settings.theme}
+            theme={theme}
             toggleTheme={toggleTheme}
             isOpen={sidebarOpen}
             layout="drawer"

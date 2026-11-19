@@ -4,6 +4,8 @@
 try {
   var saved = JSON.parse(localStorage.getItem('visualex-storage') || 'null');
   var theme = saved && saved.state && saved.state.settings && saved.state.settings.theme;
+  // «Di sistema» (LC115): the device's light or dark, as Layout resolves it.
+  if (theme === 'system') theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   if (theme === 'dark') document.documentElement.classList.add('dark');
   document.documentElement.setAttribute('data-theme', theme || 'light');
 } catch (e) {

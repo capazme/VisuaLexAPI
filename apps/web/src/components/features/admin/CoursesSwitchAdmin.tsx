@@ -1,11 +1,13 @@
 import { useEffect, useId, useState } from 'react';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { cn } from '../../../lib/utils';
 import * as adminService from '../../../services/adminService';
 import { setCoursesSwitch } from '../studia/corsi/coursesSwitch';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { CARD_RADIUS } from '../../ui/controlStyles';
 
-const PANEL = 'rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800';
+/** A box that holds things: `Card`'s 8 px corners (`CARD_RADIUS`). */
+const PANEL = cn('border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800', CARD_RADIUS);
 const KEY = 'lingo_courses';
 
 /**
@@ -65,7 +67,7 @@ export function CoursesSwitchAdmin() {
       {readFailed && enabled === null ? (
         <div role="alert" className="mt-3 flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
           <p>Non riesco a leggere l’interruttore dei percorsi.</p>
-          <Button variant="outline" size="sm" className={TOUCH_TARGET_RESPONSIVE} onClick={() => setRound((n) => n + 1)}>
+          <Button variant="outline" onClick={() => setRound((n) => n + 1)}>
             Riprova
           </Button>
         </div>
@@ -79,7 +81,7 @@ export function CoursesSwitchAdmin() {
           {/* Not `disabled` while it writes: a disabled button drops the focus to the page (#458). */}
           <Button
             variant={enabled ? 'outline' : 'primary'}
-            className={TOUCH_TARGET_RESPONSIVE}
+           
             aria-disabled={saving}
             onClick={(event) => {
               if (saving) return;

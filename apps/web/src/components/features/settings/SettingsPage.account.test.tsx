@@ -8,6 +8,7 @@ vi.mock('../../../features/merlt/privacy/MerltDataSection', () => ({ MerltDataSe
 vi.mock('../../../services/accountService', () => ({ accountService: {} }));
 
 import { SettingsPage } from './SettingsPage';
+import { appStore } from '../../../store/useAppStore';
 
 const view = () => (
   <MemoryRouter initialEntries={['/impostazioni']}>
@@ -31,23 +32,41 @@ describe('Impostazioni — the groups (Y1)', () => {
   });
 });
 
+describe('Impostazioni — «Tema» (LC115)', () => {
+  it('is a choice of three, the chosen one checked, and a choice changes the theme', () => {
+    appStore.setState((state) => ({ settings: { ...state.settings, theme: 'light' } }));
+    render(view());
+    const group = screen.getByRole('radiogroup', { name: 'Tema' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios.map((radio) => radio.textContent?.trim())).toEqual(['Chiaro', 'Scuro', 'Di sistema']);
+    expect(within(group).getByRole('radio', { name: 'Chiaro' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(within(group).getByRole('radio', { name: 'Di sistema' }));
+    expect(appStore.getState().settings.theme).toBe('system');
+    expect(within(group).getByRole('radio', { name: 'Di sistema' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(group).getByRole('radio', { name: 'Chiaro' })).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(within(group).getByRole('radio', { name: 'Scuro' }));
+    expect(appStore.getState().settings.theme).toBe('dark');
+  });
+});
+
 describe('Impostazioni — «Carattere dell’interfaccia»', () => {
   it('names the typeface control for what it sets, the interface\'s, not the law\'s (Bill and Luca)', () => {
     render(view());
     expect(screen.getByText('Carattere dell’interfaccia')).toBeInTheDocument();
-    const group = screen.getByRole('group', { name: 'Carattere dell’interfaccia' });
+    const group = screen.getByRole('radiogroup', { name: 'Carattere dell’interfaccia' });
     expect(group).toBeInTheDocument();
     expect(screen.queryByText('Font')).toBeNull();
-    expect(screen.queryByRole('group', { name: 'Famiglia font' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Famiglia font' })).toBeNull();
   });
 
-  it('on a phone puts the label over its buttons, three 44 px thirds of the row; beside them from sm', () => {
+  // LC115: the app's segmented choice, small: 44 px segments on a phone, 32 inside a 36 px row from md.
+  it('on a phone puts the label over its choice, three 44 px thirds of the row; beside it from sm', () => {
     render(view());
-    const group = screen.getByRole('group', { name: 'Carattere dell’interfaccia' });
-    expect(group).toHaveClass('grid', 'grid-cols-3', 'sm:flex');
+    const group = screen.getByRole('radiogroup', { name: 'Carattere dell’interfaccia' });
+    expect(group).toHaveClass('max-sm:w-full');
     expect(group.parentElement).toHaveClass('flex-col', 'sm:flex-row', 'sm:justify-between');
     for (const name of ['Sans', 'Serif', 'Mono']) {
-      expect(within(group).getByRole('button', { name })).toHaveClass('min-h-[44px]', 'sm:min-h-0');
+      expect(within(group).getByRole('radio', { name })).toHaveClass('min-h-11', 'md:min-h-8', 'max-sm:flex-1');
     }
   });
 });
@@ -103,11 +122,11 @@ describe('Impostazioni — «Elimina l’account…» (Y1)', () => {
     expect(screen.getByLabelText('Password corrente per eliminare account')).toHaveValue('');
   });
 
-  it('keeps 44 px buttons on a phone', () => {
+  it('keeps 44 px buttons on a phone, 36 from md (`Button`)', () => {
     render(view());
     fireEvent.click(opener());
     for (const name of [/Esporta i miei dati/, /Elimina l’account…/, /Elimina definitivamente/, 'Annulla']) {
-      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]');
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-11', 'md:min-h-9');
     }
   });
 });
