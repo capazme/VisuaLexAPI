@@ -109,9 +109,9 @@ export function ArticleSkeleton({ className }: { className?: string }) {
 }
 
 /**
- * Pratiche's cards while they are read (LC120): the list's own grid (`CARD_GRID_COLUMNS`, its gaps) and cards of the
- * real ones' height with nothing but a name and a foot (134 px from md): a title row as tall as the «⋯» beside it, the
- * counts and the date at the foot.
+ * Pratiche's cards while they are read (LC120): the list's own grid (`CARD_GRID_COLUMNS`, its gaps) and cards as tall
+ * as a real one listing its acts (166 px from md, 158 on a phone): a title row as tall as the «⋯» beside it, the acts,
+ * the counts and the date at the foot.
  */
 export function DossierListSkeleton({ count = 6 }: { count?: number }) {
   return (
@@ -121,6 +121,7 @@ export function DossierListSkeleton({ count = 6 }: { count?: number }) {
           <div className="flex h-10 items-center">
             <Skeleton variant="text" className="h-5 w-3/5" />
           </div>
+          <div className="mt-3 flex h-5 items-center"><Skeleton variant="text" className="h-3.5 w-4/5" /></div>
           <div className="mt-auto pt-3">
             <div className="flex h-5 items-center"><Skeleton variant="text" className="h-3.5 w-2/5" /></div>
             <div className="mt-1 flex h-4 items-center"><Skeleton variant="text" className="h-3 w-1/3" /></div>
@@ -132,14 +133,14 @@ export function DossierListSkeleton({ count = 6 }: { count?: number }) {
 }
 
 /**
- * Cronologia's rows while they are read (LC120): a day's heading, then the rows as the list draws them, cards on a
+ * Cronologia's rows while they are read (LC120): a day's heading on the paper's band, then the rows as the list draws them, cards on a
  * phone and rows with a rule under them (71 px) from md.
  */
 export function HistoryListSkeleton({ count = 5 }: { count?: number }) {
   const rows = Array.from({ length: count });
   return (
     <div aria-hidden>
-      <div className="mb-3 flex h-6 items-center md:mb-4 md:h-8"><Skeleton variant="text" className="h-3 w-16" /></div>
+      <div className="mb-3 flex h-6 items-center bg-slate-50 md:mb-4 md:h-8 dark:bg-slate-950"><Skeleton variant="text" className="h-3 w-16" /></div>
       <div className="space-y-2 md:hidden">
         {rows.map((_, i) => (
           <div key={i} data-skeleton-row className={cn('border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800', CARD_RADIUS)}>
