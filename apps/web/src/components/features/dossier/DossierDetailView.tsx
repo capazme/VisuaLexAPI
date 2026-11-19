@@ -492,6 +492,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           className="w-fit max-w-full"
           // The tabs whole on a 390 px phone (LC54): less padding below `sm`.
           tabClassName="gap-1.5 px-2.5 sm:gap-2 sm:px-4"
+          // LC113 (the consultant on #640): 44 px on a phone and 36 from md, as the toolbar's fields under it, 4 px corners.
+          size="sm"
         />
         </div>
         <div id={VIEW_PANEL} role="tabpanel" aria-labelledby={`${VIEW_PANEL}-tab-${view}`} className="min-h-[calc(100dvh-8rem)]">
