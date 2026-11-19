@@ -1,6 +1,7 @@
 import { cn } from '../../lib/utils';
 import { useSection } from './useSection';
 import { goToLabel, type SectionId } from './sections';
+import { preparePage } from '../../pageCode';
 
 /** The prototype's order (12 November): Work, Learn, Forum, Labs. `SECTIONS` keeps Labs before the Forum. */
 const TAB_ORDER: readonly SectionId[] = ['opus', 'gymnasium', 'forum', 'academia'];
@@ -27,6 +28,11 @@ export function SectionTabs({ forumCount, onChoose, inDrawer = false }: { forumC
             type="button"
             aria-label={s.id === 'forum' && forumDot ? `${s.name}, nuove attività` : active ? goToLabel(s) : s.name}
             aria-current={active ? 'true' : undefined}
+            // The home's code asked for as the tab is pointed at or focused, as the sidebar's entries do (LC133): the
+            // press then finds the page, its title there with the change, not after its code.
+            onPointerEnter={() => preparePage(s.home)}
+            onPointerDown={() => preparePage(s.home)}
+            onFocus={() => preparePage(s.home)}
             onClick={(event) => {
               chooseSection(s.id, { still: inDrawer, byPointer: event.detail > 0 });
               onChoose?.();

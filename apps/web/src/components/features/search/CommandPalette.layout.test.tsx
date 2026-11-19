@@ -282,10 +282,37 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     expect(fetch).not.toHaveBeenCalled();
     rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(ahead.hidden).toBe(false);
+    // No row mounted, cmdk's choice is still the first one, at every opening.
+    const chosen = () => ahead.querySelector('[cmdk-item][data-selected="true"]')?.textContent;
+    const first = ahead.querySelector('[cmdk-item]')?.textContent;
+    expect(chosen()).toBe(first);
     const box = screen.getByRole('combobox');
     expect(box).toHaveFocus();
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    expect(chosen()).not.toBe(first);
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(chosen()).toBe(first);
     await user.keyboard('proc');
-    expect(box).toHaveValue('proc');
+    expect(screen.getByRole('combobox')).toHaveValue('proc');
+  });
+
+  it('opened before the page is idle, keeps the band from then on: the flag never changes while it closes (LC133)', () => {
+    asDesktop(true);
+    recordAnimations();
+    pillInBar();
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    const band = document.querySelector<HTMLElement>('[data-palette-band]')!;
+    const shut = runOn(band);
+    end(shut);
+    // Kept, hidden: not dropped by the closing that started before any idle time.
+    expect(document.querySelector('[data-palette-band]')).toBe(band);
+    expect(band.hidden).toBe(true);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(shut.animation.cancel).toHaveBeenCalled();
+    expect(band.hidden).toBe(false);
   });
 
   it('the band does not move while one types: its height changes at once, no row slides (LC129)', () => {

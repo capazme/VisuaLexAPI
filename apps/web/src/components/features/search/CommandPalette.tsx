@@ -211,6 +211,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // Its reads stay on `isOpen` (`useAliasCatalog`, `useRassegneForTopic`): nothing is fetched for the hidden band.
   const [prepared, setPrepared] = useState(false);
   useEffect(() => whenIdle(() => setPrepared(true)), []);
+  // Opened before the page was idle: kept from then on, so the flag never changes while the band closes.
+  if (isOpen && !prepared) setPrepared(true);
 
   // Which way the step moved, for its slide: forward slides in from the right, back from the left.
   // Adjusted during render (own state, no effect). A step changed while the palette is closed (the reset)
@@ -613,6 +615,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   const bandRef = useRef<HTMLDivElement>(null);
   const fieldBoxRef = useRef<HTMLDivElement>(null);
+  // Opened, cmdk's choice is the first row. Its rows mounting chose it; drawn ahead (LC133) none mounts, so it is set here.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const first = bandRef.current?.querySelector('[cmdk-item]:not([aria-disabled="true"])')?.getAttribute('data-value');
+    if (first) setChosenRow(first);
+  }, [isOpen]);
   // A click outside the field and the band closes it, as the veil's did; the page under takes the click as well. So does
   // the focus going out to the page, by Tab (Papiniano, #599): the same «outside».
   useEffect(() => {
@@ -731,7 +739,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             <Search aria-hidden className={ISLAND_LENS} />
             <Command.Input
               ref={boxRef}
-              autoFocus
+              // Drawn ahead in the hidden band, it takes no focus; opened, `Expand` gives it (LC133).
+              autoFocus={isOpen}
               value={inputValue}
               onValueChange={(value) => {
                 // A change of the words drops a wait: a new Enter is needed, even back on the same words.
