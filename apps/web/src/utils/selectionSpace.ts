@@ -50,8 +50,9 @@ function barAt(x: number, y: number, text: HTMLElement): HTMLElement | null {
 }
 
 /**
- * About how tall a selection's space is: its title line and its buttons, wrapped on a phone.
- * shortcut: an estimate, not a measure (the space is not drawn yet when the place is chosen); measure it if the actions grow.
+ * About how tall a selection's space is, for the first choice, before it is drawn. On a phone its commands wrap on
+ * several rows (about 308 px at 390): the drawn space is measured again as it opens (`fitsInView`), and goes to the
+ * island if it would leave the view.
  */
 export const SPACE_ESTIMATE = 180;
 
@@ -72,6 +73,14 @@ export function revealBy(spaceBottom: number, wordsTop: number, view: View): num
   const need = spaceBottom - view.bottom;
   if (need <= 0) return 0;
   return Math.max(0, Math.min(need, wordsTop - view.top));
+}
+
+/**
+ * Whether a space opened under the words, measured now that it is drawn, can be brought into view with the words still
+ * in it (`revealBy`). Not, it would go past the bars at the foot: the actions go to the island instead (LC145).
+ */
+export function fitsInView(spaceBottom: number, wordsTop: number, view: View): boolean {
+  return spaceBottom - revealBy(spaceBottom, wordsTop, view) <= view.bottom;
 }
 
 /** Scrolls an element's scroller (or the window) by `by` pixels, at once. */

@@ -266,6 +266,41 @@ describe('SelectionPopup in the page (LC142, L-73): the actions under the paragr
     }
   });
 
+  it('drawn taller than its estimate and past the bars at the foot, the space gives way to the island, the words still (LC145)', async () => {
+    // 390×450: the app's bar and the reader's toolbar down to 109, a fixed bar from 400; the space's commands wrap to 308 px.
+    const height = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 450 });
+    const toolbar = document.createElement('div');
+    toolbar.style.position = 'sticky';
+    const foot = document.createElement('div');
+    foot.style.position = 'fixed';
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === toolbar) return new DOMRect(0, 0, 390, 109);
+      if (this === foot) return new DOMRect(0, 400, 390, 50);
+      if (this.classList.contains('vlx-b')) return new DOMRect(0, 110, 390, 30);
+      if (this.getAttribute('role') === 'region' && this.closest('[data-reader-slot]')) return new DOMRect(0, 148, 390, 308);
+      return new DOMRect();
+    });
+    document.elementFromPoint = (_x: number, y: number) => (y < 109 ? toolbar : y >= 400 ? foot : null);
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    try {
+      render(<Harness />);
+      document.body.prepend(toolbar);
+      document.body.append(foot);
+      await select('fatto doloso', FIRST);
+      await waitFor(() => expect(screen.getByRole('region', { name: 'Testo selezionato' }).closest('[data-reader-slot]')).toBeNull());
+      const island = screen.getByRole('region', { name: 'Testo selezionato' });
+      expect(island.contains(document.activeElement)).toBe(true);
+      expect(window.getSelection()?.toString()).toBe('fatto doloso');
+      expect(scrollBy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      scrollBy.mockRestore();
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+    }
+  });
+
   it('under the paragraph, the space is not scrolled into view by itself: the selected words stay', async () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
