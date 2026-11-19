@@ -2426,6 +2426,18 @@ it itself (the practice made active, the row revealed or the window reopened, or
 through `windowFocusRequest`, a one-shot signal the window takes atomically; a topic-search window is never a target; on a phone the same step opens the full-screen reader on a subject read beside, or closes it for a row of the table, since a phone has no windows).
 `moveActToPractice` rewrites the entries that name the moved act.
 
+**The search and the reader on the common controls** (LC113, omologazione 8 of 14): `components/features/search/`
+(with `caseLaw/`) and `practice/` draw `Button`, `IconButton`, `Input` and `Select`: the glosses' and margin notes' commands
+(`Button` small quiet), the reading toolbar's tools (`Button` quiet with `vlx-hover-tile`; the highlighter's and the
+note's tools take the bar's look by `triggerClassName`), ⌘K's fields (the box stays cmdk's and keeps the focus at the
+opening), the find window, «Apri accanto» and «Azioni» of a row in «Fonti» (36 px from `md`, 44 on a phone). The case
+law's section opens as an `Expand` under its heading (Esc closes it); a row's text sits in an open `Expand`, so «Mostra
+tutto» follows the height on `ISLAND_OPEN`. «Fonti · Atti · Compiti» are `SegmentedTabs size="sm"`; «Seleziona»
+carries `aria-controls`. `search/ricerca.guard.test.ts` refuses, in both folders, a bare `<button>`, `<select>` or
+`<input>` without `bare-button: <reason>` on the line above, the old local looks (`ACTION`, `LINK`, `FIELD_INPUT`…),
+a 6, 10 or 16 px radius and a duration by hand; the windows over the content still there (L-73) are listed, left out
+of those checks, and no new one comes in.
+
 **The practice.** A practice is the table of one question (spec `2026-10-08-norm-tab-container-design.md`):
 acts with their articles, then «Giurisprudenza», and the light windows beside the table. It is UI state saved in
 the browser (gotcha 17); the store holds it as `practices` with `activePracticeId`, and every way in routes to it.
