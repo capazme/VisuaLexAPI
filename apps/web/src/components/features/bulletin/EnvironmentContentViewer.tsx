@@ -427,6 +427,8 @@ export function EnvironmentContentViewer({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              // The label and its count, read apart («Alias 1», not «Alias1»).
+              aria-label={count > 0 ? `${tab.label} ${count}` : tab.label}
               className={`
                 flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap
                 transition-colors border-b-2 -mb-px

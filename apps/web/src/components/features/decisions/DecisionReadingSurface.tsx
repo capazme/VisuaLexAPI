@@ -223,10 +223,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     [testo, proposalHighlights],
   );
 
-  const [isNotesOpen, setIsNotesOpen] = useState(false);
-  const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
-  const [isHighlightsOpen, setIsHighlightsOpen] = useState(false);
-  const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
+  // «Note» and «Evidenziazioni» open under the toolbar (LC139, L-73), one at a time.
+  const [space, setSpace] = useState<'notes' | 'highlights' | null>(null);
+  const isNotesOpen = space === 'notes';
+  const isHighlightsOpen = space === 'highlights';
   const [highlightsHidden, setHighlightsHidden] = useState(false);
   const findButtonRef = useRef<HTMLButtonElement>(null);
   const textRootRef = useRef<HTMLDivElement>(null);
@@ -362,10 +362,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         highlightsCount={decisionHighlights.length}
         isNotesOpen={isNotesOpen}
         isHighlightsOpen={isHighlightsOpen}
-        notesButtonRef={setNotesButtonEl}
-        highlightsButtonRef={setHighlightsButtonEl}
-        onToggleNotes={() => setIsNotesOpen((v) => !v)}
-        onToggleHighlights={() => setIsHighlightsOpen((v) => !v)}
+        onToggleNotes={() => setSpace((s) => (s === 'notes' ? null : 'notes'))}
+        onToggleHighlights={() => setSpace((s) => (s === 'highlights' ? null : 'highlights'))}
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
@@ -404,11 +402,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       )}
       <NotesPeekPanel
         isOpen={isNotesOpen}
-        anchorEl={notesButtonEl}
         annotations={decisionNotes}
         articleLabel={label}
         noteAnchor={noteAnchor}
-        onClose={() => setIsNotesOpen(false)}
+        onClose={() => setSpace((s) => (s === 'notes' ? null : s))}
         onAddNote={handleAddNote}
         onUpdateNote={updateAnnotation}
         onRemoveNote={removeAnnotation}
@@ -418,10 +415,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       />
       <HighlightsActionsPicker
         isOpen={isHighlightsOpen}
-        anchorEl={highlightsButtonEl}
         highlightsCount={decisionHighlights.length}
         highlightsHidden={highlightsHidden}
-        onClose={() => setIsHighlightsOpen(false)}
+        onClose={() => setSpace((s) => (s === 'highlights' ? null : s))}
         onToggleVisibility={() => setHighlightsHidden((v) => !v)}
         onExportTxt={exportHighlights}
       />

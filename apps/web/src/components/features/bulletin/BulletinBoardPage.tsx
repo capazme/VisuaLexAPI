@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
 import { SuggestContentPanel } from './SuggestContentPanel';
 import { EditSharedEnvironmentPanel } from './EditSharedEnvironmentPanel';
-import { SuggestionReviewDialog, type TakeResult } from './SuggestionReviewDialog';
+import { SuggestionReviewDialog, type AliasConflict, type TakeResult } from './SuggestionReviewDialog';
 import { EditSuggestionDialog } from './EditSuggestionDialog';
-import { AliasConflictDialog } from './AliasConflictDialog';
+import type { AliasChoice } from './AliasConflictDialog';
 import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
@@ -30,6 +30,17 @@ import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/me
 import type { Environment, SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
 import { PUBLIC_DOSSIERS_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
+import { getErrorMessage } from '../../../utils/errors';
+
+/** A 409 for an alias whose trigger the user already has. The client (`services/api.ts`) rejects with `{ status, message,
+ * data }`; an axios error's `response` is read too. */
+function aliasConflictOf(err: unknown): { suggestedTrigger: string; existingAliasId?: string } | null {
+  const e = err as { status?: number; data?: unknown; response?: { status?: number; data?: unknown } } | null;
+  const status = e?.status ?? e?.response?.status;
+  const data = (e?.data ?? e?.response?.data) as { error?: string; suggestedTrigger?: string; existingAliasId?: string } | undefined;
+  if (status !== 409 || data?.error !== 'alias_trigger_conflict' || typeof data.suggestedTrigger !== 'string') return null;
+  return { suggestedTrigger: data.suggestedTrigger, existingAliasId: data.existingAliasId };
+}
 
 
 export function BulletinBoardPage() {
@@ -73,7 +84,7 @@ export function BulletinBoardPage() {
   const [shownEnv, setShownEnv] = useState<SharedEnvironment | null>(null);
   const [reviewingSuggestion, setReviewingSuggestion] = useState<EnvironmentSuggestion | null>(null);
   const [editingSuggestion, setEditingSuggestion] = useState<EnvironmentSuggestion | null>(null);
-  const [aliasConflict, setAliasConflict] = useState<{ itemId: string; suggestedTrigger: string; existingAliasId?: string } | null>(null);
+  const [aliasConflict, setAliasConflict] = useState<AliasConflict | null>(null);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info'; action?: { label: string; onClick: () => void } } | null>(null);
@@ -83,6 +94,7 @@ export function BulletinBoardPage() {
   };
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const refreshDossiers = useAppStore((s) => s.refreshDossiers);
 
   /** What became study dossiers (a download, a pack): said, the list read again, the one new dossier one tap away. */
@@ -280,15 +292,13 @@ export function BulletinBoardPage() {
       setToast({ type: 'success', message: 'Item preso.' });
       return { kind: 'ok' };
     } catch (err: unknown) {
-      const maybeAxios = err as { response?: { status?: number; data?: { error?: string; suggestedTrigger?: string; existingAliasId?: string } } };
-      if (maybeAxios.response?.status === 409 && maybeAxios.response.data?.error === 'alias_trigger_conflict') {
-        const body = maybeAxios.response.data as { suggestedTrigger: string; existingAliasId?: string };
-        setAliasConflict({ itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId });
-        return { kind: 'alias_conflict', itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId };
+      const conflict = aliasConflictOf(err);
+      if (conflict) {
+        setAliasConflict({ itemId, ...conflict });
+        return { kind: 'alias_conflict', itemId, ...conflict };
       }
-      const msg = err instanceof Error ? err.message : 'Errore';
-      setToast({ type: 'error', message: msg });
-      return { kind: 'ok' };
+      // Said under the item, in the review that stays open: no notice to dismiss with an Esc that would close it.
+      return { kind: 'error', message: getErrorMessage(err) || "Non è stato possibile prendere l'item. Riprova." };
     }
   }, [reviewingSuggestion, fetchSuggestions]);
 
@@ -322,6 +332,45 @@ export function BulletinBoardPage() {
       setToast({ type: 'error', message: msg });
     }
   }, [editingSuggestion, fetchSuggestions]);
+
+  // The choice under an alias item whose trigger the user already has (a 409 on «Prendi»).
+  const handleAliasChoice = async (choice: AliasChoice): Promise<boolean> => {
+    if (!aliasConflict) return false;
+    if (choice.action === 'skip') { setAliasConflict(null); return false; }
+    if (!reviewingSuggestion) { setAliasConflict(null); return false; }
+    try {
+      if (choice.action === 'replace') {
+        if (!aliasConflict.existingAliasId) {
+          throw new Error('Missing existingAliasId in alias conflict body');
+        }
+        await customAliasService.delete(aliasConflict.existingAliasId);
+        await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId);
+      } else if (choice.action === 'rename') {
+        await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId, choice.newTrigger);
+        // MERLT-1.10: forum_suggestion_accepted — same shape as handleTakeItem.
+        publishMerltEvent({
+          interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
+          metadata: {
+            suggestion_id: reviewingSuggestion.id,
+            shared_env_id: reviewingSuggestion.sharedEnvironmentId,
+          },
+        });
+      }
+      await fetchSuggestions();
+      setToast({ type: 'success', message: 'Item preso.' });
+    } catch (err: unknown) {
+      const conflict = aliasConflictOf(err);
+      if (choice.action === 'rename' && conflict) {
+        setAliasConflict({ itemId: aliasConflict.itemId, ...conflict });
+        return true;
+      }
+      setToast({ type: 'error', message: getErrorMessage(err) || "Non è stato possibile prendere l'item. Riprova." });
+      setAliasConflict(null);
+      return false;
+    }
+    setAliasConflict(null);
+    return false;
+  };
 
   // Sync reviewingSuggestion with refreshed server data. reviewingSuggestion is intentionally
   // omitted from deps: including it creates an infinite loop (effect updates it → re-triggers).
@@ -385,6 +434,12 @@ export function BulletinBoardPage() {
     setReviewingSuggestion(null);
     setEditingSuggestion(null);
     setAliasConflict(null);
+    // An old link's import, under the header, is one of them too.
+    if (searchParams.has('import')) setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('import');
+      return next;
+    }, { replace: true });
   };
 
   const openPublish = () => {
@@ -544,81 +599,40 @@ export function BulletinBoardPage() {
           />
         )}
 
+        {/* A suggestion's review and editing open here, at the top of Suggerimenti, in the page (LC140, L-73). */}
+        {activeTab === 'suggestions' && (
+          <SuggestionReviewDialog
+            suggestion={reviewingSuggestion}
+            onTake={handleTakeItem}
+            onDecline={handleDeclineItem}
+            aliasConflict={aliasConflict}
+            onAliasChoose={handleAliasChoice}
+            onAliasCancel={() => setAliasConflict(null)}
+            onClose={() => { setReviewingSuggestion(null); setAliasConflict(null); }}
+          />
+        )}
+        {activeTab === 'suggestions' && (
+          <EditSuggestionDialog
+            suggestion={editingSuggestion}
+            onRevoke={handleRevokeItem}
+            onItemsAdded={() => { void fetchSuggestions(); }}
+            onClose={() => setEditingSuggestion(null)}
+          />
+        )}
         {activeTab === 'suggestions' && (
           <ForumSuggestionsView
             receivedSuggestions={receivedSuggestions}
             sentSuggestions={sentSuggestions}
-            loading={suggestionsLoading}
+            // Only the first read draws the placeholders: read again after a take, the rows stay (and the focus on them).
+            loading={suggestionsLoading && receivedSuggestions.length === 0 && sentSuggestions.length === 0}
             suggestionTab={suggestionTab}
-            setSuggestionTab={setSuggestionTab}
+            setSuggestionTab={(tab) => { closeSpaces(); setSuggestionTab(tab); }}
             pendingCount={pendingCount}
-            onOpenReview={setReviewingSuggestion}
-            onOpenEdit={setEditingSuggestion}
+            onOpenReview={(suggestion) => { closeSpaces(); setReviewingSuggestion(suggestion); }}
+            onOpenEdit={(suggestion) => { closeSpaces(); setEditingSuggestion(suggestion); }}
           />
         )}
       </SegmentedTabPanel>
-
-      {reviewingSuggestion && (
-        <SuggestionReviewDialog
-          suggestion={reviewingSuggestion}
-          onTake={handleTakeItem}
-          onDecline={handleDeclineItem}
-          onClose={() => setReviewingSuggestion(null)}
-        />
-      )}
-
-      {editingSuggestion && (
-        <EditSuggestionDialog
-          suggestion={editingSuggestion}
-          onRevoke={handleRevokeItem}
-          onItemsAdded={() => { void fetchSuggestions(); }}
-          onClose={() => setEditingSuggestion(null)}
-        />
-      )}
-
-      {aliasConflict && (
-        <AliasConflictDialog
-          suggestedTrigger={aliasConflict.suggestedTrigger}
-          onChoose={async (choice) => {
-            if (choice.action === 'skip') { setAliasConflict(null); return; }
-            if (!reviewingSuggestion) { setAliasConflict(null); return; }
-            try {
-              if (choice.action === 'replace') {
-                if (!aliasConflict.existingAliasId) {
-                  throw new Error('Missing existingAliasId in alias conflict body');
-                }
-                await customAliasService.delete(aliasConflict.existingAliasId);
-                await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId);
-              } else if (choice.action === 'rename') {
-                await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId, choice.newTrigger);
-                // MERLT-1.10: forum_suggestion_accepted — same shape as handleTakeItem.
-                publishMerltEvent({
-                  interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
-                  metadata: {
-                    suggestion_id: reviewingSuggestion.id,
-                    shared_env_id: reviewingSuggestion.sharedEnvironmentId,
-                  },
-                });
-              }
-              await fetchSuggestions();
-              setToast({ type: 'success', message: 'Item preso.' });
-            } catch (err: unknown) {
-              const maybeAxios = err as { response?: { status?: number; data?: { error?: string; suggestedTrigger?: string; existingAliasId?: string } } };
-              if (choice.action === 'rename' && maybeAxios.response?.status === 409 && maybeAxios.response.data?.error === 'alias_trigger_conflict') {
-                const body = maybeAxios.response.data as { suggestedTrigger: string; existingAliasId?: string };
-                setAliasConflict({ itemId: aliasConflict.itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId });
-                return;
-              }
-              const msg = err instanceof Error ? err.message : 'Errore';
-              setToast({ type: 'error', message: msg });
-              setAliasConflict(null);
-              return;
-            }
-            setAliasConflict(null);
-          }}
-          onClose={() => setAliasConflict(null)}
-        />
-      )}
 
       {/* Deletes the published copy with its versions, likes and reports, which are others' too: drawn from the card's
           menu button (K1b). */}

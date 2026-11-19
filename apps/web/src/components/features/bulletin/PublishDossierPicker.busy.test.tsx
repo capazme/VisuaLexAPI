@@ -11,6 +11,7 @@ vi.mock('../dossier/PublishDossierDialog', () => ({
     <>
       <h2 id={headingId}>Pubblica nel Forum</h2>
       <button type="button" disabled={busy} onClick={() => setBusy(true)}>Pubblica</button>
+      <button type="button" onClick={() => setBusy(false)}>Fine</button>
     </>
   ),
 }));
@@ -43,5 +44,28 @@ describe('PublishDossierPicker while it publishes', () => {
     expect(region).toHaveFocus();
     fireEvent.keyDown(region, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  // #709's review: another space opening while it publishes does not take it away; it closes once the server answers.
+  it('stays open while it publishes when it is told to close, then closes', () => {
+    appStore.setState({ dossiers: [{ id: 'a', title: 'Dossier a', createdAt: '', items: [item], kind: 'studio' }] });
+    function Host() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>Apri</button>
+          <button type="button" onClick={() => setOpen(false)}>Un altro spazio</button>
+          <PublishDossierPicker open={open} onClose={() => setOpen(false)} onPublished={vi.fn()} />
+        </>
+      );
+    }
+    render(<Host />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri' }));
+    fireEvent.click(screen.getByRole('button', { name: /Dossier a/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Un altro spazio' }));
+    expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Fine' }));
+    expect(screen.queryByRole('region', { name: 'Pubblica nel Forum' })).toBeNull();
   });
 });

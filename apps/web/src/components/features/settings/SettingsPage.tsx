@@ -322,7 +322,7 @@ export function SettingsPage() {
             { id: 'amministrazione', name: 'Amministrazione', shown: isAdmin },
         ] },
         { group: 'Supporto', parts: [
-            { id: 'segnala', name: 'Segnala un problema', shown: isAuthenticated },
+            { id: 'segnala', name: 'Dicci cosa ti serve', shown: isAuthenticated },
             { id: 'scorciatoie', name: 'Scorciatoie da tastiera' },
             { id: 'aiuto', name: 'Aiuto' },
             { id: 'informazioni', name: 'Informazioni' },
@@ -507,7 +507,7 @@ export function SettingsPage() {
                 {/* LC92: the form that was «Commenti»'s dialog, for a signed-in user as it was. */}
                 {isAuthenticated && (
                     <Part id="segnala">
-                        <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Segnala un problema</h3>
+                        <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dicci cosa ti serve</h3>
                         <ReportProblemSection />
                     </Part>
                 )}

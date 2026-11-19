@@ -158,15 +158,17 @@ describe('describeVersion — an article that did not exist yet', () => {
 
   it('does not draw the served notice as an article', () => {
     expect(shown.textVisible).toBe(false);
-    expect(shown.chip).toMatchObject({ tone: 'not_yet', label: 'Non ancora esistente' });
+    // The day asked for stays in the row (LC139); with none, the plain words.
+    expect(shown.chip).toMatchObject({ tone: 'not_yet', label: 'Al 1° gennaio 2010 l’articolo non esisteva' });
+    expect(describeVersion(NOT_YET, { versione: 'originale' }).chip).toMatchObject({ label: 'Non ancora esistente' });
   });
 
-  it('says when it came into being and offers the way forward', () => {
+  it('says when it came into being and offers the way back and the way forward', () => {
     expect(shown.banner).toEqual({
       kind: 'not_yet',
       title: 'Articolo non ancora esistente',
       body: 'Questo articolo non esisteva al 1° gennaio 2010. È in vigore dal 13 settembre 2014.',
-      actions: ['open_next_day', 'pick_date'],
+      actions: ['go_current', 'open_next_day', 'pick_date'],
       nextDay: '2014-09-13',
     });
   });

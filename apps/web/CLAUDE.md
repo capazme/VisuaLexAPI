@@ -2286,8 +2286,8 @@ text), never what came back. On a past text the practice's row, the dossier read
 Study Mode take no notes, highlights, discussions or quick-norm (the selection
 popup offers only "Copia"), and the update notes open;
 an article that did not exist yet draws no text, only the way forward. The
-"Testo alla data" dialog (`TextAtDateDialog`) replaces the old "Cerca versione"
-modal; the result opens as a row of its own in the act, labelled with the day asked for (the text in
+"Testo alla data" space (`TextAtDateDialog`, in the page under the toolbar since LC139, L-73) replaces the old
+"Cerca versione" modal; the result opens as a row of its own in the act, labelled with the day asked for (the text in
 force stays another row: `practiceArticleKey` carries the version).
 `utils/citation.ts` writes how a lawyer cites it, in the owner's style ("art. 1284
 c.c., nel testo in vigore al 29 dicembre 2007"; "art. 2, l. 7 agosto 1990, n. 241,
@@ -2356,16 +2356,21 @@ A comma over `DIFF_WORD_CAP` words that would have been «modificato» is «risc
 confronto parola per parola» (`tooLong`). One scroll replaces the old synchronised scrolling (the rows are the
 alignment).
 
-**Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
-free notes; the notes beside the text (`AnnotationMargin`: a card per anchored note, read, edited and removed there,
+**Notes**: a space under the toolbar (`NotesPeekPanel`; LC139, L-73: it was a popover, a sheet on a phone) for
+browsing and free notes; the notes beside the text (`AnnotationMargin`: a card per anchored note, read, edited and removed there,
 and the editor of a new one — the selection bar's «Nota», the note tool —, a sheet from the bottom with no room); a
 click on a wavy underline goes to its card; the block's sheet from a sign, for everything one block holds. Deliberately
 distinct entry points — don't collapse them.
 
 **Highlights**: created, removed and recoloured from the selection — `SelectionPopup`'s «Evidenzia» and H, or the
 highlighter (`HighlighterButton`, its tool and its menu, A4) —, always through `useHighlightInk`'s rules. The toolbar's
-«Evidenziazioni» button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
-exports to `.txt` — it is not a second creator (that was tried and rolled back).
+«Evidenziazioni» button opens `HighlightsActionsPicker`, a space under the toolbar (LC139) that toggles visibility and
+exports to `.txt` — it is not a second creator (that was tried and rolled back). The toolbar's spaces (LC125, LC139,
+L-73) open one at a time under it (`space` in `ArticleTabContent`, the decision's two likewise): «Aggiungi alla
+pratica», «Note», «Evidenziazioni», «Copia» (`ui/CopyModal`), «Esporta…» (`AdvancedExportModal inPage`; Study Mode,
+itself still over the page, keeps its window) and «Testo alla data». Each is a `ReaderSpace` (an `Expand`, a region
+with its title and «Chiudi»; the focus on the space, never in a field; Esc and «Chiudi» give it back to the command,
+and wait while a PDF is written): the twin of the Forum's `ForumSpace`, to be unified.
 Hiding them also hides the signs' colour dots and the signs that hold only
 highlights.
 
@@ -3302,7 +3307,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `<button>`, `<select>` or `<input>` without `bare-button: <reason>` on the line above, the old local looks
   (`FILTER_BUTTON`, `INPUT`, `ACTION`, `LINK`), a 6, 10 or 16 px radius, a written duration and a new window over the
   content but the confirmations (L-74: the archive's «Elimina», «Ripristina versione», a published copy's and a
-  discussion's «Elimina»); the suggestions' windows still there (L-73) are listed and left out of the style checks. While
+  discussion's «Elimina», a suggestion's two «Revocare…?»); since LC140 no other window is left in the Forum. While
   Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
   on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
   card that comes leaves a smaller shift upwards). The search's hint is «Cerca un dossier…» (whole at 768 with the
@@ -3320,9 +3325,16 @@ meant to stay split; add new features as new files, not inside the shells:
   gone) the focus lands on the discussion's title. Since LC138 (L-73) the Forum's other windows open in the page as
   `ForumSpace`s (an `Expand` with its title and «Chiudi»; Esc and «Chiudi» wait while the server works): «Segnala»
   (`ReportModal`) and «Aggiungi ai miei dossier» at the top of the card's tab, «Versioni» (`VersionHistoryModal`) above
-  «I miei pubblicati»' cards, an old link's import under the header (drawn open, it takes no focus). The suggestions'
-  review and editing (`SuggestionReviewDialog`, `EditSuggestionDialog`, `AddItemsDialog`, `AliasConflictDialog`) are
-  still windows, for the next PR. Content becomes the user's dossiers di studio through one form, `StudyImportDialog` (the
+  «I miei pubblicati»' cards (its rows parted by a line), an old link's import under the header (drawn open, it takes
+  no focus; Esc closes it with the focus anywhere but inside another space). «Pubblica un dossier» stays open while it
+  publishes, another space opened or not, and closes once the server answers. Since LC140 the suggestions too
+  (`ForumSpace`s at the top of Suggerimenti, one at a time with the others, the Ricevuti/Inviati switch closing them):
+  a received one's review (`SuggestionReviewDialog`; «Rifiuta» opens its note under the item, an alias whose trigger the
+  user has, a 409 on «Prendi», opens `AliasConflictDialog`'s choice under the item, and its «Annulla», «Salta» and Esc
+  give the focus back to «Prendi» by hand, disabled as it opened) and a sent one's editing (`EditSuggestionDialog`;
+  «Aggiungi item» opens `AddItemsDialog`'s form under the command; «Revoca» keeps its confirmation, `focusBack` to the
+  space). While an item travels the focus waits on the space, since the pressed button goes with the item's state; the
+  list's placeholders show on the first read only, so its rows (and the focus back to them) stay. Content becomes the user's dossiers di studio through one form, `StudyImportDialog` (the
   dossiers listed, notes and highlights as switches, one server request, never an existing dossier changed;
   the toast is `studyImportSentence`): «Ai miei dossier» on a card (`AddToMyDossiersDialog`, `POST
   /shared-environments/:id/download`, then `forum_download` unless the item is the user's own), an environment
@@ -3369,7 +3381,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `AnnotationMargin.tsx` and `MarginCards.tsx` (the notes beside the text),
   `NoteComposerSheet.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsSheet.tsx` (everything a block holds, opened from its sign),
-  `NoteToolButton.tsx` (the note tool), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  `NoteToolButton.tsx` (the note tool), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReaderSpace.tsx` (the toolbar's spaces), `ReadingToolbar.tsx`,
   `SearchPanel.tsx` (streaming merge logic; the stream's closing `kind: 'time_budget'` line raises «Caricamento interrotto» with `notify`, and «Carica i mancanti» appends the missing articles to
   `searchQueue`, D-323), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
   the close button and the filters 44 px on a phone — `CommandPalette.test.tsx` reads the file; its colours are

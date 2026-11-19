@@ -12,6 +12,24 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.61.0] - 2026-11-19
+
+«Dicci cosa ti serve» in the top bar, and the reading bar's and the Forum suggestions' windows inside the page.
+Web only, no migration. MERL-T stays off.
+
+### Interface
+
+- «Dicci cosa ti serve» in the top bar, on the right, as Luca asked (LC141).
+
+### Reading
+
+- Five windows of the reading bar open in the page flow; a day the article did not exist on keeps the reader's
+  place, with «Vai al testo attuale»; on a phone Note and Evidenziazioni open from «⋯» (LC139, L-73).
+
+### Forum
+
+- The Forum suggestions open in the page flow; a name already taken offers another (LC140).
+
 ## [1.60.0] - 2026-11-19
 
 Two to-do lists, one for Work and one for Learn, and the Forum's windows inside the page. Web only, no

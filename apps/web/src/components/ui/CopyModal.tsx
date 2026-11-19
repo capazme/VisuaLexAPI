@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Modal } from './Modal';
+import { Button } from './Button';
+import { ReaderSpace } from '../features/search/ReaderSpace';
 
 interface CopyModalProps {
   isOpen: boolean;
@@ -47,37 +48,13 @@ export function CopyModal({
     !options.includeNotes &&
     !options.includeHighlights;
 
+  // In the page under the toolbar since LC139 (L-73; it was a window): Esc and «Chiudi» close it, the focus back on «⋯».
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      size="md"
-      title="Copia Contenuto"
-      icon={<Copy size={20} />}
-      variant="info"
-      footer={
-        <>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-          >
-            Annulla
-          </button>
-          <button
-            onClick={handleCopy}
-            disabled={disabled}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-          >
-            <Copy size={16} />
-            Copia
-          </button>
-        </>
-      }
-    >
+    <ReaderSpace open={isOpen} onClose={onClose} title="Copia contenuto" icon={<Copy size={16} aria-hidden className="shrink-0" />} className="max-w-md">
       <div className="space-y-4">
         <div>
           <p className="text-xs font-bold text-slate-500 uppercase mb-3">Contenuto</p>
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1 space-y-1">
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[8px] p-1 space-y-1">
             <CheckboxRow
               checked={options.includeText}
               onChange={(v) => setOptions({ ...options, includeText: v })}
@@ -118,7 +95,7 @@ export function CopyModal({
         {canCopyNorma && (
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase mb-3">Ambito</p>
-            <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-1 space-y-1">
+            <div className="bg-primary-50 dark:bg-primary-900/20 rounded-[8px] p-1 space-y-1">
               <RadioRow
                 name="scope"
                 checked={options.scope === 'article'}
@@ -134,8 +111,15 @@ export function CopyModal({
             </div>
           </div>
         )}
+        <div className="flex justify-end gap-2">
+          <Button variant="quiet" onClick={onClose}>Annulla</Button>
+          <Button variant="primary" onClick={handleCopy} disabled={disabled}>
+            <Copy size={16} aria-hidden />
+            Copia
+          </Button>
+        </div>
       </div>
-    </Modal>
+    </ReaderSpace>
   );
 }
 
@@ -151,7 +135,7 @@ function CheckboxRow({ checked, onChange, disabled = false, label, description }
   return (
     <label
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg transition-colors',
+        'flex items-start gap-3 p-3 rounded-md transition-colors',
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-white dark:hover:bg-slate-800'
       )}
     >
@@ -191,7 +175,7 @@ interface RadioRowProps {
 
 function RadioRow({ name, checked, onChange, label }: RadioRowProps) {
   return (
-    <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-primary-900/30">
+    <label className="flex items-center gap-3 p-3 rounded-md cursor-pointer transition-colors hover:bg-white dark:hover:bg-primary-900/30">
       <input type="radio" name={name} checked={checked} onChange={onChange} className="sr-only" />
       <div
         className={cn(

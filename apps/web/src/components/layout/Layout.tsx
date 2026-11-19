@@ -6,7 +6,8 @@ import { Sidebar } from './Sidebar';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
 import { RoutePage } from './RouteBoundary';
 import { useDesktopSidebar } from './sidebarWidth';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Bug, Maximize2, Minimize2 } from 'lucide-react';
+import { Button } from '../ui/Button';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { CorpusPracticesDialog } from '../features/practice/CorpusPracticesDialog';
@@ -321,11 +322,30 @@ export function Layout() {
     return () => window.removeEventListener('keydown', handler);
   }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage, openSettings]);
 
+  // LC141 (Luca, 19 Nov): «Dicci cosa ti serve», the bug at the top right again, in every bar; outlined, not filled, so
+  // it does not compete with the page's own commands. Below md the icon alone, 44 px; it opens `/impostazioni#segnala`.
+  const feedbackButton = isAuthenticated ? (
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      icon={<Bug size={16} aria-hidden />}
+      title="Dicci cosa ti serve"
+      // Hidden while the search's field is open in its bar: the field's slot covers part of it.
+      data-bar-action=""
+      onClick={() => openSettings('segnala')}
+      className="shrink-0 whitespace-nowrap max-md:w-11 max-md:px-0"
+    >
+      <span className="max-md:sr-only">Dicci cosa ti serve</span>
+    </Button>
+  ) : null;
+
   // The controls of the top bar (LC21): the version's news and «Tutto schermo», compact and in line. «Commenti» left
   // it for the bug beside «Impostazioni» in the sidebar (LC92).
   const barControls = (
     <>
       <ChangelogNotification inBar />
+      {feedbackButton}
       <button
         type="button"
         onClick={() => updateSettings({ focusMode: !settings.focusMode })}
@@ -458,6 +478,7 @@ export function Layout() {
             onReveal={phoneBar.reveal}
             barRef={setPhoneBarElement}
             onSearch={openCommandPalette}
+            action={feedbackButton}
           />
         )}
 
@@ -473,12 +494,14 @@ export function Layout() {
             // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
             className={cn(
               'relative flex h-[var(--search-bar-height)] flex-shrink-0 items-center justify-center gap-1 border-b', Z_INDEX.dropdown,
+              '[&:has([data-palette-slot]:not(:empty))>[data-bar-action]]:invisible',
               // LC21: the page's own ground, as the top bar of the other pages: no white band over the stone.
               'border-slate-200 bg-slate-50/90 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[10.5rem] lg:pl-8 lg:pr-[17rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-950/90',
             )}
           >
             <MenuToggle {...menuToggle} />
             <SearchField />
+            {feedbackButton}
             {/* L-75: the search's field grows out of this one, in its place. */}
             <div data-palette-slot="" className="absolute bottom-0 left-12 right-4 flex h-14 items-center empty:hidden md:right-[10.5rem]" />
           </div>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 
 const pdfLines: string[] = [];
 const pdfSaves: string[] = [];
@@ -221,5 +222,51 @@ describe('AdvancedExportModal — the citation', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     expect(writeText.mock.calls[0][0] as string)
       .toMatch(/--- Citazione ---\nart\. 2043 c\.c\. \(Normattiva, testo vigente, consultato (?:il |l')[^)]+\)/);
+  });
+});
+
+// LC139 (L-73): in the reader the export opens in the page under the toolbar, not a window; Study Mode keeps the window.
+describe('AdvancedExportModal — in the page', () => {
+  function Host() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>Esporta…</button>
+        <AdvancedExportModal inPage isOpen={open} onClose={() => setOpen(false)} articleData={articleData} annotations={[]} highlights={[]} />
+      </>
+    );
+  }
+
+  it('opens as a region that takes the focus; Esc and «Chiudi» give it back to the command', () => {
+    render(<Host />);
+    const command = screen.getByRole('button', { name: 'Esporta…' });
+    command.focus();
+    fireEvent.click(command);
+    const region = screen.getByRole('region', { name: 'Esporta l’articolo' });
+    expect(region).toHaveFocus();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(command).toHaveFocus();
+    fireEvent.click(command);
+    fireEvent.click(screen.getByRole('button', { name: 'Chiudi' }));
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(command).toHaveFocus();
+  });
+
+  it('waits while the PDF waits for jsPDF: Esc and «Chiudi» do not close it', async () => {
+    const held = holdJsPdf();
+    render(<Host />);
+    fireEvent.click(screen.getByRole('button', { name: 'Esporta…' }));
+    const region = screen.getByRole('region', { name: 'Esporta l’articolo' });
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    expect(screen.getByRole('button', { name: 'Chiudi' })).toBeDisabled();
+    // The pressed button turned off: the space holds the focus, not the page.
+    expect(region).toHaveFocus();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.getByRole('region', { name: 'Esporta l’articolo' })).toBeInTheDocument();
+    held.open();
+    await waitFor(() => expect(screen.queryByRole('region')).toBeNull());
   });
 });

@@ -696,8 +696,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 closeMobile();
                 openFeedback();
               }}
-              aria-label="Segnala un problema"
-              title="Segnala un problema"
+              aria-label="Dicci cosa ti serve"
+              title="Dicci cosa ti serve"
               className={cn(
                 "grid shrink-0 place-items-center rounded-lg transition-colors duration-(--dur-pop)",
                 layout === 'drawer' ? "h-11 w-11" : "h-9 w-9",
@@ -779,7 +779,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 {openFeedback && (
                   <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openFeedback)} className={menuItemClass}>
                     <Bug size={16} />
-                    Segnala un problema
+                    Dicci cosa ti serve
                   </button>
                 )}
                 <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />
