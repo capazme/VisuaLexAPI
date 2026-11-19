@@ -26,8 +26,9 @@ export const ISLAND_CLOSE = { duration: 220, easing: `cubic-bezier(${ease.out.jo
  * - a keystroke moves nothing (a letter, an arrow in a list: the change is there in the same frame);
  * - a repeated action (a row that opens, a notification, ⌘K) takes at most 150–200 ms, with no spring and no cascade;
  * - a change of place (a page, a view) takes 180 ms.
- * Rare moments (a confirmation, a Gymnasium reward, the first draw of a page) keep their own times above. Reduced
- * motion keeps its fades as they are. Every time below is one of these; a new one names its row of the rule.
+ * Rare moments (a confirmation, a Gymnasium reward, the first draw of a page) keep their own times above. Under reduced
+ * motion only fades remain: the island's and `Expand`'s on their earlier times, `ViewSlide`'s on `PageFade`'s (180 ms,
+ * linear). Every time below is one of these; a new one names its row of the rule.
  */
 /** ⌘K's island, the field that grows out of the pill, and its band (a repeated action): at once, no wait. */
 export const SEARCH_OPEN = { duration: 180, easing: `cubic-bezier(${ease.drawer.join(', ')})` } as const;

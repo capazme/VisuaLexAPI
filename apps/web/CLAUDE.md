@@ -754,11 +754,11 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   Framer Motion and Web Animations): the field grows into the panel (`PanelGrowth`): the same place and width, the panel
   uncovered from the field's height down to its own (`clip-path`, `calc(100% - <the field's height>)` to
   `calc(0% - 0px)`, one template so the two ends interpolate; the corners from the field's 12 px to a card's 16), in
-  about 280 ms on `ease.out` (no bounce; a curve, not a spring); the clip is set before the first paint, so the panel
-  never flashes open, and the growth starts once the first frame is drawn (mounting the rows is a long frame, which an
-  animation started before it would spend unseen); Web Animations with no fill, so once grown nothing holds the clip and
+  about 280 ms on `ease.out` (no bounce; a curve, not a spring; since LC132 the island and its band take 180 ms to open
+  and 120 to close, `SEARCH_OPEN`/`SEARCH_CLOSE`, starting in the commit that opens them, with no wait); the clip is set
+  before the first paint, so the panel never flashes open; Web Animations with no fill, so once grown nothing holds the clip and
   the card's `shadow-lg` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
-  Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
+  Closing (Esc, a click outside, a choice), the same way back (120 ms since LC132) from wherever it is (a growth cut short
   included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
   Animations the panel is drawn at once. While the box filters, the list changes at once: no row slides, fades or pops
   out, and the band does not follow its height (`Expand`'s `followContent={false}`) — LC129: nothing moves at a key; the letters the box matched are drawn in toga, semibold (`Matched`, over `matchRanges` in

@@ -13,7 +13,7 @@ vi.mock('framer-motion', async (importOriginal) => ({
 }));
 
 import { CommandPalette } from './CommandPalette';
-import { SEARCH_CLOSE, SEARCH_OPEN } from '../../../lib/motion';
+import { ISLAND_CLOSE, ISLAND_OPEN, SEARCH_CLOSE, SEARCH_OPEN } from '../../../lib/motion';
 import { appStore } from '../../../store/useAppStore';
 import { SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID } from '../../../utils/searchFieldControl';
 import type { CustomAlias, QuickNorm } from '../../../types';
@@ -300,7 +300,7 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     await waitFor(() => expect(document.querySelector('[data-palette-slot]')).toBeEmptyDOMElement());
   });
 
-  it('opened again while it closes grows from where it is on screen', async () => {
+  it('opened again while it closes grows from where it is on screen', () => {
     asDesktop(true);
     recordAnimations();
     const pill = pillInBar();
@@ -331,7 +331,7 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     expect(pill.style.opacity).toBe('0');
   });
 
-  it('under reduced motion only fades, by the same times', async () => {
+  it('under reduced motion only fades, on the island\'s times as before LC132', () => {
     asDesktop(true);
     recordAnimations();
     motionPref.reduced = true;
@@ -339,12 +339,12 @@ describe('CommandPalette — the island in the bar (LC69, L-75)', () => {
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const root = () => shapeOf().parentElement!;
     expect(runOn(root()).keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
-    expect(runOn(root()).options).toMatchObject(SEARCH_OPEN);
+    expect(runOn(root()).options).toMatchObject(ISLAND_OPEN);
     expect(runs.filter((run) => run.el === shapeOf())).toEqual([]);
     expect(pill.style.opacity).toBe('');
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(runOn(root()).keyframes.at(-1)).toEqual({ opacity: 0 });
-    expect(runOn(root()).options).toMatchObject(SEARCH_CLOSE);
+    expect(runOn(root()).options).toMatchObject(ISLAND_CLOSE);
   });
 
   it('follows the page to its new bar when the bar it grew in goes while open (/sentenze → /)', () => {

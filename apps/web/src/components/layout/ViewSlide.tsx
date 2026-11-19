@@ -18,9 +18,9 @@ export interface ViewSlideProps {
   children: ReactNode;
 }
 
-/** Between a list and its detail: sideways by `VIEW_SHIFT` px in `PLACE_CHANGE`; only the fade under reduced motion. */
-const sideways = (still: boolean, back: boolean) => ({
-  keyframes: [{ opacity: 0, transform: still ? 'none' : `translateX(${(back ? -1 : 1) * VIEW_SHIFT}px)` }, { opacity: 1, transform: 'none' }],
+/** Between a list and its detail: sideways by `VIEW_SHIFT` px in `PLACE_CHANGE`; under reduced motion `PageFade`'s fade. */
+const sideways = (still: boolean, back: boolean) => (still ? pageFade(true) : {
+  keyframes: [{ opacity: 0, transform: `translateX(${(back ? -1 : 1) * VIEW_SHIFT}px)` }, { opacity: 1, transform: 'none' }],
   timing: PLACE_CHANGE,
 });
 

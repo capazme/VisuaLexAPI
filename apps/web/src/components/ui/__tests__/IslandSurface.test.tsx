@@ -150,6 +150,15 @@ describe('IslandSurface (LC85)', () => {
     expect(runOn(shapeOf()).options.duration).toBe(150);
   });
 
+  it('under reduced motion fades on the island\'s times even when given shorter ones (LC132)', () => {
+    motion.reduced = true;
+    const timing = { open: REPEAT_OPEN, close: REPEAT_CLOSE };
+    const { rerender } = render(<IslandSurface open source={trigger} timing={timing} role="menu"><p>Nota salvata</p></IslandSurface>);
+    expect(runOn(rootOf()!).options).toMatchObject(ISLAND_OPEN);
+    rerender(<IslandSurface open={false} source={trigger} timing={timing} role="menu"><p>Nota salvata</p></IslandSurface>);
+    expect(runOn(rootOf()!).options).toMatchObject(ISLAND_CLOSE);
+  });
+
   it('driven by its owner, says when its closing is over', async () => {
     const onClosed = vi.fn();
     const { rerender } = render(<IslandSurface open source={trigger} onClosed={onClosed} role="menu"><p>Testo</p></IslandSurface>);

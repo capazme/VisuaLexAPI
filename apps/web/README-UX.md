@@ -674,7 +674,8 @@ frequente, meno si muove:
 | Un cambio di posto | 180 ms | `PageFade`, `ViewSlide` (12 px di lato solo tra elenco e dettaglio), il cambio di sezione |
 
 I momenti rari (le conferme, i premi di Gymnasium, il primo disegno di una pagina) tengono i loro tempi. Con «Riduci
-movimento» restano le sole dissolvenze. Ogni tempo è un token di `src/lib/motion.ts`: il guard
+movimento» restano le sole dissolvenze: quelle dell'isola e di `Expand` con i tempi di prima, quella di `ViewSlide`
+con i 180 ms lineari di `PageFade`. Ogni tempo è un token di `src/lib/motion.ts`: il guard
 `src/styleRules.guard.test.ts` rifiuta le durate scritte a mano.
 
 ---

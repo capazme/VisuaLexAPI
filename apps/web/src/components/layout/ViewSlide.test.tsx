@@ -87,7 +87,9 @@ describe('ViewSlide (LC98)', () => {
     expect(coming.timing).toEqual(pageFade(true).timing);
     rerender(<Page view="list"><Titled name="Pratiche" /></Page>);
     rerender(<Page view="detail"><Titled name="Una pratica" /></Page>);
-    expect(calls.find((c) => c.el.contains(screen.getByText('Una pratica')))!.frames[0]).toEqual({ opacity: 0, transform: 'none' });
+    const detail = calls.find((c) => c.el.contains(screen.getByText('Una pratica')))!;
+    expect(detail.frames[0]).toEqual({ opacity: 0, transform: 'none' });
+    expect(detail.timing).toEqual(pageFade(true).timing);
   });
 
   it('puts the focus on the coming view\'s title, and not when the page first draws', () => {
