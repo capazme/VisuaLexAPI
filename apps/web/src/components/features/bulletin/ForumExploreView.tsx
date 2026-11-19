@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { scrollParentOf } from '../practice/practiceView';
-import { Search, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
+import { Search, RefreshCw, Download, Trophy, X as XIcon } from 'lucide-react';
 import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { EmptyState } from '../../ui/EmptyState';
 import { StudyPacksBand } from './StudyPacksBand';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
-import { cn } from '../../../lib/utils';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
+import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '../../../types';
 import { Illustration } from '../../ui/Illustration';
 
@@ -19,16 +23,12 @@ const GRID = CARD_GRID;
 /** On a phone VisuaLex's packs come after this many of the community's dossiers. */
 const PHONE_CARDS_BEFORE_PACKS = 2;
 
-/** `short`: the button's word under `sm`, where half a 320 px row cut the label («Più rece…»); the menu and the
- *  button's name keep the label. */
-const SORT_OPTIONS: { value: SortOption; label: string; short: string; icon: React.ReactNode }[] = [
-  { value: 'newest', label: 'Più recenti', short: 'Recenti', icon: <Clock size={14} /> },
-  { value: 'popular', label: 'Più popolari', short: 'Popolari', icon: <TrendingUp size={14} /> },
-  { value: 'mostDownloaded', label: 'Più aggiunti', short: 'Aggiunti', icon: <Users size={14} /> },
+/** The order as a choice in a row (LC114, as «Ordina» in Pratiche): three short words, which hold at 320 px. */
+const SORT_CHOICES: { id: SortOption; label: string }[] = [
+  { id: 'newest', label: 'Recenti' },
+  { id: 'popular', label: 'Popolari' },
+  { id: 'mostDownloaded', label: 'Aggiunti' },
 ];
-
-/** The category and order buttons: half the row each on a phone (44 px tall), their own width from `sm`. */
-const FILTER_BUTTON = 'flex w-full min-h-[44px] items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors sm:min-w-[180px] sm:px-4 sm:text-base md:min-h-0';
 
 const CATEGORY_OPTIONS: ReadonlyArray<{ value: EnvironmentCategory | 'all'; label: string }> = [
   { value: 'all', label: 'Tutte le categorie' },
@@ -46,10 +46,6 @@ interface ForumExploreViewProps {
   setCategory: (category: EnvironmentCategory | 'all') => void;
   sort: SortOption;
   setSort: (sort: SortOption) => void;
-  showCategoryDropdown: boolean;
-  setShowCategoryDropdown: (show: boolean) => void;
-  showSortDropdown: boolean;
-  setShowSortDropdown: (show: boolean) => void;
   onSearchSubmit: (e: React.FormEvent) => void;
   onRefresh: () => void;
   onPaginate: (page: number) => void;
@@ -73,10 +69,6 @@ export function ForumExploreView({
   setCategory,
   sort,
   setSort,
-  showCategoryDropdown,
-  setShowCategoryDropdown,
-  showSortDropdown,
-  setShowSortDropdown,
   onSearchSubmit,
   onRefresh,
   onPaginate,
@@ -88,7 +80,6 @@ export function ForumExploreView({
   onPacksError,
   onResetFilters,
 }: ForumExploreViewProps) {
-  const selectedSort = SORT_OPTIONS.find(o => o.value === sort)!;
   const selectedCategory = CATEGORY_OPTIONS.find(o => o.value === category)!;
   const hasFilter = Boolean(searchQuery) || category !== 'all';
   // The community's dossiers first, the Forum's reason (S7a); VisuaLex's packs after them — on a computer after the
@@ -127,13 +118,9 @@ export function ForumExploreView({
           : `Nessun dossier pubblicato nella categoria "${selectedCategory.label}".`
       }
       action={
-        <button
-          onClick={onResetFilters}
-          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors`}
-        >
-          <XIcon size={16} />
+        <Button variant="secondary" onClick={onResetFilters} icon={<XIcon size={16} aria-hidden />}>
           Azzera filtri
-        </button>
+        </Button>
       }
     />
   ) : (
@@ -173,7 +160,7 @@ export function ForumExploreView({
     <div aria-hidden className={GRID}>
       {[...Array(count)].map((_, i) => (
         // As tall as a card that has come (P1: the grid grew 159 px under the strip at 1920, 209 on a phone).
-        <div key={i} className="min-h-[16.75rem] overflow-hidden rounded-xl border border-slate-200 bg-white motion-safe:animate-pulse md:min-h-[15.25rem] dark:border-slate-700 dark:bg-slate-900">
+        <div key={i} className="min-h-[16.75rem] overflow-hidden rounded-[8px] border border-slate-200 bg-white motion-safe:animate-pulse md:min-h-[15.25rem] dark:border-slate-700 dark:bg-slate-900">
           <div className="space-y-3 p-4">
             <div className="h-5 w-3/4 rounded bg-slate-100 dark:bg-slate-800" />
             <div className="h-4 w-1/2 rounded bg-slate-100 dark:bg-slate-800" />
@@ -190,127 +177,49 @@ export function ForumExploreView({
 
   return (
     <>
-      {/* Filters: one row from sm; on a phone the search across the page and under it the category and the order, half
-          each, with the refresh beside them (M1). */}
-      <div id="tour-forum-filters" className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-3">
-        {/* Search */}
-        <form onSubmit={onSearchSubmit} className="relative basis-full sm:basis-auto sm:flex-1">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <input
+      {/* Filters: one row from md; on a phone the search across the page and under it the order, the category and the
+          refresh, wrapping while they do not fit (M1). */}
+      <div id="tour-forum-filters" className="flex flex-col gap-3 md:flex-row">
+        <form onSubmit={onSearchSubmit} className="min-w-0 flex-1">
+          <Input
             type="text"
+            icon={<Search size={16} aria-hidden />}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cerca nei dossier pubblici…"
             aria-label="Cerca nei dossier pubblici"
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </form>
-
-        {/* Category Filter */}
-        <div className="relative min-w-0 flex-1 sm:flex-none">
-          <button
-            onClick={() => {
-              setShowCategoryDropdown(!showCategoryDropdown);
-              setShowSortDropdown(false);
-            }}
-            aria-label={`Categoria: ${selectedCategory.label}`}
-            aria-expanded={showCategoryDropdown}
-            className={FILTER_BUTTON}
-          >
-            <Filter size={16} aria-hidden className="hidden shrink-0 sm:block" />
-            {/* «Tutte» on a phone, as the dossier list's menu: half the row does not hold «Tutte le categorie». */}
-            <span className="min-w-0 flex-1 truncate text-left">
-              {category === 'all' ? <><span className="sm:hidden">Tutte</span><span className="hidden sm:inline">{selectedCategory.label}</span></> : selectedCategory.label}
-            </span>
-            <ChevronDown size={16} aria-hidden className="shrink-0" />
-          </button>
-          {showCategoryDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-20">
-              {CATEGORY_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => {
-                    setCategory(option.value);
-                    setShowCategoryDropdown(false);
-                  }}
-                  className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 ${
-                    category === option.value
-                      ? 'text-primary-600 dark:text-primary-400 font-medium'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
+        <div className="flex flex-wrap items-center gap-3 md:flex-nowrap">
+          <SegmentedTabs
+            label="Ordina i dossier pubblici"
+            tabs={SORT_CHOICES}
+            value={sort}
+            onChange={setSort}
+            // Small: as tall as the menu beside it, 44 px on a phone and 36 from md, with its corners.
+            size="sm"
+            className="shrink-0"
+          />
+          <div className="flex min-w-[8rem] flex-1 gap-3 md:w-56 md:flex-none">
+            <div className="min-w-0 flex-1">
+              <Select value={category} onChange={(e) => setCategory(e.target.value as EnvironmentCategory | 'all')} aria-label="Filtra per categoria">
+                {CATEGORY_OPTIONS.map((option) => (
+                  // «Tutte» on a phone, as the dossier list's menu: half the row does not hold «Tutte le categorie».
+                  <option key={option.value} value={option.value}>{option.value === 'all' && !desktop ? 'Tutte' : option.label}</option>
+                ))}
+              </Select>
             </div>
-          )}
+            <IconButton
+              variant="secondary"
+              onClick={onRefresh}
+              disabled={loading}
+              aria-label="Aggiorna l'elenco"
+              icon={<RefreshCw className={loading ? 'animate-spin' : ''} aria-hidden />}
+              className="shrink-0"
+            />
+          </div>
         </div>
-
-        {/* Sort */}
-        <div className="relative min-w-0 flex-1 sm:flex-none">
-          <button
-            onClick={() => {
-              setShowSortDropdown(!showSortDropdown);
-              setShowCategoryDropdown(false);
-            }}
-            aria-label={`Ordine: ${selectedSort.label}`}
-            aria-expanded={showSortDropdown}
-            className={cn(FILTER_BUTTON, 'sm:min-w-[160px]')}
-          >
-            <span aria-hidden className="hidden shrink-0 sm:block">{selectedSort.icon}</span>
-            <span className="min-w-0 flex-1 truncate text-left">
-              <span className="sm:hidden">{selectedSort.short}</span>
-              <span className="hidden sm:inline">{selectedSort.label}</span>
-            </span>
-            <ChevronDown size={16} aria-hidden className="shrink-0" />
-          </button>
-          {showSortDropdown && (
-            <div className="absolute top-full right-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-20">
-              {SORT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => {
-                    setSort(option.value);
-                    setShowSortDropdown(false);
-                  }}
-                  className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${
-                    sort === option.value
-                      ? 'text-primary-600 dark:text-primary-400 font-medium'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {option.icon}
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Refresh */}
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          aria-label="Aggiorna l'elenco"
-          className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center p-2.5 md:min-h-0 md:min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-        </button>
       </div>
-
-      {/* Close dropdowns on outside click */}
-      {(showCategoryDropdown || showSortDropdown) && (
-        <div
-          className="fixed inset-0 z-10"
-          onClick={() => {
-            setShowCategoryDropdown(false);
-            setShowSortDropdown(false);
-          }}
-        />
-      )}
 
       {/* Results count; while the read travels its line is kept, empty, so the cards do not move down when it comes (P1). */}
       {loading ? (
@@ -342,23 +251,15 @@ export function ForumExploreView({
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex justify-center gap-2">
-          <button
-            onClick={() => onPaginate(pagination.page - 1)}
-            disabled={pagination.page <= 1 || loading}
-            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <Button variant="secondary" onClick={() => onPaginate(pagination.page - 1)} disabled={pagination.page <= 1 || loading}>
             Precedente
-          </button>
+          </Button>
           <span className="px-4 py-2 text-slate-600 dark:text-slate-400">
             Pagina {pagination.page} di {pagination.pages}
           </span>
-          <button
-            onClick={() => onPaginate(pagination.page + 1)}
-            disabled={pagination.page >= pagination.pages || loading}
-            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <Button variant="secondary" onClick={() => onPaginate(pagination.page + 1)} disabled={pagination.page >= pagination.pages || loading}>
             Successivo
-          </button>
+          </Button>
         </div>
       )}
 
@@ -407,7 +308,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
 
   if (state.status === 'loading') {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+      <div className="rounded-[8px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
         <div className="flex items-center gap-2 mb-3">
           <Trophy size={16} className="text-amber-500" />
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h2>
@@ -426,7 +327,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+    <div className="rounded-[8px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
       <div className="flex items-center gap-2 mb-3">
         <Trophy size={16} className="text-amber-500" />
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h2>
@@ -434,10 +335,11 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
       <ul className="space-y-1">
         {items.map((env, idx) => (
           <li key={env.id}>
+            {/* bare-button: a whole row, the dossier's rank, title and count, that opens its addition. */}
             <button
               type="button"
               onClick={() => onImport(env)}
-              className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${TOUCH_TARGET_RESPONSIVE}`}
+              className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${TOUCH_TARGET_RESPONSIVE}`}
             >
               <span className="w-5 shrink-0 text-sm font-bold text-amber-700 dark:text-amber-400 text-center">{idx + 1}</span>
               <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-200">

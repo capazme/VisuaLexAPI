@@ -3272,19 +3272,39 @@ meant to stay split; add new features as new files, not inside the shells:
   «Segnala» asks first in `ui/ConfirmDialog`, with «Annulla»); the panel's «Nuova glossa» asks the subject, optional
   («Materia (facoltativa)», sent as `materia` only when chosen), which the feed filters by, and counts replies as the
   Forum does (not the comments under them); the discussion's author alone sees «Accetta» on another's reply (`accept`, «Ritira l’accettazione» on
-  the accepted one), and the discussion is read again after each change, its feed row following it. Never «validata»:
+  the accepted one), and the discussion is read again after each change, its feed row following it. The author of a
+  discussion, a reply or a comment (`isOwner`) sees «Modifica» and «Elimina» on it, never «Segnala» nor a vote (LC114):
+  «Modifica» edits in the item's place (the discussion's title and text, a reply's or comment's text; the text focused;
+  `PATCH /article-discussions/:id`, `PATCH /article-discussion-comments/:id`; a refusal says the server's words),
+  «Elimina» asks in `ui/wireConfirm/WireConfirm` and then `DELETE`s: `deleted` on a discussion goes back to the list
+  with its row gone (`onDeleted`), `emptied` (others answered) reads it again, its place «cancellata dall'autore».
+  «Commenta» opens a box that takes the focus (`ReplyForm`'s `focusOnOpen`, on a phone too: the keyboard was asked
+  for); the box at the foot never takes it. «Invia risposta» is `IconButton` md, 36 px from md. The discussion and the
+  list trade places through `layout/ViewSlide` (`view` «list» or «thread»). Never «validata»:
   that word waits for an expert's validation. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
   equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
   `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
-  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. While
+  from `md` and, on a phone, the search across with the order, the category («Tutte») and the 44 px refresh under it,
+  wrapping while they do not fit, M1. Since LC114 (omologazione 9 of 14) the order is a choice in a row, as «Ordina» in
+  Pratiche (`ui/SegmentedTabs size="sm"`, no panel: a `radiogroup` named «Ordina i dossier pubblici», «Recenti ·
+  Popolari · Aggiunti»), the category the common `ui/Select` («Filtra per categoria»), the search `ui/Input`; the menus
+  made by hand over the content and their veil are gone. The tabs and «Ricevuti · Inviati» are `SegmentedTabs
+  size="sm"` with 44 px tabs on a phone. Every button of the folder is `Button` or `IconButton`; 4 px for what is
+  pressed or typed in, 8 for what holds things; no duration by hand. `bulletin/forum.guard.test.ts` refuses a bare
+  `<button>`, `<select>` or `<input>` without `bare-button: <reason>` on the line above, the old local looks
+  (`FILTER_BUTTON`, `INPUT`, `ACTION`, `LINK`), a 6, 10 or 16 px radius, a written duration and a new window over the
+  content; the dialogs still there (L-73) are listed and left out of the style checks. While
   Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
   on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
   card that comes leaves a smaller shift upwards). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
-  (`EditSharedEnvironmentModal`) edits its name, description, category and tags only — what it holds changes
-  from the dossier. Content becomes the user's dossiers di studio through one dialog, `StudyImportDialog` (the
+  (`EditSharedEnvironmentPanel`, in the page since LC114, L-73: an `Expand` at the top of «I miei pubblicati», the
+  common fields, not closed while the save travels) edits its name, description, category and tags only — what it
+  holds changes from the dossier. «Suggerisci contenuto» on another's card (`SuggestContentPanel`, LC114, L-73: it
+  was a window with a veil) opens in the page too, an `Expand` at the top of Explore: the focus on the space, Esc,
+  «Chiudi» or «Annulla» close it and the focus goes back to the card's menu; a space left open closes with its tab. Content becomes the user's dossiers di studio through one dialog, `StudyImportDialog` (the
   dossiers listed, notes and highlights as switches, one server request, never an existing dossier changed;
   the toast is `studyImportSentence`): «Ai miei dossier» on a card (`AddToMyDossiersDialog`, `POST
   /shared-environments/:id/download`, then `forum_download` unless the item is the user's own), an environment

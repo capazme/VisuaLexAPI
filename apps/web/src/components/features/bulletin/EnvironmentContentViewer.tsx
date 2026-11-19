@@ -154,6 +154,7 @@ export function EnvironmentContentViewer({
     if (!selectable) return null;
     const checked = isSelected(type, id);
     return (
+      // bare-button: a checkbox, its square drawn, inside a row that opens on its own click.
       <button
         onClick={(e) => { e.stopPropagation(); toggleSelection(type, id); }}
         className="mr-2 flex-shrink-0 hover:text-primary-600 dark:hover:text-primary-400"
@@ -177,10 +178,11 @@ export function EnvironmentContentViewer({
         {stats.dossiers.items.map(dossier => (
           <div key={dossier.id}>
             <div
-              className="flex items-center py-1.5 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+              className="flex items-center py-1.5 px-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
               onClick={() => toggleDossierExpand(dossier.id)}
             >
               {renderCheckbox('dossiers', dossier.id)}
+              {/* bare-button: the row's chevron; the whole row opens the dossier. */}
               <button className="mr-1.5 text-slate-500">
                 {expandedDossiers.has(dossier.id) ? (
                   <ChevronDown size={14} />
@@ -226,7 +228,7 @@ export function EnvironmentContentViewer({
         {stats.quickNorms.items.map(qn => (
           <div
             key={qn.id}
-            className="flex items-center py-1.5 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="flex items-center py-1.5 px-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             {renderCheckbox('quickNorms', qn.id)}
             <Zap size={14} className="mr-2 text-amber-500" />
@@ -260,7 +262,7 @@ export function EnvironmentContentViewer({
           .map(alias => (
             <div
               key={alias.id}
-              className="flex items-center py-1.5 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="flex items-center py-1.5 px-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               {renderCheckbox('aliases', alias.id)}
               <code className="text-xs font-mono bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded mr-2">
@@ -283,7 +285,7 @@ export function EnvironmentContentViewer({
           .map(alias => (
             <div
               key={alias.id}
-              className="flex items-center py-1.5 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="flex items-center py-1.5 px-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               {renderCheckbox('aliases', alias.id)}
               <code className="text-xs font-mono bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded mr-2">
@@ -326,7 +328,7 @@ export function EnvironmentContentViewer({
           {stats.annotations.items.map(ann => (
             <div
               key={ann.id}
-              className="flex items-start py-1.5 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="flex items-start py-1.5 px-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               {renderCheckbox('annotations', ann.id)}
               <MessageSquare size={14} className="mr-2 mt-0.5 text-emerald-500 flex-shrink-0" />
@@ -367,7 +369,7 @@ export function EnvironmentContentViewer({
           {stats.highlights.items.map(hl => (
             <div
               key={hl.id}
-              className="flex items-start py-1.5 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="flex items-start py-1.5 px-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               {renderCheckbox('highlights', hl.id)}
               <div
@@ -396,7 +398,7 @@ export function EnvironmentContentViewer({
   };
 
   return (
-    <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
+    <div className="border border-slate-200 dark:border-slate-700 rounded-[8px] overflow-hidden bg-white dark:bg-slate-900">
       {/* Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 overflow-x-auto">
         {TABS.map(tab => {
@@ -404,6 +406,7 @@ export function EnvironmentContentViewer({
           const isActive = effectiveActiveTab === tab.id;
 
           return (
+            // bare-button: a tab of the viewer's underlined row, with its count.
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}

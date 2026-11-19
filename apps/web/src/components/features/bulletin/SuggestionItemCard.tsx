@@ -32,7 +32,7 @@ export function SuggestionItemCard({ item, actions, footer }: SuggestionItemCard
   const Icon = meta.icon;
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
+    <div className="rounded-[8px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
       <div className="flex items-start gap-3">
         <div className={`mt-0.5 ${meta.colorClass}`}>
           <Icon size={16} />

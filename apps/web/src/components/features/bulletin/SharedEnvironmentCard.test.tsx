@@ -59,8 +59,8 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
   it('gives «Mi piace» and «Aggiungi ai miei dossier» a 44 px touch target on a phone', () => {
     renderCard(base);
     // 44 px on a phone; on a computer as tall as the action beside it (36 px), not the heart's 18.
-    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-9');
-    expect(screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-9');
+    expect(screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ })).toHaveClass('min-h-11', 'md:min-h-9');
   });
 });
 
@@ -114,7 +114,8 @@ describe('SharedEnvironmentCard — its shape (S7a)', () => {
     // «Aggiungi» on a phone, the whole words from sm; the name whole on every width.
     expect(within(add).getByText('Aggiungi', { selector: 'span' })).toHaveClass('sm:hidden');
     expect(within(add).getByText('Aggiungi ai miei dossier')).toHaveClass('hidden', 'sm:inline');
-    expect(add).toHaveClass('border', 'border-primary-600');
+    // The common outlined button (LC114), `Button variant="secondary"`.
+    expect(add).toHaveClass('border', 'border-ink-200');
     expect(add.className).not.toMatch(/bg-primary-600/);
     // Only the like, the action and the «⋯» menu: no counters drawn as bare numbers.
     expect(screen.getAllByRole('button')).toHaveLength(3);

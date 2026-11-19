@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { FolderUp, Upload } from 'lucide-react';
 import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { VersionHistoryModal } from './VersionHistoryModal';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
 import type { SharedEnvironment } from '../../../types';
 
 interface ForumMyEnvironmentsViewProps {
@@ -45,7 +45,7 @@ export function ForumMyEnvironmentsView({
         {[...Array(3)].map((_, i) => (
           <div
             key={i}
-            className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-pulse"
+            className="bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 overflow-hidden animate-pulse"
           >
             <div className="h-10 bg-slate-100 dark:bg-slate-700" />
             <div className="p-4 space-y-3">
@@ -69,13 +69,9 @@ export function ForumMyEnvironmentsView({
         <p className="text-slate-600 dark:text-slate-400 mb-4">
           Non hai ancora pubblicato un dossier nel Forum.
         </p>
-        <button
-          onClick={onPublishClick}
-          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors`}
-        >
-          <Upload size={16} />
+        <Button onClick={onPublishClick} icon={<Upload size={16} aria-hidden />}>
           Pubblica un dossier
-        </button>
+        </Button>
       </div>
     );
   }

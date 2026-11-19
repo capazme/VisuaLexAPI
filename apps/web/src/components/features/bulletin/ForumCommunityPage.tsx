@@ -10,6 +10,11 @@ import { AcceptedMark, AuthorName, COMMUNITY_PATH, CommunityThreadView } from '.
 import { subjectHue } from '../studia/progress/tokens';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
+import { ViewSlide } from '../../layout/ViewSlide';
+import { Button } from '../../ui/Button';
+
+/** The Community's two views: the list, then a discussion opened from it. */
+const COMMUNITY_VIEWS = ['list', 'thread'] as const;
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -70,6 +75,11 @@ export function ForumCommunityPage() {
 
   const firstLoad = loading && items.length === 0;
   const navigate = useNavigate();
+  // The author deleted the open discussion and nothing of it stays: its row goes, and the list comes back.
+  const onDeleted = useCallback((id: string) => {
+    setItems(prev => prev.filter(item => item.id !== id));
+    navigate(COMMUNITY_PATH);
+  }, [navigate]);
   const choose = (next: Materia | '') => {
     setMateria(next);
     // A community chosen while a discussion is open goes back to the list, narrowed.
@@ -84,18 +94,21 @@ export function ForumCommunityPage() {
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10">
         <div className="min-w-0">
           <Communities value={materia} onChange={choose} row />
+          {/* LC114: a discussion opened slides in over the list's place, and the list back the other way (`ViewSlide`, the
+              tokens' 24 px on `ISLAND_OPEN` and `ISLAND_CLOSE`, the fade alone under reduced motion). */}
+          <ViewSlide view={threadId ? 'thread' : 'list'} order={COMMUNITY_VIEWS}>
           {threadId ? (
             <section aria-label="Discussione aperta" className="min-w-0">
-              <CommunityThreadView key={threadId} threadId={threadId} onChanged={onChanged} />
+              <CommunityThreadView key={threadId} threadId={threadId} onChanged={onChanged} onDeleted={onDeleted} />
             </section>
           ) : (
             <section aria-labelledby="community-feed-heading">
               <h2 id="community-feed-heading" className="sr-only">Discussioni</h2>
               {firstLoad && <p role="status" className="text-sm text-slate-600 dark:text-slate-400">Caricamento delle discussioni…</p>}
               {failed && (
-                <div role="alert" className="mb-3 rounded-xl border border-slate-200 p-4 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-300">
+                <div role="alert" className="mb-3 rounded-[8px] border border-slate-200 p-4 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-300">
                   Impossibile caricare le discussioni.{' '}
-                  <button type="button" onClick={() => void load(items.length ? page + 1 : 1)} className={cn('font-semibold underline underline-offset-2', FOCUS_RING)}>Riprova</button>
+                  <Button type="button" variant="link" onClick={() => void load(items.length ? page + 1 : 1)} className="font-semibold">Riprova</Button>
                 </div>
               )}
               {!loading && !failed && items.length === 0 && (
@@ -110,17 +123,13 @@ export function ForumCommunityPage() {
                 </ul>
               )}
               {items.length > 0 && page < pages && !failed && (
-                <button
-                  type="button"
-                  onClick={() => void load(page + 1)}
-                  disabled={loading}
-                  className={cn('mt-4 min-h-[44px] w-full rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
-                >
+                <Button type="button" variant="secondary" onClick={() => void load(page + 1)} disabled={loading} className="mt-4 w-full">
                   Altre discussioni
-                </button>
+                </Button>
               )}
             </section>
           )}
+          </ViewSlide>
         </div>
         <aside aria-label="Comunità" className="hidden lg:block">
           <div className="sticky top-8">
@@ -144,6 +153,7 @@ function Communities({ value, onChange, row = false }: { value: Materia | ''; on
       {all.map(([key, label]) => {
         const on = value === key;
         return (
+          // bare-button: a subject's chip (a pill in the row, a list entry beside the feed), pressed when chosen.
           <button
             key={key || 'tutte'}
             type="button"
@@ -151,7 +161,7 @@ function Communities({ value, onChange, row = false }: { value: Materia | ''; on
             onClick={() => onChange(key)}
             className={cn(
               'flex shrink-0 items-center gap-2 whitespace-nowrap text-left text-sm transition-colors',
-              row ? 'min-h-[44px] rounded-full border px-4' : 'h-9 rounded-lg px-3',
+              row ? 'min-h-[44px] rounded-full border px-4' : 'h-9 rounded-md px-3',
               on
                 ? cn('font-semibold text-slate-900 dark:text-slate-50', row ? 'border-slate-900 bg-ink-300/60 dark:border-slate-200 dark:bg-ink-700/60' : 'bg-ink-300/60 dark:bg-ink-700/60')
                 : cn('font-medium text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800', row && 'border-slate-300 dark:border-slate-700'),
@@ -175,7 +185,7 @@ function FeedRow({ item }: { item: CommunityFeedItem }) {
         to={`${COMMUNITY_PATH}/${encodeURIComponent(item.id)}`}
         // The title first for a screen reader, then what the row says around it.
         aria-label={`${rowTitle(item)}: ${[item.materia && MATERIA_LABEL[item.materia], item.user.username && `di ${item.user.username}`, `su ${sourceLabel(item)}`, count(item.replyCount, 'risposta', 'risposte'), count(item.voteCount, 'voto utile', 'voti utili'), item.acceptedCommentId && 'risposta accettata'].filter(Boolean).join(', ')}`}
-        className={cn('flex gap-4 rounded-lg px-2 py-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-900', FOCUS_RING)}
+        className={cn('flex gap-4 rounded-[8px] px-2 py-4 transition-colors hover:bg-slate-100 dark:hover:bg-slate-900', FOCUS_RING)}
       >
         <span aria-hidden className="flex w-10 shrink-0 flex-col items-center pt-0.5 text-slate-600 dark:text-slate-400">
           <span className="font-serif text-xl leading-none text-slate-900 tabular-nums dark:text-slate-50">{item.voteCount}</span>

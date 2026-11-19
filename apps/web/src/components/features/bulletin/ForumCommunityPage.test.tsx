@@ -17,6 +17,10 @@ const service = vi.hoisted(() => ({
   voteComment: vi.fn(),
   report: vi.fn(),
   reportComment: vi.fn(),
+  editThread: vi.fn(),
+  deleteThread: vi.fn(),
+  editComment: vi.fn(),
+  deleteComment: vi.fn(),
 }));
 vi.mock('../../../services/articleDiscussionService', () => ({ articleDiscussionService: service }));
 
@@ -105,6 +109,13 @@ function thread(over: Partial<CommunityThread> = {}): CommunityThread {
     replies: [],
     ...over,
   };
+}
+
+/** The deletion's question (`WireConfirm`) answers once its buttons are in sight. */
+async function confirmDelete() {
+  const question = await screen.findByRole('alertdialog');
+  await waitFor(() => expect(question).toHaveAttribute('data-ready'));
+  fireEvent.click(within(question).getByRole('button', { name: 'Elimina' }));
 }
 
 const page = (data: CommunityFeedItem[], pages = 1) => ({ data, pagination: { page: 1, limit: 20, total: data.length, pages } });
@@ -399,7 +410,8 @@ describe('ForumCommunityPage: the open discussion', () => {
     expect(await screen.findByRole('button', { name: 'Vota la discussione, 5 voti' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vota la risposta di luigi, 1 voto' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Commenta la risposta di luigi' })).toHaveClass('min-h-11');
-    expect(screen.getByRole('button', { name: 'Invia risposta' })).toHaveClass('min-h-11', 'min-w-11');
+    // LC114: 36 px from md, the common control's height (it was 32).
+    expect(screen.getByRole('button', { name: 'Invia risposta' })).toHaveClass('min-h-11', 'min-w-11', 'md:min-h-9', 'md:min-w-9');
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Scrivi una risposta…' }), { target: { value: 'Una risposta' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invia risposta' }));
@@ -434,6 +446,100 @@ describe('ForumCommunityPage: the open discussion', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Vota la risposta di luigi, 1 voto' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Non puoi votare un tuo contributo');
     expect(screen.queryByText(/Riprova/)).toBeNull();
+  });
+
+  // LC114: the box opened to write in takes the focus, on a phone too; the box always at the foot never does.
+  it('puts the focus in the comment\'s box once «Commenta» opens it', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread({ replies: [reply({ id: 'r1' })] }));
+    renderAt('/forum/community/t1');
+    const heading = await screen.findByRole('heading', { name: 'Risoluzione e inadempimento di scarsa importanza' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    const commenta = screen.getByRole('button', { name: 'Commenta la risposta di luigi' });
+    fireEvent.click(commenta);
+    expect(commenta).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('textbox', { name: 'Scrivi un commento…' })).toHaveFocus();
+  });
+
+  // LC114: on what one wrote, «Modifica» and «Elimina»; never «Segnala» nor a vote.
+  it('gives the author «Modifica» and «Elimina» on their own discussion, reply and comment, and nothing to report or vote', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread({
+      isOwner: true,
+      replies: [reply({ id: 'r1', isOwner: true, comments: [reply({ id: 'c1', parentId: 'r1', isOwner: true, body: 'Mio commento' })] }), reply({ id: 'r2' })],
+    }));
+    renderAt('/forum/community/t1');
+    await screen.findByText('Mio commento');
+    for (const what of ['la discussione', 'la tua risposta', 'il tuo commento']) {
+      expect(screen.getByRole('button', { name: `Modifica ${what}` })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `Elimina ${what}` })).toBeInTheDocument();
+    }
+    // Another's reply: no «Modifica», its «Segnala» and vote stay.
+    expect(screen.getAllByRole('button', { name: /^Modifica / })).toHaveLength(3);
+    expect(screen.queryByRole('button', { name: 'Segnala la discussione' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Segnala / })).toEqual([screen.getByRole('button', { name: 'Segnala la risposta di luigi' })]);
+    expect(screen.queryByRole('button', { name: /^Vota la discussione/ })).toBeNull();
+  });
+
+  it('edits the discussion in its place, the text focused, and reads it again; a refusal says the server\'s words', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread({ isOwner: true }));
+    service.editThread.mockRejectedValueOnce({ status: 400, message: 'Il testo deve avere almeno 3 caratteri' }).mockResolvedValue(undefined);
+    renderAt('/forum/community/t1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Modifica la discussione' }));
+    const form = screen.getByRole('form', { name: 'Modifica la discussione' });
+    const text = within(form).getByRole('textbox', { name: 'Testo' });
+    expect(text).toHaveFocus();
+    expect(within(form).getByRole('textbox', { name: 'Titolo' })).toHaveValue('Risoluzione e inadempimento di scarsa importanza');
+    fireEvent.change(text, { target: { value: 'ok' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il testo deve avere almeno 3 caratteri');
+    fireEvent.change(text, { target: { value: 'Il testo corretto.' } });
+    service.get.mockResolvedValue(thread({ isOwner: true, body: 'Il testo corretto.' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Salva' }));
+    await waitFor(() => expect(service.editThread).toHaveBeenLastCalledWith('t1', { title: 'Risoluzione e inadempimento di scarsa importanza', body: 'Il testo corretto.' }));
+    expect(await screen.findByText('Il testo corretto.')).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Modifica la discussione' })).toBeNull();
+  });
+
+  it('deletes a discussion nothing hangs on: back to the list, its row gone', async () => {
+    service.feed.mockResolvedValue(page([item({ isOwner: true }), item({ id: 't2', title: 'Un\'altra discussione' })]));
+    service.get.mockResolvedValue(thread({ isOwner: true, replyCount: 0 }));
+    service.deleteThread.mockResolvedValue({ outcome: 'deleted' });
+    renderAt('/forum/community/t1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Elimina la discussione' }));
+    await confirmDelete();
+    await waitFor(() => expect(service.deleteThread).toHaveBeenCalledWith('t1'));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/forum\/community$/));
+    const list = await screen.findByRole('list', { name: 'Discussioni' });
+    expect(within(list).queryByText('Risoluzione e inadempimento di scarsa importanza')).toBeNull();
+    expect(within(list).getByText('Un\'altra discussione')).toBeInTheDocument();
+  });
+
+  it('deletes a discussion others answered: emptied, it stays and is read again', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread({ isOwner: true, replies: [reply({ id: 'r1' })] }));
+    service.deleteThread.mockResolvedValue({ outcome: 'emptied' });
+    renderAt('/forum/community/t1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Elimina la discussione' }));
+    service.get.mockResolvedValue(thread({ isOwner: true, deleted: true, title: '', body: '', replies: [reply({ id: 'r1' })] }));
+    await confirmDelete();
+    expect(await screen.findByRole('heading', { name: 'Discussione cancellata dall’autore' })).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/forum/community/t1');
+    expect(screen.getByText('Serve un inadempimento grave.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Elimina la discussione' })).toBeNull();
+  });
+
+  it('deletes one\'s own reply and reads the discussion again', async () => {
+    service.feed.mockResolvedValue(page([]));
+    service.get.mockResolvedValue(thread({ replies: [reply({ id: 'r1', isOwner: true, body: 'La mia risposta' })] }));
+    service.deleteComment.mockResolvedValue({ outcome: 'deleted' });
+    renderAt('/forum/community/t1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Elimina la tua risposta' }));
+    service.get.mockResolvedValue(thread({ replyCount: 0, replies: [] }));
+    await confirmDelete();
+    await waitFor(() => expect(service.deleteComment).toHaveBeenCalledWith('r1'));
+    await waitFor(() => expect(screen.queryByText('La mia risposta')).toBeNull());
   });
 
   it('says when the discussion is not there any more', async () => {

@@ -31,7 +31,7 @@ const KEYS: Record<string, string> = {
     'the courts: one colour per authority on every row of case law (the Corte costituzionale is violet)',
   [join('components', 'features', 'bulletin', 'SuggestionItemCard.tsx')]:
     'the kinds of a suggestion\'s items: notes, highlights, dossiers, quick norms, aliases (purple)',
-  [join('components', 'features', 'bulletin', 'SuggestContentModal.tsx')]:
+  [join('components', 'features', 'bulletin', 'SuggestContentPanel.tsx')]:
     'the same kinds counted before a suggestion is sent: the aliases\' purple',
 };
 

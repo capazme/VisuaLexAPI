@@ -32,14 +32,16 @@ export function ForumTabs({ active, onChange, pendingCount }: ForumTabsProps) {
       value={active}
       onChange={onChange}
       className="w-full sm:w-fit sm:max-w-full"
-      tabClassName="flex-1 whitespace-nowrap px-2 sm:flex-none sm:px-4"
+      // LC114: the small row (it was 52 px with 6 px corners), each tab 44 px to touch on a phone, as Fonti's (LC113).
+      tabClassName="min-h-11 flex-1 whitespace-nowrap px-2 sm:flex-none sm:px-4 md:min-h-8"
+      size="sm"
       tabs={FORUM_TAB_ORDER.map((id) => {
         const { label, short, icon: Icon } = TABS[id];
         return {
           id,
           label: (
             <>
-              <Icon size={16} className="hidden sm:block" aria-hidden />
+              <Icon size={14} className="hidden sm:block" aria-hidden />
               {/* One of the two is drawn: the short label on a phone, the whole one from `sm`. A browser leaves the one
                   not displayed out of the tab's name, which is what the reader sees; jsdom, with no CSS, joins both. */}
               <span className="sm:hidden">{short}</span>

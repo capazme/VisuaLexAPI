@@ -21,6 +21,6 @@ describe('ForumMyEnvironmentsView - nothing published yet', () => {
         onPublishClick={noop}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Pubblica un dossier' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: 'Pubblica un dossier' })).toHaveClass('min-h-11', 'md:min-h-9');
   });
 });

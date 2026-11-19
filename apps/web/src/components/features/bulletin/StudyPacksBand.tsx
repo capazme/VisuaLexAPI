@@ -5,6 +5,7 @@ import { dossierService } from '../../../services/dossierService';
 import { getErrorMessage } from '../../../utils/errors';
 import { loadStudyPacks, packAlreadyAdded, packContent, peekStudyPacks, type StudyPack } from '../../../utils/studyPacks';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
 import { CARD_GRID_COLUMNS } from '../../layout/frame';
 import type { EnvironmentCategory, StudyImportReport } from '../../../types';
 
@@ -17,8 +18,8 @@ interface Props {
   onShown?: () => void;
 }
 
-/** The pack's 44 px controls (S7a): on every width, the cards being small. */
-const ACTION = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 text-sm font-medium';
+/** The pack's 44 px line (S7a): on every width, the cards being small; its button is `Button size="lg"`, 44 px too. */
+const PACK_FOOT = 'inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium';
 /**
  * The band's two layouts (U1 §7), chosen by its own width (`@container` on the section, so the sidebar and the full
  * screen count, not the window): a row of 224 px cards that scrolls sideways, on a phone and wherever fewer than three
@@ -27,7 +28,7 @@ const ACTION = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 te
  * list and the cards held while it loads share it, so the one takes the other's place.
  */
 const LAYOUT = `-mx-1 flex gap-3 px-1 pb-3 pt-1 @min-[61.5rem]:grid @min-[61.5rem]:pb-1 ${CARD_GRID_COLUMNS}`;
-const CARD = 'flex w-56 shrink-0 snap-start flex-col justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm @min-[61.5rem]:w-auto dark:border-slate-700 dark:bg-slate-900';
+const CARD = 'flex w-56 shrink-0 snap-start flex-col justify-between gap-2 rounded-[8px] border border-slate-200 bg-white p-3 shadow-sm @min-[61.5rem]:w-auto dark:border-slate-700 dark:bg-slate-900';
 const BAR = 'rounded bg-slate-100 dark:bg-slate-800';
 /** While the packs load: cards of their size — a name on two lines in the row (the cards stretch to the tallest), on one
  *  in the grid (at 20rem the names fit one, the longest 41 characters), the count, the button's 44 px — as many as the
@@ -121,7 +122,7 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
                 </span>
                 <span className="mt-0.5 flex h-5 items-center text-sm"><span className={cn(BAR, 'h-3 w-16')} /></span>
               </span>
-              <span className={cn(ACTION, 'px-0')}><span className={cn(BAR, 'h-4 w-20')} /></span>
+              <span className={PACK_FOOT}><span className={cn(BAR, 'h-4 w-20')} /></span>
             </div>
           ))}
         </div>
@@ -133,7 +134,7 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
           aria-labelledby="study-packs"
           className={cn(
             LAYOUT,
-            'snap-x overflow-x-auto rounded-xl @min-[61.5rem]:overflow-x-visible',
+            'snap-x overflow-x-auto rounded-[8px] @min-[61.5rem]:overflow-x-visible',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
           )}
         >
@@ -151,23 +152,22 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
                   </span>
                 </span>
                 {added ? (
-                  <span className={cn(ACTION, 'px-0 text-emerald-700 dark:text-emerald-300')}>
+                  <span className={cn(PACK_FOOT, 'text-emerald-700 dark:text-emerald-300')}>
                     <Check size={16} aria-hidden /> Già tra i tuoi dossier
                   </span>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="quiet"
+                    size="lg"
                     onClick={() => void add(pack)}
                     disabled={adding !== null}
                     aria-label={`Aggiungi «${pack.name}» ai miei dossier`}
-                    className={cn(
-                      ACTION,
-                      '-mx-2 self-start text-primary-700 hover:bg-primary-50 disabled:opacity-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                    )}
+                    icon={<FolderPlus size={16} aria-hidden />}
+                    className="-mx-2 gap-1.5 self-start px-2 text-sm text-primary-700 hover:bg-primary-50 hover:text-primary-800 dark:text-primary-300 dark:hover:bg-primary-900/30 dark:hover:text-primary-200"
                   >
-                    <FolderPlus size={16} aria-hidden /> {adding === pack.key ? 'Aggiungo…' : 'Aggiungi'}
-                  </button>
+                    {adding === pack.key ? 'Aggiungo…' : 'Aggiungi'}
+                  </Button>
                 )}
               </li>
             );

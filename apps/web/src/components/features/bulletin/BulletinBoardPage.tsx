@@ -4,8 +4,8 @@ import { Upload } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
-import { SuggestContentModal } from './SuggestContentModal';
-import { EditSharedEnvironmentModal } from './EditSharedEnvironmentModal';
+import { SuggestContentPanel } from './SuggestContentPanel';
+import { EditSharedEnvironmentPanel } from './EditSharedEnvironmentPanel';
 import { SuggestionReviewDialog, type TakeResult } from './SuggestionReviewDialog';
 import { EditSuggestionDialog } from './EditSuggestionDialog';
 import { AliasConflictDialog } from './AliasConflictDialog';
@@ -17,6 +17,7 @@ import { FORUM_PANEL_ID, FORUM_TAB_ORDER } from './forumSections';
 import { SegmentedTabPanel } from '../../ui/SegmentedTabs';
 import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
+import { Button } from '../../ui/Button';
 import { Toast } from '../../ui/Toast';
 import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
 import { useTour } from '../../../hooks/useTour';
@@ -56,8 +57,6 @@ export function BulletinBoardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<EnvironmentCategory | 'all'>('all');
   const [sort, setSort] = useState<SortOption>('newest');
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   // Modals
   const [showPublishModal, setShowPublishModal] = useState(false);
@@ -430,22 +429,22 @@ export function BulletinBoardPage() {
       line="I dossier di studio pubblicati dalla comunità"
       section="forum"
       action={
-        <button
-          id="tour-forum-publish"
-          onClick={() => setShowPublishModal(true)}
-          className="flex min-h-[44px] items-center gap-2 px-4 py-2.5 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 md:min-h-0"
-        >
-          <Upload size={18} />
+        <Button id="tour-forum-publish" onClick={() => setShowPublishModal(true)} icon={<Upload size={16} aria-hidden />}>
           Pubblica un dossier
-        </button>
+        </Button>
       }
     >
 
       {/* The tabs: short labels on a phone, whole from `sm` (S7a). */}
-      <ForumTabs active={activeTab} onChange={setActiveTab} pendingCount={pendingCount} />
+      {/* A space left open in one tab does not wait in it for the next visit. */}
+      <ForumTabs active={activeTab} onChange={(tab) => { setActiveTab(tab); setSuggestingTo(null); setEditingEnv(null); }} pendingCount={pendingCount} />
 
       {/* The view of the chosen tab, shifting the way the mark moved (U1). */}
       <SegmentedTabPanel panelId={FORUM_PANEL_ID} order={FORUM_TAB_ORDER} value={activeTab} className="flex flex-col gap-6">
+        {/* «Suggerisci contenuto» opens here, at the top of Explore, in the page (LC114, L-73). */}
+        {activeTab === 'explore' && (
+          <SuggestContentPanel environment={suggestingTo} onClose={() => setSuggestingTo(null)} onSuggested={handleSuggestComplete} />
+        )}
         {activeTab === 'explore' && (
           <ForumExploreView
             environments={environments}
@@ -458,10 +457,6 @@ export function BulletinBoardPage() {
             setCategory={setCategory}
             sort={sort}
             setSort={setSort}
-            showCategoryDropdown={showCategoryDropdown}
-            setShowCategoryDropdown={setShowCategoryDropdown}
-            showSortDropdown={showSortDropdown}
-            setShowSortDropdown={setShowSortDropdown}
             onSearchSubmit={handleSearchSubmit}
             onRefresh={() => fetchEnvironments(pagination.page)}
             onPaginate={fetchEnvironments}
@@ -478,6 +473,10 @@ export function BulletinBoardPage() {
           />
         )}
 
+        {/* «Modifica» opens here, at the top of «I miei pubblicati», in the page (LC114, L-73). */}
+        {activeTab === 'my' && (
+          <EditSharedEnvironmentPanel environment={editingEnv} onClose={() => setEditingEnv(null)} onUpdated={handleEditComplete} />
+        )}
         {activeTab === 'my' && (
           <ForumMyEnvironmentsView
             environments={myEnvironments}
@@ -534,22 +533,6 @@ export function BulletinBoardPage() {
           environmentId={reportingEnvId}
           onClose={() => setReportingEnvId(null)}
           onReported={handleReportComplete}
-        />
-      )}
-
-      {suggestingTo && (
-        <SuggestContentModal
-          environment={suggestingTo}
-          onClose={() => setSuggestingTo(null)}
-          onSuggested={handleSuggestComplete}
-        />
-      )}
-
-      {editingEnv && (
-        <EditSharedEnvironmentModal
-          environment={editingEnv}
-          onClose={() => setEditingEnv(null)}
-          onUpdated={handleEditComplete}
         />
       )}
 
