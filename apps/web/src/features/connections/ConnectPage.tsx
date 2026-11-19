@@ -82,7 +82,7 @@ export function ConnectPage() {
           <Link2 size={20} aria-hidden /> Collegare un’applicazione a LexCraft
         </h1>
 
-        {state.status === 'loading' && <p className="mt-4 text-sm text-slate-500">Caricamento della richiesta…</p>}
+        {state.status === 'loading' && <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Caricamento della richiesta…</p>}
 
         {state.status === 'redirecting' && (
           <p role="status" className="mt-4 text-sm text-slate-600 dark:text-slate-300">
@@ -100,7 +100,7 @@ export function ConnectPage() {
         {(state.status === 'ready' || state.status === 'deciding') && (
           <div className="mt-4 space-y-4">
             <div>
-              <p className="text-sm text-slate-500">L’applicazione</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">L’applicazione</p>
               <p className="text-base font-semibold text-slate-900 dark:text-white break-words">
                 {state.request.client.name ?? 'Applicazione senza nome'}
               </p>
@@ -156,7 +156,7 @@ export function ConnectPage() {
               </span>
             </p>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Puoi revocare il collegamento, o togliergli il permesso di eliminare, in qualsiasi momento da Impostazioni → Applicazioni collegate.
             </p>
 
