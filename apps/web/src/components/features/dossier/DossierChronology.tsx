@@ -41,31 +41,34 @@ export function DossierChronology({ items, onOpen }: Props) {
           {newestFirst ? 'Dal più vecchio' : 'Dal più recente'}
         </Button>
       </div>
-      {years.map(({ year, entries }) => (
-        <Card key={year} role="region" aria-labelledby={`chronology-${year}`} className="px-3 pb-1 pt-3 md:px-4">
-          <h2 id={`chronology-${year}`} className={SECTION_HEADING}>
-            {year} <span className={SECTION_COUNT}>({entries.length})</span>
-          </h2>
-          <ol className="mt-1">
-            {entries.map((entry) => (
-              <li key={entry.id} className={cn(ROW, 'py-1')}>
-                {/* The row is the command (the consultant on #705): one per fact, no repeated link under each. */}
-                <Button
-                  variant="quiet"
-                  aria-label={`${formatDateItalianLong(entry.date)}, ${SOURCE_LABEL[entry.source]}: ${textOf(entry)} — apri nella pratica`}
-                  className="-mx-2 h-auto w-[calc(100%+1rem)] flex-col items-start justify-start gap-0 px-2 py-1.5 text-left font-normal"
-                  onClick={() => onOpen(entry)}
-                >
-                  <span className={cn(ROW_LINE, 'font-medium')}>
-                    <time dateTime={entry.date}>{formatDateItalianLong(entry.date)}</time> · {SOURCE_LABEL[entry.source]}
-                  </span>
-                  <span className={cn(ROW_TITLE, 'mt-0.5 line-clamp-2 break-words')}>{textOf(entry)}</span>
-                </Button>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      ))}
+      {/* One list, the years its headings (LC145): one card, not one per year. */}
+      <Card className="px-3 pb-1 pt-3 md:px-4">
+        {years.map(({ year, entries }, i) => (
+          <div key={year} className={cn(i > 0 && 'mt-4')}>
+            <h2 id={`chronology-${year}`} className={SECTION_HEADING}>
+              {year} <span className={SECTION_COUNT}>({entries.length})</span>
+            </h2>
+            <ol aria-labelledby={`chronology-${year}`} className="mt-1">
+              {entries.map((entry) => (
+                <li key={entry.id} className={cn(ROW, 'py-1')}>
+                  {/* The row is the command (the consultant on #705): one per fact, no repeated link under each. */}
+                  <Button
+                    variant="quiet"
+                    aria-label={`${formatDateItalianLong(entry.date)}, ${SOURCE_LABEL[entry.source]}: ${textOf(entry)} — apri nella pratica`}
+                    className="-mx-2 h-auto w-[calc(100%+1rem)] flex-col items-start justify-start gap-0 px-2 py-1.5 text-left font-normal"
+                    onClick={() => onOpen(entry)}
+                  >
+                    <span className={cn(ROW_LINE, 'font-medium')}>
+                      <time dateTime={entry.date}>{formatDateItalianLong(entry.date)}</time> · {SOURCE_LABEL[entry.source]}
+                    </span>
+                    <span className={cn(ROW_TITLE, 'mt-0.5 line-clamp-2 break-words')}>{textOf(entry)}</span>
+                  </Button>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))}
+      </Card>
     </div>
   );
 }
