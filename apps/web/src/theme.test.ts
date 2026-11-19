@@ -659,18 +659,10 @@ describe('Gymnasium\'s small motions (S2)', () => {
     expect(ratio(icon, rgb(ground))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('compiles the lesson bar\'s spring, its delay and the head', async () => {
-    const css = await compile([
-      'motion-safe:ease-(--ease-catch)',
-      'motion-safe:delay-[70ms]',
-      'motion-safe:duration-150',
-      'motion-safe:duration-300',
-      'vlx-lesson-head',
-    ]);
-    expect(css).toMatch(/transition-timing-function:\s*var\(--ease-catch\)/);
-    expect(css).toMatch(/--ease-catch:\s*linear\(0,/);
-    expect(css).toMatch(/transition-delay:\s*70ms/);
-    expect(css).toMatch(/\.vlx-lesson-head\s*\{\s*background:\s*var\(--vlx-gymnasium-wash\)/);
+  it('compiles the lesson bar\'s one ink, with no spring left (LC129)', async () => {
+    const css = await compile(['vlx-lesson-ink']);
+    expect(css).toMatch(/\.vlx-lesson-ink\s*\{\s*background:\s*var\(--vlx-gymnasium-bar\)/);
+    expect(css).not.toMatch(/--ease-catch/);
   }, 30000);
 
   it('draws the inked mission and the landing digit, and stills them under reduced motion', async () => {
