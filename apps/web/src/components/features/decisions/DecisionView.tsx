@@ -89,7 +89,7 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
   // The source's own page, only ever over https: the address comes from our server, built on fixed
   // bases, so this is defence in depth.
   const sourceUrl = httpsUrl(answer.fonte.url);
-  const [dossierAnchor, setDossierAnchor] = useState<HTMLElement | null>(null);
+  const [adding, setAdding] = useState(false);
   // In a dossier's «Lettura» (LC55): «Aggiungi a questo dossier», no choice of dossier.
   const hostDossier = useHostDossier();
 
@@ -148,9 +148,10 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
           icon={<FolderPlus size={16} />}
           // 14 px in a dossier's «Lettura», as its rows' commands (the tests of 16-11); 12 elsewhere.
           className={cn(TOUCH_TARGET_RESPONSIVE, hostDossier && 'text-sm/5')}
-          onClick={(e) => (hostDossier
+          aria-expanded={hostDossier ? undefined : adding}
+          onClick={() => (hostDossier
             ? addToThisDossier(hostDossier.id, { sentenza: sentenzaFromDecision(answer.identita, answer.attributi) }, onToast, 'Aggiunta')
-            : setDossierAnchor(e.currentTarget))}
+            : setAdding(true))}
         >
           {hostDossier ? 'Aggiungi a questa pratica' : 'Aggiungi alla pratica'}
         </Button>
@@ -167,6 +168,15 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
         <DecisionDownloads answer={answer} identity={answer.identita} />
         {actions}
       </div>
+      {/* «Aggiungi alla pratica» opens under the commands, in the page (LC125, L-73). The item keeps the identity and
+          the citation computed from what it keeps (source convention, Q9), never the text. */}
+      <AddToDossierPopover
+        isOpen={adding}
+        onClose={() => setAdding(false)}
+        sentenza={sentenzaFromDecision(answer.identita, answer.attributi)}
+        onAdded={(_dossierId, title) => onToast(`Aggiunta a «${title}»`, 'success')}
+        onDuplicate={(title) => onToast(`Già presente in «${title}»`, 'info')}
+      />
       {/* Found without its text: the notice above says so, no empty block is drawn, and the reader's
           notes and highlights on it are listed instead of dropped. */}
       {hasDecisionText(answer.testo)
@@ -182,16 +192,6 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
       <footer className="border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
         Fonte: {answer.fonte.nome}
       </footer>
-      {/* The item keeps the identity and the citation computed from what it keeps (source
-          convention, Q9), never the text. */}
-      <AddToDossierPopover
-        isOpen={dossierAnchor !== null}
-        anchorEl={dossierAnchor}
-        onClose={() => setDossierAnchor(null)}
-        sentenza={sentenzaFromDecision(answer.identita, answer.attributi)}
-        onAdded={(_dossierId, title) => onToast(`Aggiunta a «${title}»`, 'success')}
-        onDuplicate={(title) => onToast(`Già presente in «${title}»`, 'info')}
-      />
     </article>
   );
 }

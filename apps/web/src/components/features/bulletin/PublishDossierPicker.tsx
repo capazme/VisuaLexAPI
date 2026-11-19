@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { useAppStore } from '../../../store/useAppStore';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { kindLabel } from '../dossier/dossierKinds';
-import { PublishDossierDialog } from '../dossier/PublishDossierDialog';
+import { PublishDossierForm } from '../dossier/PublishDossierDialog';
 import type { Dossier } from '../../../types';
 
 interface Props {
@@ -22,19 +22,27 @@ export function PublishDossierPicker({ onClose, onPublished }: Props) {
   const [chosenId, setChosenId] = useState<string | null>(null);
   const chosen = chosenId ? dossiers.find((d) => d.id === chosenId) ?? null : null;
   const candidates = dossiers.filter((d) => !d.published && d.items.length > 0);
+  const headingId = useId();
+  const [busy, setBusy] = useState(false);
 
+  // The Forum's window still holds the dossier's form (L-73: the Forum's PR brings it into the page).
   if (chosen) {
     return (
-      <PublishDossierDialog
-        dossier={chosen}
-        otherDossiers={dossiers}
-        onClose={onClose}
-        onPublished={(message) => {
-          void refreshDossier(chosen.id);
-          onPublished(message);
-        }}
-        onAlreadyPublished={() => void refreshDossier(chosen.id)}
-      />
+      <Modal isOpen onClose={() => { if (!busy) onClose(); }} labelledBy={headingId} size="lg" closeOnBackdrop={false}>
+        <PublishDossierForm
+          dossier={chosen}
+          otherDossiers={dossiers}
+          onClose={onClose}
+          onPublished={(message) => {
+            void refreshDossier(chosen.id);
+            onPublished(message);
+          }}
+          onAlreadyPublished={() => void refreshDossier(chosen.id)}
+          headingId={headingId}
+          busy={busy}
+          setBusy={setBusy}
+        />
+      </Modal>
     );
   }
 

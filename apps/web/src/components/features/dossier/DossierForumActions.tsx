@@ -8,7 +8,6 @@ import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { getErrorMessage } from '../../../utils/errors';
 import { Button } from '../../ui/Button';
-import { PublishDossierDialog } from './PublishDossierDialog';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -17,6 +16,10 @@ interface Props {
   showToast: (message: string, type?: ToastType) => void;
   /** The header's look for a secondary action. */
   buttonClassName: string;
+  /** «Pubblica nel Forum» or «Aggiorna la versione pubblicata»: the host opens the form in the page (LC125, L-73). */
+  onPublish: () => void;
+  /** Whether that form is open, for the command's `aria-expanded`. */
+  publishOpen?: boolean;
 }
 
 /**
@@ -27,11 +30,9 @@ interface Props {
  * withdrew cannot be published or republished (question 190): the button says so. The published copies are the
  * Forum's «Dossier pubblici», so what leaves them says so, not «dal Forum».
  */
-export function DossierForumActions({ dossier, showToast, buttonClassName }: Props) {
-  const dossiers = useAppStore((s) => s.dossiers);
+export function DossierForumActions({ dossier, showToast, buttonClassName, onPublish, publishOpen }: Props) {
   const refreshDossier = useAppStore((s) => s.refreshDossier);
   const navigate = useNavigate();
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const published = dossier.published ?? null;
@@ -82,20 +83,6 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
     />
   );
 
-  const dialog = dialogOpen && (
-    <PublishDossierDialog
-      dossier={dossier}
-      otherDossiers={dossiers}
-      onClose={() => setDialogOpen(false)}
-      onPublished={(message) => {
-        setDialogOpen(false);
-        showToast(message, 'success');
-        void refreshDossier(dossier.id);
-      }}
-      onAlreadyPublished={() => void refreshDossier(dossier.id)}
-    />
-  );
-
   if (!published) {
     return (
       <>
@@ -103,7 +90,8 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
           ref={publishRef}
           type="button"
           variant="secondary"
-          onClick={() => setDialogOpen(true)}
+          onClick={onPublish}
+          aria-expanded={publishOpen}
           disabled={blocked || dossier.items.length === 0}
           title={blocked ? "L'amministrazione l'ha ritirato dai dossier pubblici: non puoi ripubblicarlo." : undefined}
           aria-label={blocked ? 'Ritirato dai dossier pubblici' : 'Pubblica nel Forum'}
@@ -113,7 +101,6 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
           <Upload size={16} aria-hidden />
           <span className="hidden sm:inline" aria-hidden>{blocked ? 'Ritirato dai dossier pubblici' : 'Pubblica nel Forum'}</span>
         </Button>
-        {dialog}
         {confirmation}
       </>
     );
@@ -130,7 +117,7 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
         align="left"
         triggerClassName={buttonClassName}
         items={[
-          { label: 'Aggiorna la versione pubblicata', icon: RefreshCw, onSelect: () => setDialogOpen(true), disabled: busy },
+          { label: 'Aggiorna la versione pubblicata', icon: RefreshCw, onSelect: onPublish, disabled: busy },
           published.isActive
             ? {
                 label: 'Ritira dai dossier pubblici', icon: EyeOff, disabled: busy,
@@ -151,7 +138,6 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
         {published.isActive ? <Globe size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
         <span className="hidden sm:inline">{state}</span>
       </MenuButton>
-      {dialog}
       {confirmation}
     </>
   );

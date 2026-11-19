@@ -12,6 +12,24 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.54.0] - 2026-11-19
+
+A light transition at every change of page, the last windows of Pratiche inside the page, and steadier tests.
+Web only, no migration. MERL-T stays off.
+
+### Interface
+
+- A minimal transition at every change of page, as Luca asked (LC126).
+
+### Work
+
+- The last windows of Pratiche open inside the page (LC125, L-73).
+
+### Tests
+
+- Three flaky tests made steady; the import panel moves its focus and its leave warning in the same commit that
+  draws them (LC122).
+
 ## [1.53.0] - 2026-11-19
 
 The PDF of an act opens inside the page. Web only, no migration. MERL-T stays off.

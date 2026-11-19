@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { FolderInput } from 'lucide-react';
 import { useAppStore, type ImportProgress } from '../../../store/useAppStore';
 import { importReport, importToastType, type ImportCheck } from './dossierUtils';
@@ -90,11 +90,13 @@ function ImportBody({ check, busy, setBusy, onClose, onOpen, showToast }: Omit<P
   const [result, setResult] = useState<Result | null>(null);
   const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [tally, setTally] = useState<Tally | null>(null);
-  // The pressed «Importa» is gone with the outcome: the focus goes to what comes next, a button, never a field.
+  // The pressed «Importa» is gone with the outcome: the focus goes to what comes next, a button, never a field. In the
+  // commit that draws the outcome: a passive effect ran a task later, and the focus was still on the space meanwhile.
   const nextRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (result) nextRef.current?.focus({ preventScroll: true }); }, [result]);
+  useLayoutEffect(() => { if (result) nextRef.current?.focus({ preventScroll: true }); }, [result]);
   // Leaving the page stops the import, and what is not in yet is lost: the browser asks first (L-74, data at stake).
-  useEffect(() => {
+  // Held and let go in the commit that shows or hides «Se lasci la pagina…», as the focus above.
+  useLayoutEffect(() => {
     if (!busy) return undefined;
     const hold = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', hold);
