@@ -2,6 +2,8 @@ import { forwardRef } from 'react';
 import type { HTMLAttributes } from 'react';
 import { cn } from '../../lib/utils';
 import { CARD_RADIUS, CONTROL_RADIUS } from './controlStyles';
+import { Card } from './Card';
+import { CARD_GRID_COLUMNS } from '../layout/frame';
 
 export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'text' | 'circular' | 'rectangular';
@@ -107,65 +109,55 @@ export function ArticleSkeleton({ className }: { className?: string }) {
 }
 
 /**
- * Skeleton for dossier list items
+ * Pratiche's cards while they are read (LC120): the list's own grid (`CARD_GRID_COLUMNS`, its gaps) and cards as tall
+ * as a real one listing its acts (166 px from md, 158 on a phone): a title row as tall as the «⋯» beside it, the acts,
+ * the counts and the date at the foot.
  */
-export function DossierListSkeleton({ count = 3, className }: { count?: number; className?: string }) {
+export function DossierListSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className={cn('space-y-3', className)}>
+    <div aria-hidden className={cn('grid gap-4 md:gap-6', CARD_GRID_COLUMNS)}>
       {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className={cn('p-4 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900', CARD_RADIUS)}
-        >
-          <div className="flex items-start gap-3">
-            {/* Icon */}
-            <Skeleton variant="rectangular" width={40} height={40} />
-
-            {/* Content */}
-            <div className="flex-1 space-y-2">
-              <Skeleton variant="text" width="50%" height={18} />
-              <Skeleton variant="text" width="80%" height={14} />
-              <div className="flex gap-2 pt-1">
-                <Skeleton variant="rectangular" width={60} height={20} className="rounded-full" />
-                <Skeleton variant="rectangular" width={80} height={20} className="rounded-full" />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <Skeleton variant="rectangular" width={24} height={24} />
+        <Card key={i} data-skeleton-card className="flex flex-col p-4 md:p-5">
+          <div className="flex h-10 items-center">
+            <Skeleton variant="text" className="h-5 w-3/5" />
           </div>
-        </div>
+          <div className="mt-3 flex h-5 items-center"><Skeleton variant="text" className="h-3.5 w-4/5" /></div>
+          <div className="mt-auto pt-3">
+            <div className="flex h-5 items-center"><Skeleton variant="text" className="h-3.5 w-2/5" /></div>
+            <div className="mt-1 flex h-4 items-center"><Skeleton variant="text" className="h-3 w-1/3" /></div>
+          </div>
+        </Card>
       ))}
     </div>
   );
 }
 
 /**
- * Skeleton for history list items
+ * Cronologia's rows while they are read (LC120): a day's heading on the paper's band, then the rows as the list draws them, cards on a
+ * phone and rows with a rule under them (71 px) from md.
  */
-export function HistoryListSkeleton({ count = 5, className }: { count?: number; className?: string }) {
+export function HistoryListSkeleton({ count = 5 }: { count?: number }) {
+  const rows = Array.from({ length: count });
   return (
-    <div className={cn('space-y-2', className)}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className={cn('p-3 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900', CARD_RADIUS)}
-        >
-          <div className="flex items-center gap-3">
-            {/* Icon */}
-            <Skeleton variant="circular" width={32} height={32} />
-
-            {/* Content */}
-            <div className="flex-1 space-y-1.5">
-              <Skeleton variant="text" width="60%" height={16} />
-              <Skeleton variant="text" width="30%" height={12} />
-            </div>
-
-            {/* Timestamp */}
-            <Skeleton variant="text" width={60} height={12} />
+    <div aria-hidden>
+      <div className="mb-3 flex h-6 items-center bg-slate-50 md:mb-4 md:h-8 dark:bg-slate-950"><Skeleton variant="text" className="h-3 w-16" /></div>
+      <div className="space-y-2 md:hidden">
+        {rows.map((_, i) => (
+          <div key={i} data-skeleton-row className={cn('border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800', CARD_RADIUS)}>
+            <div className="flex h-6 items-center"><Skeleton variant="text" className="w-2/5" /></div>
+            <div className="mt-1 flex h-5 items-center"><Skeleton variant="text" className="h-3 w-3/5" /></div>
+            <div className="mt-0.5 flex h-4 items-center"><Skeleton variant="text" className="h-2.5 w-1/4" /></div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      <div className="hidden border-t border-slate-200 md:block dark:border-slate-800">
+        {rows.map((_, i) => (
+          <div key={i} data-skeleton-row className="border-b border-slate-200 px-2 py-3 dark:border-slate-800">
+            <div className="flex h-6 items-center"><Skeleton variant="text" className="w-40" /></div>
+            <div className="mt-0.5 flex h-5 items-center"><Skeleton variant="text" className="h-3 w-72 max-w-full" /></div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
