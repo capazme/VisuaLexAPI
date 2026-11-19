@@ -1774,16 +1774,12 @@
 .vlx-practice-switching::view-transition-old(vlx-practice-window-1):only-child { animation-name: vlx-practice-window-out; }
 @keyframes vlx-practice-window-in { from { opacity: 0; translate: 24px 0; } }
 @keyframes vlx-practice-window-out { to { opacity: 0; translate: 24px 0; } }
-/* The new section's title takes the focus after the change; chosen with a pointer it shows no ring. The browser
-   counts that focus, given by the script after a focused menu entry, as visible, so `FOCUS_RING`'s `:focus-visible`
-   alone would draw it. Unlayered, so it wins over the utilities; the attribute goes with the focus. */
-[data-pointer-focus]:focus { outline: none; box-shadow: none; }
 
 /* LC143: what the script focuses but no one operates — a page's title, `<main>`, a region, a notice, a card, a
    paragraph (`tabindex="-1"`) — shows no ring, from a pointer or the keyboard: neither the browser's outline nor a
    `ring-*` utility (its two variables cleared, so a card's own shadow stays). The controls focused by the script
-   (a menu's entries, options, tabs) keep theirs. Unlayered, so it wins over the utilities. */
-[tabindex="-1"]:not(a, button, input, select, textarea, summary, [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"], [role="tab"], [role="treeitem"], [role="gridcell"], [role="radio"], [role="checkbox"], [role="switch"], [role="slider"]):is(:focus, :focus-visible) {
+   (a menu's entries, options, tabs, rows and other roving-tabindex roles) keep theirs. Unlayered, so it wins over the utilities. */
+[tabindex="-1"]:not(a, button, input, select, textarea, summary, [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"], [role="tab"], [role="treeitem"], [role="gridcell"], [role="radio"], [role="checkbox"], [role="switch"], [role="slider"], [role="button"], [role="link"], [role="row"], [role="combobox"]):is(:focus, :focus-visible) {
   outline: none;
   --tw-ring-shadow: 0 0 #0000;
   --tw-ring-offset-shadow: 0 0 #0000;
