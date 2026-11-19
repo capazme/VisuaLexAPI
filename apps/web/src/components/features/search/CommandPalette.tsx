@@ -13,13 +13,16 @@ import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { isNumberedActType } from '../../../utils/sources/numberedActTypes';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
-import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { FOCUS_RING } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
 import { ISLAND_FIELD_FOCUS, ISLAND_LENS, ISLAND_PLACEHOLDER, ISLAND_SHAPE, ISLAND_SURFACE, ISLAND_TEXT, ISLAND_WORDS, SEARCH_FIELD_FORM_ID, SEARCH_ISLAND_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatParsedCitation, isSearchReady, type ParsedCitation } from '../../../utils/citationParser';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
 import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
 import { IslandSurface } from '../../ui/IslandSurface';
 import { Expand } from '../../ui/Expand';
@@ -62,7 +65,7 @@ function requiresDetails(actValue: string): boolean {
 }
 
 // One row of the lists: 44 px, a colour change when chosen, never a lift (UI conventions).
-const ROW = 'relative isolate flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink-800 dark:text-ink-100';
+const ROW = 'relative isolate flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-ink-800 dark:text-ink-100';
 const ROW_ICON = 'shrink-0 text-ink-500 dark:text-ink-400';
 const SUBTLE = 'text-ink-600 dark:text-ink-400';
 // A group's heading, drawn by cmdk (`heading`), which also names the group for a screen reader.
@@ -70,18 +73,6 @@ const GROUP_WITH_HEADING = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading
 // Pietra's type (LC81): a serif title at 18 px and weight 400, as its headings; a group's name 12 px, weight 600.
 const COLUMN_TITLE = 'px-3 pt-3 font-serif text-lg font-normal text-ink-900 dark:text-ink-50';
 const QUIET_LINE = 'px-3 py-2 text-sm text-ink-600 dark:text-ink-400';
-const FIELD_INPUT = cn(
-  'h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-ink-900 placeholder:text-ink-500',
-  FIELD_TEXT,
-  'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50 dark:placeholder:text-ink-500 dark:placeholder:text-ink-400',
-  FOCUS_RING,
-);
-const SMALL_INPUT = cn(
-  'min-h-[44px] rounded-lg border border-ink-200 bg-white px-3 text-ink-900 md:min-h-9',
-  FIELD_TEXT,
-  'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50',
-  FOCUS_RING,
-);
 
 /**
  * The keys cmdk takes for its list wherever they are pressed inside it: Enter (it picks the chosen row
@@ -107,7 +98,7 @@ function RowHighlight({ value, still }: { value: string; still: boolean }) {
   const scope = useContext(ChosenRowScope);
   if (!chosen) return null;
   // A stone tile, as the sidebar's active row (LC32: no edge bar beside it, the anti-slop review).
-  const tint = 'absolute inset-0 -z-10 rounded-lg bg-ink-200 dark:bg-ink-700';
+  const tint = 'absolute inset-0 -z-10 rounded-md bg-ink-200 dark:bg-ink-700';
   return still
     ? <span aria-hidden className={tint} />
     : <motion.span aria-hidden layoutId={`command-palette-chosen-row:${scope}`} transition={spring.snappy} className={tint} />;
@@ -790,36 +781,40 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
         {step !== 'select_act' && (
           // The crumb in the field (R2): the act chosen, which takes you back a step; Backspace on an empty field too.
-          <button
+          <Button
             type="button"
+            variant="quiet"
             onClick={stepBack}
             aria-label={`Torna indietro: ${crumbText}`}
-            className={cn('inline-flex min-h-[44px] max-w-[45%] shrink-0 items-center gap-1 rounded-md bg-ink-100 px-2 text-sm font-medium text-ink-800 hover:bg-ink-200 md:min-h-9 dark:bg-ink-800 dark:text-ink-100 dark:hover:bg-ink-700', FOCUS_RING)}
+            className="max-w-[45%] shrink-0 gap-1 bg-ink-100 px-2 text-ink-800 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-100 dark:hover:bg-ink-700"
           >
             <span className="truncate">{crumbText}</span>
             <ChevronRight size={14} aria-hidden className="shrink-0" />
-          </button>
+          </Button>
         )}
         {step === 'input_details' && (
           <div className="flex min-w-0 flex-1 gap-2 py-1">
-            <input
-              type="text"
-              ref={numberRef}
-              aria-label="Numero dell'atto"
-              placeholder="Numero, es. 241"
-              value={actNumber}
-              onChange={(e) => setActNumber(e.target.value)}
-              className={cn(FIELD_INPUT, 'flex-[1.5]')}
-              autoFocus
-              onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitDetails() : backOnEmpty(e))}
-            />
-            <input
+            <div className="min-w-0 flex-[1.5]">
+              <Input
+                type="text"
+                ref={numberRef}
+                aria-label="Numero dell'atto"
+                placeholder="Numero, es. 241"
+                value={actNumber}
+                onChange={(e) => setActNumber(e.target.value)}
+                className="px-3"
+                autoFocus
+                onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitDetails() : backOnEmpty(e))}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <Input
               type="text"
               aria-label="Anno o data dell'atto"
               value={actDate}
               onChange={(e) => setActDate(e.target.value)}
               placeholder="Anno o data"
-              className={cn(FIELD_INPUT, 'flex-1')}
+              className="px-3"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSubmitDetails();
                 // Backspace on an empty date goes back to the number first, while it holds one.
@@ -828,19 +823,20 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                   numberRef.current?.focus();
                 } else backOnEmpty(e);
               }}
-            />
+              />
+            </div>
           </div>
         )}
 
         {step === 'input_article' && (
           <div className="min-w-0 flex-1 py-1">
-            <input
+            <Input
               type="text"
               aria-label="Numero dell'articolo"
               placeholder="Articolo, es. 12"
               value={article}
               onChange={(e) => setArticle(e.target.value)}
-              className={FIELD_INPUT}
+              className="px-3"
               autoFocus
               onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitArticle() : backOnEmpty(e))}
             />
@@ -849,15 +845,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       </motion.div>
 
       {/* «Chiudi», on a phone too: the panel has no other (R2). */}
-      <button
-        type="button"
+      <IconButton
         onClick={onClose}
         aria-label="Chiudi"
-        // LC81: as tall as the field (40 px, 32 from lg), 44 px to the finger.
-        className={cn("relative inline-flex size-10 shrink-0 items-center justify-center rounded-full text-ink-500 after:absolute after:-inset-0.5 after:content-[''] hover:bg-ink-100 hover:text-ink-800 lg:size-8 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100", FOCUS_RING)}
-      >
-        <X size={18} aria-hidden />
-      </button>
+        icon={<X aria-hidden />}
+        // LC81: as tall as the field, a round beside its pill (40 px, 32 from lg), 44 px to the finger.
+        className="relative size-10 min-h-0 min-w-0 shrink-0 rounded-full after:absolute after:-inset-0.5 after:content-[''] md:min-h-0 md:min-w-0 lg:size-8"
+      />
     </div>
   );
 
@@ -977,14 +971,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           // The heading is as tall as «Gestisci» (44 px on a phone), which sits in it and covers no row.
           className={cn('relative', GROUP_WITH_HEADING, '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:min-h-[44px] [&_[cmdk-group-heading]]:items-end md:[&_[cmdk-group-heading]]:min-h-0')}
         >
-          <button
+          <Button
             type="button"
+            variant="link"
+            size="sm"
             onClick={handleOpenQuickNormsManager}
             onKeyDown={keepKeys}
-            className={cn('absolute right-1 top-0 inline-flex items-center rounded px-2 text-xs font-medium text-toga-700 hover:underline md:top-2 dark:text-toga-300', TOUCH_TARGET_RESPONSIVE, FOCUS_RING)}
+            className="absolute right-3 top-0 md:top-1"
           >
             Gestisci
-          </button>
+          </Button>
           {quickNorms.length === 0 ? (
             <p className={QUIET_LINE}>Nessun preferito: «Aggiungi alle norme rapide», nel menu ⋯ di un articolo, lo porta qui</p>
           ) : (
@@ -1176,6 +1172,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // ── «Filtri avanzati» and the keys ──────────────────────────────────────────────────────────────
   const filtersBlock = (
     <div className="shrink-0 border-t border-ink-100 dark:border-ink-800" onKeyDown={keepKeys}>
+      {/* bare-button: the filters' disclosure, a row the panel's width with what is set at its right end. */}
       <button
         type="button"
         onClick={() => setShowAdvancedFilters(value => !value)}
@@ -1189,32 +1186,31 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         </span>
         <span className={cn('flex items-center gap-1 text-xs', activeFilters > 0 ? 'font-medium text-toga-700 dark:text-toga-300' : SUBTLE)}>
           {activeFiltersLabel(filters)}
-          <ChevronDown size={14} aria-hidden className={cn('transition-[rotate] duration-150 motion-reduce:transition-none', showAdvancedFilters && 'rotate-180')} />
+          <ChevronDown size={14} aria-hidden className={cn('transition-[rotate] duration-(--dur-press) motion-reduce:transition-none', showAdvancedFilters && 'rotate-180')} />
         </span>
       </button>
       {showAdvancedFilters && (
         <div id="command-palette-filters" className="flex flex-wrap items-end gap-x-4 gap-y-3 px-4 pb-3 text-xs">
-          <label className={cn('flex flex-col gap-1', SUBTLE)}>
-            Fonte
-            <select
+          <div className="w-40">
+            <Select
+              label="Fonte"
+              size="sm"
               value={filters.source}
               onChange={(event) => setFilters(previous => ({ ...previous, source: event.target.value as SearchFilters['source'] }))}
-              className={SMALL_INPUT}
             >
               <option value="all">Tutte le fonti</option>
               <option value="normattiva">Normattiva</option>
               <option value="eurlex">EUR-Lex</option>
-            </select>
-          </label>
-          <label className={cn('flex flex-col gap-1', SUBTLE)}>
-            Dall'anno
-            <input type="number" inputMode="numeric" placeholder="1990" value={filters.yearFrom ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearFrom: event.target.value ? Number(event.target.value) : undefined }))} className={cn(SMALL_INPUT, 'w-24')} />
-          </label>
-          <label className={cn('flex flex-col gap-1', SUBTLE)}>
-            All'anno
-            <input type="number" inputMode="numeric" placeholder="2024" value={filters.yearTo ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearTo: event.target.value ? Number(event.target.value) : undefined }))} className={cn(SMALL_INPUT, 'w-24')} />
-          </label>
+            </Select>
+          </div>
+          <div className="w-24">
+            <Input label="Dall'anno" type="number" inputMode="numeric" placeholder="1990" value={filters.yearFrom ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearFrom: event.target.value ? Number(event.target.value) : undefined }))} className="px-3" />
+          </div>
+          <div className="w-24">
+            <Input label="All'anno" type="number" inputMode="numeric" placeholder="2024" value={filters.yearTo ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearTo: event.target.value ? Number(event.target.value) : undefined }))} className="px-3" />
+          </div>
           <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink-800 md:min-h-9 dark:text-ink-100">
+            {/* bare-input: a checkbox inside its label, the label the 44 px target. */}
             <input type="checkbox" className="size-4 accent-toga-600" checked={filters.onlyHistorical} onChange={(event) => setFilters(previous => ({ ...previous, onlyHistorical: event.target.checked }))} />
             Solo versioni storiche
           </label>

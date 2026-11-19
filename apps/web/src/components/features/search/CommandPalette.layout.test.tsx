@@ -476,7 +476,7 @@ describe('CommandPalette — «A portata di mano»', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const group = document.getElementById('command-palette-quick-norms')!;
     expect(group.className).toMatch(/\[&_\[cmdk-group-heading\]\]:min-h-\[44px\]/);
-    expect(within(group).getByRole('button', { name: 'Gestisci' })).toHaveClass('top-0', 'min-h-[44px]');
+    expect(within(group).getByRole('button', { name: 'Gestisci' })).toHaveClass('top-0', 'min-h-11');
   });
 
   it('shows the first six of 30 favourites and of 50 aliases, and the way to all of them', () => {
@@ -680,5 +680,40 @@ describe('CommandPalette — on a phone, the focus back (R2)', () => {
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     await waitFor(() => expect(opener).toHaveFocus());
     opener.remove();
+  });
+});
+
+// LC113: the palette's fields are the common `Input` and `Select`; the box, the arrows and Enter are cmdk's, as before.
+describe('CommandPalette — on the common controls (LC113)', () => {
+  it('opens with the focus in the box; the arrows move the chosen row and Enter picks it', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Costituzione · Cost.' })).toHaveAttribute('aria-selected', 'true'));
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Legge · l.' })).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Torna indietro: Legge' })).toBeInTheDocument();
+    // The act's number, an `Input`, takes the focus for the next words.
+    expect(screen.getByRole('textbox', { name: "Numero dell'atto" })).toHaveFocus();
+  });
+
+  it('keeps Enter and the arrows in the filters\' `Select` and `Input`: the list does not move', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: /Filtri avanzati/ }));
+    const source = screen.getByRole('combobox', { name: 'Fonte' });
+    expect(source.tagName).toBe('SELECT');
+    expect(source).toHaveClass('appearance-none', 'rounded-md');
+    const year = screen.getByRole('spinbutton', { name: "Dall'anno" });
+    expect(year).toHaveClass('rounded-md');
+    for (const field of [source, year]) {
+      field.focus();
+      await user.keyboard('{ArrowDown}{Enter}');
+    }
+    expect(screen.getByRole('option', { name: 'Costituzione · Cost.' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('button', { name: /^Torna indietro/ })).toBeNull();
   });
 });

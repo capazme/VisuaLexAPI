@@ -828,9 +828,9 @@ describe('CommandPalette — sizes on a phone (the owner\'s pass of 20 October 2
   it('gives the crumb and «Gestisci» 44 px on a phone, and names the close button', async () => {
     appStore.setState({ quickNorms: [] });
     renderPalette();
-    expect(screen.getByRole('button', { name: 'Gestisci' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: 'Gestisci' })).toHaveClass('min-h-11', 'md:min-h-8');
     fireEvent.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
-    expect(await screen.findByRole('button', { name: 'Torna indietro: Codice civile' })).toHaveClass('min-h-[44px]');
+    expect(await screen.findByRole('button', { name: 'Torna indietro: Codice civile' })).toHaveClass('min-h-11');
     // LC81: as tall as the field (40 px), 44 px to the finger.
     expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('size-10', 'after:-inset-0.5');
   });
