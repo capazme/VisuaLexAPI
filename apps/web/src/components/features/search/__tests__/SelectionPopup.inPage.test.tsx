@@ -7,22 +7,34 @@ import { BlockSpace } from '../BlockSpace';
 const FIRST = 'Qualunque fatto doloso o colposo.';
 const SECOND = 'Obbliga colui che ha commesso il fatto a risarcire il danno.';
 
-function Harness({ onCopy = vi.fn(), onHighlight = vi.fn() }: { onCopy?: (text: string) => void; onHighlight?: () => void }) {
+interface HarnessProps {
+  onCopy?: (text: string) => void;
+  onHighlight?: () => void;
+  /** The reader stops asking for the actions (a passage being moved). */
+  bar?: boolean;
+  /** A text drawn flat: no paragraph to open under. */
+  flat?: boolean;
+  /** The paragraph the other space opens under. */
+  otherAt?: number;
+}
+
+function Harness({ onCopy = vi.fn(), onHighlight = vi.fn(), bar = true, flat = false, otherAt = 1 }: HarnessProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   // Another space of the same text (a block's annotations), for «one at a time».
   const [other, setOther] = useState<number | null>(null);
   return (
     <div ref={containerRef} data-testid="container">
-      <SelectionPopup inPage containerRef={containerRef} textRootRef={textRef} onHighlight={onHighlight} onAddNote={vi.fn()} onCopy={onCopy} />
+      {bar && <SelectionPopup inPage containerRef={containerRef} textRootRef={textRef} onHighlight={onHighlight} onAddNote={vi.fn()} onCopy={onCopy} />}
       <div ref={textRef}>
-        <div className="vlx-b vlx-comma">{FIRST}</div>
-        <div className="vlx-b vlx-comma">{SECOND}</div>
+        <div className={flat ? undefined : 'vlx-b vlx-comma'}>{FIRST}</div>
+        <div className={flat ? undefined : 'vlx-b vlx-comma'}>{SECOND}</div>
       </div>
+      <textarea aria-label="Una nota" />
       <BlockSpace
         value={other}
         rootRef={textRef}
-        block={(root) => root.querySelectorAll<HTMLElement>('.vlx-b')[1]}
+        block={(root) => root.querySelectorAll<HTMLElement>('.vlx-b')[otherAt]}
         onClose={() => setOther(null)}
         title={() => 'Annotazioni'}
       >
@@ -111,5 +123,71 @@ describe('SelectionPopup in the page (LC142, L-73): the actions under the paragr
     fireEvent.mouseUp(within(space).getByRole('button', { name: 'Copia' }));
     await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
     expect(screen.getByRole('region', { name: 'Testo selezionato' })).toBe(space);
+  });
+
+  it('H and N typed in a field are letters, not shortcuts', async () => {
+    const onHighlight = vi.fn();
+    render(<Harness onHighlight={onHighlight} />);
+    await select('fatto doloso', FIRST);
+    const field = screen.getByRole('textbox', { name: 'Una nota' });
+    field.focus();
+    fireEvent.keyDown(field, { key: 'h' });
+    expect(onHighlight).not.toHaveBeenCalled();
+    expect(screen.getByRole('region', { name: 'Testo selezionato' })).toBeInTheDocument();
+  });
+
+  it('a selection across another space open in the text copies the article\'s words alone', async () => {
+    const onCopy = vi.fn();
+    render(<Harness onCopy={onCopy} otherAt={0} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri le annotazioni' }));
+    await screen.findByRole('region', { name: 'Annotazioni' });
+    // From the first paragraph to the second, across the space open between them.
+    const from = screen.getByText(FIRST).firstChild as Text;
+    const to = screen.getByText(SECOND).firstChild as Text;
+    const range = document.createRange();
+    range.setStart(from, FIRST.indexOf('colposo'));
+    range.setEnd(to, 'Obbliga'.length);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    fireEvent.mouseUp(screen.getByTestId('container'));
+    const space = await screen.findByRole('region', { name: 'Testo selezionato' });
+    fireEvent.click(within(space).getByRole('button', { name: 'Copia' }));
+    expect(onCopy).toHaveBeenCalledWith('colposo.Obbliga');
+  });
+
+  it('a selection ending inside a space is not the text\'s: nothing opens', async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apri le annotazioni' }));
+    const other = await screen.findByRole('region', { name: 'Annotazioni' });
+    const note = within(other).getByText('Le note del comma').firstChild as Text;
+    const range = document.createRange();
+    range.setStart(screen.getByText(SECOND).firstChild as Text, 0);
+    range.setEnd(note, 3);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    fireEvent.mouseUp(screen.getByTestId('container'));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull();
+  });
+
+  it('a text drawn flat keeps the bar over the selection', async () => {
+    render(<Harness flat />);
+    const node = screen.getByText(FIRST).firstChild as Text;
+    const range = document.createRange();
+    range.setStart(node, 0);
+    range.setEnd(node, 10);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    fireEvent.mouseUp(screen.getByTestId('container'));
+    expect(await screen.findByTitle('Aggiungi nota (N)')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Testo selezionato' })).toBeNull();
+  });
+
+  it('leaves the text when its reader stops asking for it', async () => {
+    const { rerender } = render(<Harness />);
+    await select('fatto doloso', FIRST);
+    expect(document.querySelectorAll('[data-reader-slot]')).toHaveLength(1);
+    rerender(<Harness bar={false} />);
+    expect(document.querySelectorAll('[data-reader-slot]')).toHaveLength(0);
   });
 });

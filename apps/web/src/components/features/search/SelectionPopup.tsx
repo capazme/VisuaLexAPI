@@ -4,7 +4,8 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_ICON_ON_DARK, highlightColorName } from '../../../utils/highlightColors';
 import { useAppStore } from '../../../store/useAppStore';
-import { getSelectionAnchor, inReaderSlot } from '../../../utils/selectionOffset';
+import { getSelectionAnchor, inReaderSlot, READER_SLOT_ATTR } from '../../../utils/selectionOffset';
+import { isEditableTarget } from '../../ui/notifications/undoShortcut';
 import { getInkAnchor } from '../../../utils/inkSelection';
 import type { Ink } from '../../../utils/highlighterRules';
 import { registerInkTarget, type NoteKind } from '../../../utils/inkTargets';
@@ -243,7 +244,8 @@ export function SelectionPopup({
         text: anchor.text,
         startOffset: anchor.startOffset,
         ink: inkAnchor,
-        displayText: rawSelected.trim(),
+        // Across a space open in the text, the words as seen hold the space's too: the article's alone, then.
+        displayText: crossesSlot(range, textRootRef?.current ?? containerRef.current) ? anchor.text : rawSelected.trim(),
         block: inPage ? blockOf(range.endContainer, textRootRef?.current ?? containerRef.current) : null,
       });
     }, 10);
@@ -302,6 +304,8 @@ export function SelectionPopup({
     if (!popup.visible) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Typed in a field (a note being written in a space open in the text, or anywhere else): not a shortcut.
+      if (isEditableTarget(e.target)) return;
       if (e.key === 'Escape') {
         hidePopup();
         window.getSelection()?.removeAllRanges();
@@ -382,7 +386,9 @@ export function SelectionPopup({
     }
   };
 
-  if (inPage) {
+  // In the page where the selection is in a paragraph; a text drawn flat has none, and keeps the bar.
+  const spaced = inPage && popup.block !== null;
+  if (inPage && (spaced || !popup.visible)) {
     const close = () => {
       hidePopup();
       window.getSelection()?.removeAllRanges();
@@ -390,7 +396,7 @@ export function SelectionPopup({
     return (
       <BlockSpace
         // The same selection released again (a press on its own words) is the same space.
-        value={popup.visible ? `${popup.startOffset}:${popup.text.length}` : null}
+        value={popup.visible && spaced ? `${popup.startOffset}:${popup.text.length}` : null}
         rootRef={textRootRef ?? containerRef}
         block={() => (popup.block?.isConnected ? popup.block : null)}
         onClose={close}
@@ -567,16 +573,14 @@ export function SelectionPopup({
   );
 }
 
-/**
- * The block a selection ends in, the space's place: an article's comma or item, a decision's paragraph; in a text drawn
- * flat, the root's child that holds it.
- * shortcut: a flat text is one child, so its space opens at the end of the text; upgrade if flat texts grow long.
- */
+/** The block a selection ends in, the space's place: an article's comma or item, a decision's paragraph. */
 function blockOf(node: Node, root: HTMLElement | null): HTMLElement | null {
   const el = node instanceof HTMLElement ? node : node.parentElement;
-  const block = el?.closest<HTMLElement>('.vlx-b, .vlx-dec-para');
-  if (block) return block;
-  let at: HTMLElement | null = el ?? null;
-  while (at && at.parentElement && at.parentElement !== root) at = at.parentElement;
-  return at && at !== root && at.parentElement === root ? at : null;
+  const block = el?.closest<HTMLElement>('.vlx-b, .vlx-dec-para') ?? null;
+  return block && root?.contains(block) ? block : null;
+}
+
+/** Whether a range runs across a space open in the text (`BlockSpace`). */
+function crossesSlot(range: Range, root: HTMLElement | null): boolean {
+  return Array.from(root?.querySelectorAll(`[${READER_SLOT_ATTR}]`) ?? []).some((slot) => !!slot.textContent && range.intersectsNode(slot));
 }

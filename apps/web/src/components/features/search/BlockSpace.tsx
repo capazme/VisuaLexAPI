@@ -50,7 +50,8 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const root = rootRef.current;
-    const target = root && shown !== null ? findBlock(root, shown) : null;
+    // Closed, it is not put back: a redraw takes it out of the text.
+    const target = root && shown !== null && (value !== null || placed !== null) ? findBlock(root, shown) : null;
     if (root && target) blockPath.current = pathOf(root, target);
     if (target && host.previousElementSibling !== target) {
       const lost = !host.isConnected;
@@ -62,6 +63,9 @@ export function BlockSpace<T extends string | number>({ value, rootRef, block, t
     if (value !== null && placed !== value && host.isConnected) setPlaced(value);
     if (value === null && placed !== null) setPlaced(null);
   });
+
+  // Gone with its reader (a reader that stops asking for a selection's actions), it leaves the text.
+  useEffect(() => () => host.remove(), [host]);
 
   // One at a time: an opening says so, and the others open in the same text close.
   const closeRef = useRef(onClose);
