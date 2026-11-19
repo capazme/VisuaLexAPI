@@ -1,18 +1,13 @@
 /**
  * CitationPreviewPopup - Popup hover per preview di citazioni normative.
  *
- * Mostra il contenuto dell'articolo citato con opzione per aprirlo nella pratica.
+ * Mostra le prime righe dell'articolo citato.
  */
 
-import { useCallback } from 'react';
-import { ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import type { ArticleData } from '../../types';
 import type { ParsedCitationData } from '../../utils/citationMatcher';
 import { formatCitationLabel } from '../../utils/citationMatcher';
-import type { NerFeedbackType, NerCorrectReference } from '../../services/merltService';
-import { CitationNerFeedback } from '../../features/merlt/ner/CitationNerFeedback';
-import { cn } from '../../lib/utils';
-import { CONTROL_RADIUS } from './controlStyles';
 import { PreviewFrame } from './PreviewFrame';
 
 interface CitationPreviewPopupProps {
@@ -23,17 +18,14 @@ interface CitationPreviewPopupProps {
   article: ArticleData | null;
   position: { top: number; left: number };
   onClose: () => void;
-  onOpenCitation: (citation: ParsedCitationData) => void;
-  /** The open button's words, when the host opens the norm elsewhere than in a practice (the dossier's own norms). */
-  openLabel?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  /** When true (full-consent contributor), show the NER ✓/✗/Correggi bar. */
-  nerFeedbackEnabled?: boolean;
-  /** Emit a NER correction/confirmation for the previewed citation. */
-  onNerFeedback?: (feedbackType: NerFeedbackType, correctReference?: NerCorrectReference) => void;
 }
 
+/**
+ * A pure tooltip on hover (LC142, L-74): the cited article's first lines, nothing to press or scroll. The click on the
+ * citation opens it beside the text. Its «Apri» button and the NER feedback (dev mode) left it: see the PR's queue.
+ */
 export function CitationPreviewPopup({
   isVisible,
   isLoading,
@@ -42,21 +34,9 @@ export function CitationPreviewPopup({
   article,
   position,
   onClose,
-  onOpenCitation,
-  openLabel = 'Apri sul tavolo',
   onMouseEnter,
   onMouseLeave,
-  nerFeedbackEnabled,
-  onNerFeedback,
 }: CitationPreviewPopupProps) {
-  const handleOpen = useCallback(() => {
-    if (citation) {
-      onOpenCitation(citation);
-      onClose();
-    }
-  }, [citation, onOpenCitation, onClose]);
-
-  // Formatta il testo dell'articolo per l'anteprima (senza troncamento)
   const getPreviewText = () => {
     if (!article?.article_text) return null;
 
@@ -86,33 +66,6 @@ export function CitationPreviewPopup({
       onClose={onClose}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      footer={
-        /* Open button (primary) + NER feedback below it (design §3.7) */
-        <>
-          <button
-            onClick={handleOpen}
-            disabled={isLoading}
-            className={cn(
-              "w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium transition-colors", CONTROL_RADIUS,
-              "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 hover:bg-primary-700 text-white",
-              "disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed",
-              "dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
-            )}
-          >
-            <ExternalLink size={14} />
-            {openLabel}
-          </button>
-          {citation && nerFeedbackEnabled && onNerFeedback && (
-            <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-              <CitationNerFeedback
-                key={`${citation.act_type}-${citation.article}-${citation.act_number ?? ''}`}
-                citation={citation}
-                onSubmit={onNerFeedback}
-              />
-            </div>
-          )}
-        </>
-      }
     >
       {isLoading && (
         <div className="flex items-center justify-center gap-2 py-8 text-slate-500 dark:text-slate-400">
@@ -131,7 +84,7 @@ export function CitationPreviewPopup({
       {!isLoading && !error && article && (
         <div className="space-y-3">
           {/* Article preview - scrollable without truncation */}
-          <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed max-h-[300px] overflow-y-auto custom-scrollbar whitespace-pre-wrap">
+          <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-6 whitespace-pre-wrap">
             {getPreviewText() || (
               <span className="text-slate-400 italic">Nessun contenuto disponibile</span>
             )}

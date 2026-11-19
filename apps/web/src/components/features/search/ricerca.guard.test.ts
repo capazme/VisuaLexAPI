@@ -50,4 +50,15 @@ describe('Search and reader, the common components', () => {
     ));
     expect(windows).toEqual([...WINDOWS, ...CONFIRMATIONS, ...ALLOWED].sort());
   });
+
+  // L-74 (LC142): the citation previews on hover are allowed over the text as pure tooltips (`role="tooltip"`): words
+  // only, nothing to press or scroll. The click on the citation opens the norm or the decision beside the text.
+  it('keeps the citation previews pure tooltips', () => {
+    const UI = resolve(process.cwd(), 'src/components/ui');
+    for (const name of ['CitationPreviewPopup.tsx', 'DecisionPreviewPopup.tsx']) {
+      const source = readFileSync(join(UI, name), 'utf8');
+      // The scroll is checked by their own tests: the list's dialog shares the decision's body and keeps it.
+      expect(source, name).not.toMatch(/<button|<Button|onClick|footer=/);
+    }
+  });
 });
