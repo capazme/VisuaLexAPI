@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Search, CheckSquare, Square, TreeDeciduous } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Select } from '../../ui/Select';
@@ -8,15 +8,20 @@ import { resolveAct } from '../../../utils/actUrn';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
 import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
 import { legalFetch } from '../../../services/legalFetch';
+import { Expand } from '../../ui/Expand';
+import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
+import { cn } from '../../../lib/utils';
 
 
 interface ActIdentity { tipo_atto: string; data: string; numero_atto: string }
 
 interface Props {
+  open: boolean;
   onClose: () => void;
   onImport: (articles: { numero: string; urn?: string }[], normInfo: ActIdentity) => void;
   /** Open on this act's index at once ("+ articoli" of a dossier's act block). */
   initialAct?: ActIdentity;
+  className?: string;
 }
 
 // The act types the form offers; an act opened from a dossier may be another.
@@ -37,7 +42,21 @@ const ACT_TYPE_OPTIONS: { value: string; label: string }[] = [
 
 type TreeEntry = string | Record<string, string>;
 
-export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
+/**
+ * «Importa articoli da norma» in the page (LC125, L-73): a space under the header's «Aggiungi» (`Expand`), never over
+ * the content. The focus lands on the space, never in a field; Esc closes it and the focus goes back to the command.
+ */
+export function TreeNavigatorModal({ open, className, ...rest }: Props) {
+  const headingId = useId();
+  return (
+    <Expand open={open} onClose={rest.onClose} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
+      {/* Closed, `Expand` draws nothing: opened again, the form starts afresh (and an act's index is read again). */}
+      <TreeNavigatorForm {...rest} headingId={headingId} />
+    </Expand>
+  );
+}
+
+function TreeNavigatorForm({ onClose, onImport, initialAct, headingId }: Omit<Props, 'open' | 'className'> & { headingId: string }) {
   const [actType, setActType] = useState(initialAct?.tipo_atto ?? 'codice civile');
   const [actNumber, setActNumber] = useState(initialAct?.numero_atto ?? '');
   const [actDate, setActDate] = useState(initialAct?.data ?? '');
@@ -146,17 +165,13 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-lg max-h-[85vh] border border-slate-200 dark:border-slate-800 flex flex-col">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-800">
-          <h3 className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
-            <TreeDeciduous size={20} className="text-green-600" />
-            Importa articoli da norma
-          </h3>
-        </div>
+    <div>
+        <h2 id={headingId} className="flex items-center gap-2 px-4 pt-4 text-base font-semibold text-slate-900 md:px-5 md:pt-5 dark:text-slate-50">
+          <TreeDeciduous size={18} aria-hidden className="text-green-600" />
+          Importa articoli da norma
+        </h2>
 
-        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+        <div className="space-y-4 p-4 md:p-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <Select label="Tipo atto" value={actType} onChange={(e) => setActType(e.target.value)}>
@@ -187,7 +202,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
           )}
 
           {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-md text-sm">
               {error}
             </div>
           )}
@@ -202,7 +217,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
                   {allSelected ? 'Deseleziona tutti' : 'Seleziona tutti'}
                 </Button>
               </div>
-              <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-md divide-y divide-slate-100 dark:divide-slate-800">
                 {tree.map((item, idx) => {
                   const articleNum = typeof item === 'string' ? item : Object.keys(item)[0];
                   const selected = selectedArticles.has(articleNum);
@@ -228,7 +243,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+        <div className="flex justify-end gap-3 px-4 pb-4 md:px-5 md:pb-5">
           <Button variant="quiet" onClick={onClose}>
             Annulla
           </Button>
@@ -236,8 +251,6 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
             Importa {selectedArticles.size > 0 ? `(${selectedArticles.size})` : ''}
           </Button>
         </div>
-
-      </div>
     </div>
   );
 }

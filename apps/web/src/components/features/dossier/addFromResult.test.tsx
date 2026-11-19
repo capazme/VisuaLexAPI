@@ -52,9 +52,9 @@ describe('«Aggiungi alla pratica» on a row of the Ricerca (LC59)', () => {
   it('an article row has the command, with its name, and it opens the dossier choice', () => {
     render(row({ norma: NORMA }));
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica art. 2043 c.c.' }));
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Aggiungi alla pratica')).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: /Sinistro Rossi/ }));
+    const space = screen.getByRole('region', { name: 'Aggiungi alla pratica' });
+    expect(within(space).getByText('Aggiungi alla pratica')).toBeInTheDocument();
+    fireEvent.click(within(space).getByRole('button', { name: /Sinistro Rossi/ }));
     const held = appStore.getState().dossiers.find((d) => d.id === 'a')!.items;
     expect(held).toHaveLength(1);
     expect(held[0]).toMatchObject({ type: 'norma', data: expect.objectContaining({ numero_articolo: '2043' }) });
@@ -63,7 +63,7 @@ describe('«Aggiungi alla pratica» on a row of the Ricerca (LC59)', () => {
   it('a decision row adds the decision', () => {
     render(row({ sentenza: SENTENZA }, 'Cass. civ., n. 24908/2026'));
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica Cass. civ., n. 24908/2026' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Studio GDPR/ }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Aggiungi alla pratica' })).getByRole('button', { name: /Studio GDPR/ }));
     expect(appStore.getState().dossiers.find((d) => d.id === 'b')!.items[0]).toMatchObject({ type: 'sentenza', data: expect.objectContaining({ numero: 24908 }) });
   });
 
@@ -74,7 +74,7 @@ describe('«Aggiungi alla pratica» on a row of the Ricerca (LC59)', () => {
     // The toggle's name replaces its content: the mark's words are in it.
     expect(screen.getByRole('button', { name: 'Espandi art. 2043 c.c., nella pratica «Sinistro Rossi»' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica art. 2043 c.c.' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Studio GDPR/ }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Aggiungi alla pratica' })).getByRole('button', { name: /Studio GDPR/ }));
     expect(screen.getByText('In 2 pratiche')).toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe('«Aggiungi alla pratica» on a row of the Ricerca (LC59)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Azioni su art. 2043 c.c.' }));
     expect(screen.getByRole('menuitem', { name: /Togli dal tavolo/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: /Aggiungi alla pratica/ }));
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Aggiungi alla pratica' })).toBeInTheDocument();
   });
 
   it('writes nothing in the browser: no practice made or changed, the saved workspace untouched', () => {
@@ -104,7 +104,7 @@ describe('«Aggiungi alla pratica» on a row of the Ricerca (LC59)', () => {
     expect(saved).not.toBeNull();
     render(row({ norma: NORMA }));
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica art. 2043 c.c.' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sinistro Rossi/ }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Aggiungi alla pratica' })).getByRole('button', { name: /Sinistro Rossi/ }));
     const after = appStore.getState();
     expect(after.practices).toBe(before.practices);
     expect(after.activePracticeId).toBe(before.activePracticeId);
@@ -133,7 +133,7 @@ describe('«Aggiungi alla pratica» on a hit of case law (LC59)', () => {
   it('has the command with its name, and adds the decision', () => {
     hit();
     fireEvent.click(screen.getByRole('button', { name: 'Aggiungi alla pratica Cass. civ., n. 24908/2026' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Sinistro Rossi/ }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Aggiungi alla pratica' })).getByRole('button', { name: /Sinistro Rossi/ }));
     expect(appStore.getState().dossiers.find((d) => d.id === 'a')!.items[0]).toMatchObject({ type: 'sentenza' });
     expect(screen.getByText('Nella pratica «Sinistro Rossi»')).toBeInTheDocument();
   });

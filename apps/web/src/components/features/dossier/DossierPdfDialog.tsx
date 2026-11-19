@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '../../ui/Button';
-import { Modal } from '../../ui/Modal';
+import { Expand } from '../../ui/Expand';
+import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
+import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { SentenzaItem } from './dossierLayout';
 import { decisionCitationOf } from './dossierUtils';
@@ -22,6 +24,7 @@ interface Props {
   /** Set while the PDF is being prepared. */
   progress: { done: number; total: number } | null;
   onExport: (options: DossierPdfOptions) => void;
+  className?: string;
 }
 
 const RADIO = 'h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
@@ -29,13 +32,14 @@ const OPTION = `flex items-start gap-2 rounded text-sm text-slate-700 dark:text-
 
 /**
  * «Esporta → PDF»: what to print (the full texts or only the marked passages) and which decisions
- * go in. The dialog only asks; `DossierDetailView` loads the texts and writes the file.
+ * go in. It only asks; `DossierDetailView` loads the texts and writes the file. In the page (LC125, L-73): a space
+ * under the header's «Esporta» (`Expand`); the focus on the space, Esc closes it and gives the focus back.
  */
-export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExport }: Props) {
+export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExport, className }: Props) {
   const [excerpts, setExcerpts] = useState(false);
   // What the reader un-ticked: a decision added meanwhile starts ticked, one removed just vanishes.
   const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
-  const firstRadio = useRef<HTMLInputElement>(null);
+  const headingId = useId();
   const busy = progress !== null;
   const chosen = decisions.filter((d) => !left.has(d.id));
 
@@ -47,35 +51,20 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
   });
 
   return (
-    <Modal
-      isOpen={isOpen}
+    <Expand
+      open={isOpen}
       // The file is on its way: closing now would hide the progress and the toast of a PDF still being made.
-      onClose={() => { if (!busy) onClose(); }}
-      title="Esporta in PDF"
-      size="md"
-      initialFocusRef={firstRadio}
-      footer={(
-        <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
-            Annulla
-          </Button>
-          <Button
-            variant="primary"
-            icon={<Download size={16} aria-hidden />}
-            disabled={busy}
-            onClick={() => onExport({ excerpts, decisionIds: chosen.map((d) => d.id) })}
-          >
-            Scarica PDF
-          </Button>
-        </>
-      )}
+      onClose={busy ? undefined : onClose}
+      role="region"
+      aria-labelledby={headingId}
+      className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}
     >
-      <div className="space-y-5">
+      <div className="space-y-5 p-4 md:p-5">
+        <h2 id={headingId} className="text-base font-semibold text-slate-900 dark:text-slate-50">Esporta in PDF</h2>
         <fieldset className="space-y-1">
           <legend className="mb-1 text-sm font-semibold text-slate-900 dark:text-slate-100">Cosa stampare</legend>
           <label className={OPTION}>
             <input
-              ref={firstRadio}
               type="radio"
               name="dossier-pdf-scope"
               className={`${RADIO} mt-0.5`}
@@ -132,7 +121,20 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
         <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
           {progress ? `Preparo il PDF…${progress.total > 0 ? ` ${progress.done} di ${progress.total}` : ''}` : ''}
         </p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Annulla
+          </Button>
+          <Button
+            variant="primary"
+            icon={<Download size={16} aria-hidden />}
+            disabled={busy}
+            onClick={() => onExport({ excerpts, decisionIds: chosen.map((d) => d.id) })}
+          >
+            Scarica PDF
+          </Button>
+        </div>
       </div>
-    </Modal>
+    </Expand>
   );
 }

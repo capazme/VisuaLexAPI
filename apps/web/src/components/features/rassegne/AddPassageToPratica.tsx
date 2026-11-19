@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../ui/Button';
 import { useAppStore } from '../../../store/useAppStore';
@@ -15,7 +15,8 @@ import type { RassegnePasso } from './types';
 export function AddPassageToPratica({ passo, className }: { passo: RassegnePasso; className?: string }) {
   const navigate = useNavigate();
   const addNoteToDossier = useAppStore((s) => s.addNoteToDossier);
-  const [anchor, setAnchor] = useState<HTMLElement | null | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+  const id = useId();
 
   const added = (id: string, title: string) => {
     void addNoteToDossier(id, passageNote(passo)).then((saved) => {
@@ -32,10 +33,11 @@ export function AddPassageToPratica({ passo, className }: { passo: RassegnePasso
 
   return (
     <>
-      <Button variant="link" aria-haspopup="dialog" onClick={(e) => setAnchor(e.currentTarget)} className={className}>
+      <Button variant="link" aria-expanded={open} aria-controls={id} onClick={() => setOpen(true)} className={className}>
         Aggiungi alla pratica
       </Button>
-      <AddToDossierPopover isOpen={anchor !== undefined} anchorEl={anchor ?? null} onClose={() => setAnchor(undefined)} onAdded={added} />
+      {/* Under the command, in the page (LC125, L-73). */}
+      <AddToDossierPopover id={id} isOpen={open} onClose={() => setOpen(false)} onAdded={added} />
     </>
   );
 }

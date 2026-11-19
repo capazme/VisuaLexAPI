@@ -1,34 +1,20 @@
-import { useState, useEffect, useMemo, type FormEvent } from 'react';
-import {
-    useFloating,
-    useDismiss,
-    useRole,
-    useInteractions,
-    FloatingPortal,
-    FloatingFocusManager,
-    autoUpdate,
-    flip,
-    offset,
-    shift,
-} from '@floating-ui/react';
+import { useId, useState, useMemo, type FormEvent } from 'react';
 import { Folder, FolderPlus, Check, X, Search } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { dossierRecency, dossierContainsArticle, dossierContainsDecision } from './dossierUtils';
 import { useDossierKind } from '../../../features/sections/useSection';
 import { cn } from '../../../lib/utils';
-import { Z_INDEX } from '../../../constants/zIndex';
 import { Button } from '../../ui/Button';
+import { Expand } from '../../ui/Expand';
 import { IconButton } from '../../ui/IconButton';
 import { Input } from '../../ui/Input';
+import { CARD_RADIUS, CONTROL_BORDER, CONTROL_RADIUS } from '../../ui/controlStyles';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
-import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { Dossier, DossierSentenzaData, NormaVisitata } from '../../../types';
 
 export interface AddToDossierPopoverProps {
     isOpen: boolean;
-    /** Desktop anchor; when null (or the viewport is mobile-sized) the popover renders as a bottom sheet. */
-    anchorEl: HTMLElement | null;
     onClose: () => void;
     /** What is added: an article, or a court decision (design 2026-10-01 §6). Pass exactly one. */
     norma?: NormaVisitata;
@@ -37,18 +23,35 @@ export interface AddToDossierPopoverProps {
     onAdded: (dossierId: string, dossierTitle: string) => void;
     /**
      * Fired when the user picks a dossier that already contains this article or decision.
-     * Per spec, the click does nothing except a neutral toast — the popover
+     * Per spec, the click does nothing except a neutral toast — the space
      * stays open and no add happens.
      */
     onDuplicate?: (dossierTitle: string) => void;
+    /** For the command's `aria-controls`. */
+    id?: string;
+    className?: string;
 }
 
-export function AddToDossierPopover({ isOpen, anchorEl, onClose, norma, sentenza, onAdded, onDuplicate }: AddToDossierPopoverProps) {
-    const isDesktopViewport = useIsDesktop();
-    if (!isOpen) return null;
-    return isDesktopViewport && anchorEl
-        ? <DesktopPopover anchorEl={anchorEl} onClose={onClose} norma={norma} sentenza={sentenza} onAdded={onAdded} onDuplicate={onDuplicate} />
-        : <MobileSheet onClose={onClose} norma={norma} sentenza={sentenza} onAdded={onAdded} onDuplicate={onDuplicate} />;
+/**
+ * «Aggiungi alla pratica» in the page (LC125, L-73): a space that opens under the command, where the reader is reading
+ * (`Expand`), on a computer and on a phone alike — no popover, no bottom sheet. The focus lands on the space, never in
+ * a field; Esc closes it and the focus goes back to the command. The host draws it right under the command.
+ */
+export function AddToDossierPopover({ isOpen, onClose, norma, sentenza, onAdded, onDuplicate, id, className }: AddToDossierPopoverProps) {
+    const headingId = useId();
+    return (
+        <Expand
+            id={id}
+            open={isOpen}
+            onClose={onClose}
+            role="region"
+            aria-labelledby={headingId}
+            className={cn('my-2 flex max-w-md flex-col bg-card', CARD_RADIUS, CONTROL_BORDER, className)}
+        >
+            {/* Closed, `Expand` draws nothing: opened again, the search and «Nuova pratica» start afresh. */}
+            <PopoverBody norma={norma} sentenza={sentenza} onClose={onClose} onAdded={onAdded} onDuplicate={onDuplicate} headingId={headingId} />
+        </Expand>
+    );
 }
 
 type BodyProps = {
@@ -57,98 +60,12 @@ type BodyProps = {
     onClose: () => void;
     onAdded: (dossierId: string, dossierTitle: string) => void;
     onDuplicate?: (dossierTitle: string) => void;
+    headingId: string;
 };
-
-// ───────────────────────── DESKTOP POPOVER ─────────────────────────
-
-function DesktopPopover({ anchorEl, onClose, norma, sentenza, onAdded, onDuplicate }: BodyProps & { anchorEl: HTMLElement }) {
-    // Pass the anchor through `elements.reference` so the FIRST render
-    // already has a valid position — see the identical comment in
-    // NotesPeekPanel.tsx (gotcha #13).
-    const { refs, floatingStyles, context, placement } = useFloating({
-        open: true,
-        onOpenChange: (open) => { if (!open) onClose(); },
-        placement: 'bottom-start',
-        elements: { reference: anchorEl },
-        middleware: [
-            offset(8),
-            flip({ fallbackPlacements: ['top-start', 'bottom', 'top'] }),
-            shift({ padding: 16 }),
-        ],
-        whileElementsMounted: autoUpdate,
-    });
-
-    const dismiss = useDismiss(context, { outsidePress: true, escapeKey: true });
-    const role = useRole(context, { role: 'dialog' });
-    const { getFloatingProps } = useInteractions([dismiss, role]);
-
-    return (
-        <FloatingPortal>
-            <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
-                <div
-                    // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
-                    ref={refs.setFloating}
-                    style={floatingStyles}
-                    {...getFloatingProps()}
-                    className={Z_INDEX.citationPreview}
-                >
-                    {/*
-                        Inner wrapper owns the enter animation, kept apart from
-                        the outer positioning element — otherwise the
-                        zoom-in-95 scale transform overwrites floating-ui's
-                        translate and the popover visibly jumps from (0,0).
-                    */}
-                    <div
-                        style={{ transformOrigin: getTransformOrigin(placement) }}
-                        className={cn(
-                            'w-72 flex flex-col rounded-xl shadow-md border border-slate-200 dark:border-slate-700',
-                            'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
-                        )}
-                    >
-                        <PopoverBody norma={norma} sentenza={sentenza} onClose={onClose} onAdded={onAdded} onDuplicate={onDuplicate} />
-                    </div>
-                </div>
-            </FloatingFocusManager>
-        </FloatingPortal>
-    );
-}
-
-// ───────────────────────── MOBILE BOTTOM SHEET ─────────────────────────
-
-function MobileSheet({ onClose, norma, sentenza, onAdded, onDuplicate }: BodyProps) {
-    // Close on Escape even on mobile (useful for external keyboards).
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
-
-    return (
-        <FloatingPortal>
-            <div
-                className={cn('fixed inset-0 bg-black/30 animate-in fade-in duration-150', Z_INDEX.citationPreview)}
-                onClick={onClose}
-                aria-hidden
-            />
-            <div
-                role="dialog"
-                aria-modal="true"
-                className={cn(
-                    'fixed inset-x-4 bottom-4 flex flex-col rounded-2xl shadow-lg',
-                    'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800',
-                    'max-h-[70vh] animate-in slide-in-from-bottom duration-200',
-                    Z_INDEX.citationPreview,
-                )}
-            >
-                <PopoverBody norma={norma} sentenza={sentenza} onClose={onClose} onAdded={onAdded} onDuplicate={onDuplicate} />
-            </div>
-        </FloatingPortal>
-    );
-}
 
 // ───────────────────────── SHARED BODY ─────────────────────────
 
-function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyProps) {
+function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate, headingId }: BodyProps) {
     const { dossiers, addToDossier, createDossier } = useAppStore(useShallow((s) => ({
         dossiers: s.dossiers, addToDossier: s.addToDossier, createDossier: s.createDossier,
     })));
@@ -179,7 +96,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
         if (!target) return;
         if (contains(target)) {
             // Per spec: clicking a dossier that already has this article does
-            // nothing except a neutral toast. Popover stays open.
+            // nothing except a neutral toast. The space stays open.
             onDuplicate?.(target.title);
             return;
         }
@@ -207,7 +124,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
             <header className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                     <Folder size={16} className="text-primary-500 shrink-0" />
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                    <h3 id={headingId} className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                         Aggiungi alla pratica
                     </h3>
                 </div>
@@ -228,7 +145,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                 </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 min-h-[80px]">
+            <div className="max-h-72 overflow-y-auto px-2 py-2 space-y-1 min-h-[80px]">
                 {visible.length === 0 ? (
                     <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-6">
                         {dossiers.length === 0 ? 'Nessuna pratica presente.' : 'Nessuna pratica corrisponde alla ricerca.'}
@@ -244,7 +161,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                                 aria-disabled={alreadyPresent}
                                 onClick={() => handlePick(d.id)}
                                 className={cn(
-                                    'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors',
+                                    'w-full flex items-center gap-2.5 px-2.5 py-2 text-left transition-colors', CONTROL_RADIUS,
                                     TOUCH_TARGET_RESPONSIVE,
                                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                                     // No opacity on the row (LC61): «già presente» and the name keep their contrast (AA).
@@ -287,7 +204,8 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
                                 autoFocus
                                 value={newTitle}
                                 onChange={(e) => setNewTitle(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Escape') setCreating(false); }}
+                                // Esc here leaves the name, not the space around it.
+                                onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); setCreating(false); } }}
                                 placeholder="Nome della pratica…"
                                 aria-label="Nome della nuova pratica"
                             />
@@ -300,24 +218,4 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate }: BodyPro
             </div>
         </>
     );
-}
-
-// ───────────────────────── HELPERS ─────────────────────────
-
-/**
- * Translate a floating-ui placement into the CSS transform-origin that
- * corresponds to the edge of the popover touching the reference — see the
- * identical helper in NotesPeekPanel.tsx / HighlightsActionsPicker.tsx.
- */
-function getTransformOrigin(placement: string): string {
-    const [side, align] = placement.split('-') as [string, string | undefined];
-    const opposite: Record<string, string> = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
-    const main = opposite[side] ?? 'center';
-    const crossAxisIsHorizontal = side === 'top' || side === 'bottom';
-    const cross = !align
-        ? 'center'
-        : crossAxisIsHorizontal
-            ? (align === 'start' ? 'left' : 'right')
-            : (align === 'start' ? 'top' : 'bottom');
-    return crossAxisIsHorizontal ? `${cross} ${main}` : `${main} ${cross}`;
 }

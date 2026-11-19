@@ -198,9 +198,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     });
 
     const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
-    // State (not ref) so the popover re-reads the anchor when the button
-    // actually mounts — same reasoning as notesButtonEl below (gotcha #13).
-    const [dossierBtnEl, setDossierBtnEl] = useState<HTMLButtonElement | null>(null);
     const [isPeekOpen, setIsPeekOpen] = useState(false);
     // State (not ref) so the popover re-reads the anchor when the button
     // actually mounts. Using ref.current in render triggers the
@@ -947,7 +944,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     : () => setDossierPopoverOpen(true)}
                 dossierLabel={hostDossier ? 'Aggiungi a questa pratica' : undefined}
                 hideDossier={dossierCommandInRow || inHostDossier}
-                dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
                 onCopyLink={handleCopyLink}
                 onOpenAdvancedExport={() => setShowAdvancedExport(true)}
@@ -959,6 +955,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                         ? closeFindWindow()
                         : openFindWindow({ tabId: findHost, targetKey: findTargetKey, returnFocus: button })),
                 } : undefined}
+            />
+
+            {/* «Aggiungi alla pratica» opens under the toolbar, where the reader is reading (LC125, L-73). */}
+            <AddToDossierPopover
+                isOpen={dossierPopoverOpen}
+                onClose={() => setDossierPopoverOpen(false)}
+                norma={norma_data}
+                onAdded={(_dossierId, title) => showToast(`Aggiunto a «${title}»`, 'success')}
+                onDuplicate={(title) => showToast(`Già presente in «${title}»`, 'info')}
             />
 
             <NotesPeekPanel
@@ -1210,15 +1215,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onClose={() => setToastMessage(null)}
                 />
             )}
-
-            <AddToDossierPopover
-                isOpen={dossierPopoverOpen}
-                anchorEl={dossierBtnEl}
-                onClose={() => setDossierPopoverOpen(false)}
-                norma={norma_data}
-                onAdded={(_dossierId, title) => showToast(`Aggiunto a «${title}»`, 'success')}
-                onDuplicate={(title) => showToast(`Già presente in «${title}»`, 'info')}
-            />
 
             <CopyModal
                 isOpen={showCopyModal}

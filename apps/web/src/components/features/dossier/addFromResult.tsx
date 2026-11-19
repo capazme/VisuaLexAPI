@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { DossierSentenzaData, NormaVisitata } from '../../../types';
 import { notify } from '../../ui/notifications/notifications';
@@ -23,21 +23,23 @@ export function useHeldInLabel(target: DossierTarget | undefined): string | null
 }
 
 /**
- * The reader's popover (`AddToDossierPopover`) for a result: `open(anchor)` shows it beside the anchor on a computer,
- * as the bottom sheet with no anchor (a phone's «⋯»). Nothing is added until a dossier is chosen.
+ * The reader's «Aggiungi alla pratica» (`AddToDossierPopover`) for a result: `open()` opens it in the page, where the
+ * host draws `popover`, right under the command (LC125, L-73). The command carries `isOpen` as `aria-expanded` and `id`
+ * as `aria-controls`. Nothing is added until a dossier is chosen.
  */
-export function useAddToDossier(target: DossierTarget | undefined): { open: (anchor: HTMLElement | null) => void; popover: ReactNode } {
-  const [state, setState] = useState<{ anchor: HTMLElement | null } | null>(null);
+export function useAddToDossier(target: DossierTarget | undefined): { open: () => void; isOpen: boolean; id: string; popover: ReactNode } {
+  const [isOpen, setOpen] = useState(false);
+  const id = useId();
   const added = target && 'sentenza' in target ? 'Aggiunta' : 'Aggiunto';
   const popover = target ? (
     <AddToDossierPopover
-      isOpen={state !== null}
-      anchorEl={state?.anchor ?? null}
-      onClose={() => setState(null)}
+      id={id}
+      isOpen={isOpen}
+      onClose={() => setOpen(false)}
       {...target}
       onAdded={(_id, title) => notify({ type: 'success', message: `${added} a «${title}»`, duration: 3000 })}
       onDuplicate={(title) => notify({ type: 'info', message: `Già presente in «${title}»`, duration: 3000 })}
     />
   ) : null;
-  return { open: (anchor) => setState({ anchor }), popover };
+  return { open: () => setOpen(true), isOpen, id, popover };
 }

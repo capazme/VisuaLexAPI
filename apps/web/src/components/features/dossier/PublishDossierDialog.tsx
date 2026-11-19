@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ShieldAlert, Upload } from 'lucide-react';
 import { Button } from '../../ui/Button';
-import { Modal } from '../../ui/Modal';
+import { Expand } from '../../ui/Expand';
+import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
+import { cn } from '../../../lib/utils';
 import { Select } from '../../ui/Select';
 import { Input } from '../../ui/Input';
 import { Textarea } from '../../ui/Textarea';
@@ -65,11 +67,35 @@ function fieldFlags(text: string): string | null {
 type Load = { status: 'loading' } | { status: 'ready'; marks: Map<string, PdfMarks>; leftOut: string | null } | { status: 'error' };
 
 /**
- * «Pubblica nel Forum» from the dossier, in one dialog (spec 2026-10-13-environments-into-forum, D3–D5): the
- * fields, the preview of exactly what becomes public, the privacy check. Also «Aggiorna la versione pubblicata»,
- * the same dialog over the copy already in the Forum.
+ * «Pubblica nel Forum» from the dossier, in the page (LC125, L-73): a space under the header (`Expand`), never over the
+ * content. The focus lands on the space, never in a field; Esc closes it, but not while the server works, and the focus
+ * goes back to the command. The form is `PublishDossierForm`; the Forum's own «Pubblica un dossier» still holds it in a
+ * window (`PublishDossierPicker`), for the Forum's PR.
  */
-export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublished, onAlreadyPublished }: Props) {
+export function PublishDossierDialog({ open, className, ...form }: Props & { open: boolean; className?: string }) {
+  const headingId = useId();
+  // While the server works, Esc does not close: the outcome would have nowhere to be said.
+  const [busy, setBusy] = useState(false);
+  return (
+    <Expand open={open} onClose={busy ? undefined : form.onClose} role="region" aria-labelledby={headingId} className={cn('bg-card', CARD_RADIUS, CONTROL_BORDER, className)}>
+      {/* Closed, `Expand` draws nothing: opened again, the fields start from the dossier (or the Forum's copy). */}
+      <div className="p-4 md:p-5">
+        <PublishDossierForm {...form} headingId={headingId} busy={busy} setBusy={setBusy} />
+      </div>
+    </Expand>
+  );
+}
+
+/**
+ * The publication's form (spec 2026-10-13-environments-into-forum, D3–D5): the fields, the preview of exactly what
+ * becomes public, the privacy check, and its buttons. Also «Aggiorna la versione pubblicata», the same form over the
+ * copy already in the Forum. Its holder keeps `busy`, so it can refuse to close while the server works.
+ */
+export function PublishDossierForm({ dossier, otherDossiers, onClose, onPublished, onAlreadyPublished, headingId, busy, setBusy }: Props & {
+  headingId: string;
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
+}) {
   const updating = dossier.published ?? null;
   const updatingId = updating?.sharedEnvironmentId ?? null;
   const [title, setTitle] = useState(dossier.title.slice(0, TITLE_MAX));
@@ -79,14 +105,12 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
   const [load, setLoad] = useState<Load>({ status: 'loading' });
   const [included, setIncluded] = useState<Set<string> | null>(null);
   const [checked, setChecked] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyUnread, setCopyUnread] = useState(false);
   // An update's starting ticks are the published copy's: `undefined` while it is read, `null` when it could not be.
   const [publishedCopy, setPublishedCopy] = useState<SharedEnvironmentContent | null | undefined>(undefined);
   // Fields the user changed: the published copy's values never overwrite them.
   const touched = useRef(false);
-  const titleRef = useRef<HTMLInputElement>(null);
   // The items as the dialog opened: the dossier is read again every minute (`useDossierRefresh`), and
   // the marks are read once, not two requests per entry each time.
   const openedItems = useRef(dossier.items);
@@ -179,6 +203,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
         await sharedEnvironmentService.updateWithVersion(updatingId, {
           title: title.trim(), description: description.trim() || null, category, tags, content,
         });
+        setBusy(false);
         onPublished('Versione pubblicata aggiornata');
       } else {
         await sharedEnvironmentService.publish({
@@ -191,6 +216,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
           includeHighlights: sendable.includeHighlights,
           sourceDossierId: dossier.id,
         });
+        setBusy(false);
         onPublished('Dossier pubblicato nel Forum');
       }
     } catch (err) {
@@ -206,28 +232,14 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
   const tagsFlag = fieldFlags(tagsInput);
 
   return (
-    <Modal
-      isOpen
-      onClose={() => { if (!busy) onClose(); }}
-      title={updating ? 'Aggiorna la versione pubblicata' : 'Pubblica nel Forum'}
-      icon={<Upload size={20} />}
-      size="lg"
-      closeOnBackdrop={false}
-      initialFocusRef={titleRef}
-      footer={(
-        <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
-            Annulla
-          </Button>
-          <Button disabled={!canPublish} loading={busy} onClick={() => void submit()}>
-            {updating ? 'Aggiorna' : 'Pubblica'}
-          </Button>
-        </>
-      )}
-    >
+    <div>
+      <h2 id={headingId} className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-slate-50">
+        <Upload size={18} aria-hidden />
+        {updating ? 'Aggiorna la versione pubblicata' : 'Pubblica nel Forum'}
+      </h2>
       <div className="space-y-5">
         {copyUnread && (
-          <p role="alert" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <p role="alert" className="rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
             Non riesco a leggere la versione pubblicata: controlla titolo, descrizione, categoria, tag e quali note ed
             evidenziazioni includere prima di aggiornare.
           </p>
@@ -235,7 +247,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
         <div className="grid gap-3">
           <div>
             <label htmlFor="publish-title" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Titolo nel Forum</label>
-            <Input id="publish-title" ref={titleRef} value={title} maxLength={TITLE_MAX} onChange={(e) => edit(setTitle)(e.target.value)} aria-describedby="publish-title-help" />
+            <Input id="publish-title" value={title} maxLength={TITLE_MAX} onChange={(e) => edit(setTitle)(e.target.value)} aria-describedby="publish-title-help" />
             <p id="publish-title-help" className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {titleError ?? 'È il nome che vedranno gli altri: non usare il nome di una pratica o di un cliente.'}
             </p>
@@ -277,7 +289,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
                 {entries.length} {entries.length === 1 ? 'voce' : 'voci'} · {notes.filter((r) => ticked.has(r.id)).length} di {notes.length} note · {highlights.filter((r) => ticked.has(r.id)).length} di {highlights.length} evidenziazioni
               </p>
               {flaggedRows > 0 && (
-                <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                   Il controllo automatico ha trovato possibili dati personali in {flaggedRows} {flaggedRows === 1 ? 'elemento spuntato' : 'elementi spuntati'}: sono evidenziati qui sotto.
                 </p>
               )}
@@ -319,7 +331,7 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
           )}
         </section>
 
-        <section aria-labelledby="publish-warning" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <section aria-labelledby="publish-warning" className="flex items-start gap-2 rounded-[8px] bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
           <ShieldAlert size={18} className="mt-0.5 shrink-0" aria-hidden />
           <div className="space-y-1">
             <h3 id="publish-warning" className="font-semibold">Stai per rendere pubblica questa pratica.</h3>
@@ -333,8 +345,16 @@ export function PublishDossierDialog({ dossier, otherDossiers, onClose, onPublis
         </section>
 
         {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Annulla
+          </Button>
+          <Button disabled={!canPublish} loading={busy} onClick={() => void submit()}>
+            {updating ? 'Aggiorna' : 'Pubblica'}
+          </Button>
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 }
 
@@ -360,7 +380,7 @@ function RowGroup({ heading, hint, rows, ticked, onToggle, onAll }: {
       <ul className="mt-1 space-y-2">
         {rows.map((row) => (
           <li key={row.id}>
-            <label className={`flex items-start gap-2 rounded-lg border border-slate-200 p-2 text-sm dark:border-slate-700 ${TOUCH_TARGET_RESPONSIVE}`}>
+            <label className={`flex items-start gap-2 rounded-md border border-slate-200 p-2 text-sm dark:border-slate-700 ${TOUCH_TARGET_RESPONSIVE}`}>
               <input
                 type="checkbox"
                 checked={ticked.has(row.id)}

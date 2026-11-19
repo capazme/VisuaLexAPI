@@ -7,13 +7,16 @@ const files = readdirSync(DIR).filter((name) => /\.tsx$/.test(name) && !/\.test\
 
 // LC106: Pratiche speak the common components' language; their bare controls are the app's guard's (LC118).
 describe('Pratiche, the common components', () => {
-  // LC107 (L-73): nothing over the content. «Modifica» and «Importa» open in the page; the windows still listed here
-  // go in F3's other PR (nota, PDF, pubblica, norma, aggiungi, cestino), and no new one comes in.
-  it('opens no new window over the content', () => {
-    const windows = [...files].sort().filter((name) => /(?<!\[)role="dialog"|fixed inset-0|<(Modal|ConfirmDialog)\b/.test(readFileSync(join(DIR, name), 'utf8')));
-    expect(windows).toEqual([
-      'AddNoteModal.tsx', 'AddToDossierPopover.tsx', 'DossierPdfDialog.tsx', 'PublishDossierDialog.tsx', 'TrashEntryRow.tsx', 'TreeNavigatorModal.tsx',
-    ]);
+  // LC107, LC125 (L-73): nothing over the content. «Modifica», «Importa», the note, «Importa da norma», the PDF,
+  // «Pubblica nel Forum» and «Aggiungi alla pratica» open in the page. Only confirmations stay (L-74): the trash's
+  // «Elimina definitivamente» and the Forum copy's «Elimina dai dossier pubblici». No other window comes in: no dialog
+  // role, veil, portal, popover or sheet.
+  it('opens no window over the content but the confirmations', () => {
+    const windows = [...files].sort().filter((name) => (
+      /(?<!\[)role=["{']*(alert)?dialog|role: '(alert)?dialog'|fixed inset-0|createPortal|FloatingPortal|<(Modal|ConfirmDialog|Sheet|WireConfirm)\b/
+        .test(readFileSync(join(DIR, name), 'utf8'))
+    ));
+    expect(windows).toEqual(['DossierForumActions.tsx', 'TrashEntryRow.tsx']);
   });
 
   it('keeps no local button look of its own', () => {

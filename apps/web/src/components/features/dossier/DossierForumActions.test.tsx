@@ -19,17 +19,26 @@ function show(d: Dossier) {
   const showToast = vi.fn();
   const refreshDossier = vi.fn().mockResolvedValue(undefined);
   appStore.setState({ dossiers: [d], refreshDossier });
-  render(<MemoryRouter><DossierForumActions dossier={d} showToast={showToast} buttonClassName="btn" /></MemoryRouter>);
-  return { showToast, refreshDossier };
+  const onPublish = vi.fn();
+  render(<MemoryRouter><DossierForumActions dossier={d} showToast={showToast} buttonClassName="btn" onPublish={onPublish} /></MemoryRouter>);
+  return { showToast, refreshDossier, onPublish };
 }
 
 beforeEach(() => Object.values(service).forEach((f) => f.mockReset().mockResolvedValue({})));
 
 describe('DossierForumActions', () => {
-  it('offers «Pubblica nel Forum» for a dossier never published, and opens the dialog', async () => {
-    show(base);
+  it('offers «Pubblica nel Forum» for a dossier never published, and asks the page to open the form (LC125)', () => {
+    const { onPublish } = show(base);
     fireEvent.click(screen.getByRole('button', { name: 'Pubblica nel Forum' }));
-    expect(await screen.findByRole('dialog', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('«Aggiorna la versione pubblicata» asks the page for the same form', () => {
+    const { onPublish } = show({ ...base, published: published(true) });
+    fireEvent.click(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiorna la versione pubblicata' }));
+    expect(onPublish).toHaveBeenCalledTimes(1);
   });
 
   it('cannot publish a dossier the admin withdrew from the Forum (question 190)', () => {

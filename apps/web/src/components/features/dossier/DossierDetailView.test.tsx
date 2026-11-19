@@ -38,7 +38,7 @@ vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () 
 // The act's index, reduced to what it hands over: this many articles of a law.
 const tree = vi.hoisted(() => ({ count: 0 }));
 vi.mock('./TreeNavigatorModal', () => ({
-  TreeNavigatorModal: ({ onImport, onClose }: { onImport: (a: { numero: string }[], act: { tipo_atto: string; data: string; numero_atto: string }) => void; onClose: () => void }) => (
+  TreeNavigatorModal: ({ open, onImport, onClose }: { open: boolean; onImport: (a: { numero: string }[], act: { tipo_atto: string; data: string; numero_atto: string }) => void; onClose: () => void }) => open && (
     <button type="button" onClick={() => { onImport(Array.from({ length: tree.count }, (_, i) => ({ numero: String(i + 1) })), { tipo_atto: 'legge', data: '2012-12-31', numero_atto: '247' }); onClose(); }}>
       importa dall'indice
     </button>
@@ -238,9 +238,9 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
     pdf.loadPdfMarks.mockResolvedValue(new Map());
   });
 
-  it('opens the dialog instead of downloading', () => {
+  it('opens the space instead of downloading', () => {
     open(dossier);
-    expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Esporta in PDF' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Sentenze' })).toBeNull();
     expect(pdf.loadDossierTexts).not.toHaveBeenCalled();
     expect(pdf.save).not.toHaveBeenCalled();
@@ -253,14 +253,14 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
     expect(within(group).getByRole('checkbox', { name: 'Corte cost., sent. 13 gennaio 2014, n. 1' })).toBeChecked();
   });
 
-  it('exports the full text with every decision by default, saves the file and closes the dialog', async () => {
+  it('exports the full text with every decision by default, saves the file and closes the space', async () => {
     open(withDecisions);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
     await waitFor(() => expect(pdf.save).toHaveBeenCalledWith('Ricorso_Rossi.pdf'));
     expect(pdf.loadDossierDecisions).toHaveBeenCalledWith(expect.any(Array), new Set(['s1', 's2']), expect.any(Function));
     expect(pdf.loadPdfMarks).toHaveBeenCalledWith(expect.any(Array), { articles: false, decisionIds: new Set(['s1', 's2']) });
     expect(pdf.built[0][3]).toMatchObject({ excerpts: false });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Esporta in PDF' })).toBeNull());
   });
 
   it('prints the tags as stored: the PDF is a document, not the screen (D1)', async () => {
@@ -291,13 +291,13 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('PDF salvato: 2 testi non disponibili', 'info'));
   });
 
-  it('keeps the dialog open and says so when the PDF cannot be made', async () => {
+  it('keeps the space open and says so when the PDF cannot be made', async () => {
     pdf.loadDossierTexts.mockRejectedValue(new Error('down'));
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     open(dossier);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
     await waitFor(() => expect(showToast).toHaveBeenCalledWith('Impossibile creare il PDF della pratica', 'error'));
-    expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Esporta in PDF' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeEnabled();
     error.mockRestore();
   });
@@ -475,6 +475,45 @@ describe('DossierDetailView — one «Fonti» for the sources and the reading (L
     renderView();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it.each([
+    ['Aggiungi', 'Articoli da una norma', 'Importa articoli da norma'],
+    ['Aggiungi', 'Nota', 'Aggiungi una nota alla pratica'],
+    ['Esporta', 'PDF', 'Esporta in PDF'],
+  ])('opens «%s → %s» under the header, in the page, and Esc gives the focus back to its menu (LC125)', (menu, item, name) => {
+    renderView();
+    const trigger = screen.getByRole('button', { name: menu });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: item }));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    // The tree's own component is mocked here (its tests: `TreeNavigatorModal.test.tsx`): the others are the real ones.
+    if (item === 'Articoli da una norma') {
+      expect(screen.getByRole('button', { name: "importa dall'indice" })).toBeInTheDocument();
+      return;
+    }
+    const region = screen.getByRole('region', { name });
+    expect(region).toHaveFocus();
+    expect(trigger.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(region.compareDocumentPosition(screen.getByRole('tablist', { name: 'Viste della pratica' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name })).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('opens «Pubblica nel Forum» under the header, in the page, and Esc gives the focus back to it (LC125)', () => {
+    renderView();
+    const command = screen.getByRole('button', { name: 'Pubblica nel Forum' });
+    command.focus();
+    fireEvent.click(command);
+    expect(command).toHaveAttribute('aria-expanded', 'true');
+    const region = screen.getByRole('region', { name: 'Pubblica nel Forum' });
+    expect(region).toHaveFocus();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(region.compareDocumentPosition(screen.getByRole('tablist', { name: 'Viste della pratica' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.keyDown(region, { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'Pubblica nel Forum' })).toBeNull();
+    expect(command).toHaveFocus();
   });
 
   it('opens «Modifica» under the header, in the page, and Esc gives the focus back to its menu (LC107)', () => {
