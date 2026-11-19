@@ -226,7 +226,7 @@ function DesktopRows({
               role="rowheader"
               tabIndex={-1}
               data-focus-key={item.key}
-              className={cn('flex flex-col items-start gap-1.5 px-3 py-3 text-xs text-slate-500 dark:text-slate-400', FOCUS_RING)}
+              className={cn('flex flex-col items-start gap-1.5 px-3 py-3 text-xs text-slate-500 dark:text-slate-400')}
             >
               {item.part !== 'head' && <span className="font-semibold text-slate-700 dark:text-slate-200">{rowName(item)}</span>}
               {item.label && <LabelPill label={item.label} tooLong={item.tooLong} />}
@@ -313,7 +313,7 @@ function PhoneRows({
             aria-label={rowName(item)}
             tabIndex={-1}
             data-focus-key={item.key}
-            className={cn('py-2', FOCUS_RING)}
+            className="py-2"
           >
             <div className="flex flex-wrap items-center gap-2 px-4 pt-1">
               {item.part !== 'head' && <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{rowName(item)}</span>}

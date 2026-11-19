@@ -1,5 +1,4 @@
 import { useId, type ReactNode } from 'react';
-import { FOCUS_RING } from '../../constants/interactions';
 import { kickerOf, type SectionId } from '../../features/sections/sections';
 import { cn } from '../../lib/utils';
 import type { PageWidth } from './frame';
@@ -84,7 +83,7 @@ export function PageFrame({ title, kicker, line, action, beside, headerClassName
               {kickerText}
             </p>
           )}
-          <h1 id={titleId} data-page-title="" aria-describedby={kickerText ? kickerId : undefined} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
+          <h1 id={titleId} data-page-title="" aria-describedby={kickerText ? kickerId : undefined} data-section-title={section} tabIndex={section ? -1 : undefined} className={PAGE_TITLE}>
             {title}
           </h1>
           {line && <p className="mt-1 max-w-prose text-slate-600 dark:text-slate-400">{line}</p>}
