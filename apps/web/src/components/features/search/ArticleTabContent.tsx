@@ -912,7 +912,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             ref={articleRootRef}
             data-article-root=""
             data-glosses-beside={glossBeside ? '' : undefined}
-            className={cn('animate-in fade-in duration-(--dur-pop) relative', glossBeside && 'flex items-start gap-6')}
+            className={cn('relative', glossBeside && 'flex items-start gap-6')}
         >
             {/* The article; beside its margin, at the width it had closed: the text does not move (LC74). */}
             <div className="min-w-0" style={glossBeside && glossMargin.textWidth !== null ? { width: glossMargin.textWidth, flex: 'none' } : undefined}>
