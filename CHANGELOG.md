@@ -12,6 +12,16 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.51.0] - 2026-11-19
+
+The interface alignment is complete: a global guard keeps the pages on the common controls, and the common
+components take their radius and motion from one source. Web only, no migration. MERL-T stays off.
+
+### Interface
+
+- A global guard checks that no page goes back to its own controls, styles or timings (LC118, alignment 14 of 14).
+- The common components take their corner radius and their animation timings from the shared tokens (LC119).
+
 ## [1.50.0] - 2026-11-19
 
 The rest of the app on the common controls of the interface alignment. Web only, no migration. MERL-T stays
