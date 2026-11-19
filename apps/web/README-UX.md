@@ -582,16 +582,19 @@ Auto-dismiss dopo 3 secondi
 ### 5.3 PDFViewer
 **File:** `components/ui/PDFViewer.tsx`
 
+Il PDF dell'atto si apre nella pagina (LC124, L-73), sopra la lettura: uno spazio `Expand`, non una finestra.
+Esc dentro lo spazio lo chiude e il fuoco torna al comando. «Scarica» c'è sempre, come ripiego dove il PDF
+nell'iframe non si vede (Safari, Chrome per Android). Si apre alla prima pagina.
+
 ```
 ┌────────────────────────────────────────────────┐
-│ Anteprima PDF                            [✕]  │
-├────────────────────────────────────────────────┤
-│ [🔍-] [100%] [🔍+]  [📥 Download] [🖨️ Stampa] │
+│ PDF della norma              [⤓ Scarica] [✕]  │
 ├────────────────────────────────────────────────┤
 │                                                │
-│              PDF Preview                       │
+│              PDF (iframe)                      │
 │                                                │
 └────────────────────────────────────────────────┘
+  l. 8 marzo 2017, n. 24   Studio Struttura PDF ⋯
 ```
 
 ---

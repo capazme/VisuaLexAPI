@@ -46,7 +46,6 @@ vi.mock('../workspace/ArticleNavigation', () => ({ ArticleNavigation: () => null
 vi.mock('../workspace/LazyStudyMode', () => ({ LazyStudyMode: () => null }));
 vi.mock('../decisions/DecisionEntryView', () => ({ DecisionEntryView: () => <div data-testid="decision-reader" /> }));
 vi.mock('../decisions/DecisionSearchTabView', () => ({ DecisionSearchTabView: () => null }));
-vi.mock('../../ui/PDFViewer', () => ({ PDFViewer: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div role="dialog" aria-label="PDF" /> : null) }));
 
 import { appStore } from '../../../store/useAppStore';
 import { dossierService } from '../../../services/dossierService';
@@ -256,14 +255,22 @@ describe('the dossier hosts the reading: its gestures stay on its table', () => 
     expect(s().activePracticeId).toBe(corpus);
   });
 
-  it('the act\'s PDF opens here, from the dossier', async () => {
+  it('the act\'s PDF opens here, from the dossier, in the page (LC124)', async () => {
     h.legalFetch.mockResolvedValueOnce({ ok: true, status: 200, blob: async () => new Blob(['%PDF']) });
     const urlOf = vi.fn(() => 'blob:pdf');
     Object.assign(window.URL, { createObjectURL: urlOf });
     render(<DossierReadingView dossier={dossierOf([norma('5', { urn: 'urn:nir:stato:legge:2017-03-08;24~art5' }), norma('7')])} showToast={toast} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Esporta PDF della norma' }));
+    const command = screen.getByRole('button', { name: 'Esporta PDF della norma' });
+    command.focus();
+    fireEvent.click(command);
     await waitFor(() => expect(h.legalFetch).toHaveBeenCalledWith('/export_pdf', expect.objectContaining({ method: 'POST' })));
-    expect(await screen.findByRole('dialog', { name: 'PDF' })).toBeInTheDocument();
+    expect(await screen.findByTitle('PDF della norma')).toHaveAttribute('src', 'blob:pdf');
+    expect(screen.getByRole('region', { name: 'PDF della norma' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Scarica' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('region', { name: 'PDF della norma' }), { key: 'Escape' });
+    expect(screen.queryByRole('region', { name: 'PDF della norma' })).toBeNull();
+    expect(command).toHaveFocus();
   });
 
   it('a dossier with nothing to read says so', () => {
