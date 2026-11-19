@@ -28,9 +28,9 @@ const VIEW_ORDER = [...VIEWS.map((view) => view.to.split('/')[2]), 'cestino'];
 const HEADER_BUTTON = cn(buttonClassName('secondary'), 'max-lg:min-w-11 max-lg:px-0 md:max-lg:min-w-9');
 
 /**
- * Opus's page (the planner): one compact header (LC83) — «Scadenze» once, its three views beside it as tabs
- * («Scadenziario», Opus's home, «Prossimi giorni», «Lista d'ingresso»), then the trash on the same row («Raggruppa» is
- * in «Scadenziario» itself, over its rows);
+ * Opus's page (the planner): one compact header (LC83) — «Attività» once with the trash on its row, its three views
+ * under it as tabs (LC130: «Scadenziario», Opus's home, «Prossimi giorni», «Lista d'ingresso»; «Raggruppa» is in
+ * «Scadenziario» itself, over its rows);
  * from `md` it stays at the top while the view scrolls (LC27). On a phone the tabs are the bar at the screen's foot
  * (LC33) and the trash an icon beside the title. «Dossier» stays an entry of Work. The tasks' trash is a view of
  * its own, under its own title: a task's trash is on the task, not among the dossiers' (`/api/trash`).
@@ -75,21 +75,22 @@ export function OpusPage() {
   };
   return (
     <PageFrame
-      // «Scadenze» over the three views; the trash and the tools that are coming keep their own name (L-37).
-      title={inView ? 'Scadenze' : pageName(pathname) ?? 'Scadenze'}
+      // «Attività» over the three views (LC130); the trash and the tools that are coming keep their own name (L-37).
+      title={inView ? 'Attività' : pageName(pathname) ?? 'Attività'}
       kicker="opus"
       section="opus"
       className="h-full"
       // On a phone the options are icons beside the title (LC33, after Todoist: the title, then the list).
       actionBeside
-      headerClassName={(inView || inTrash) ? 'md:sticky md:top-[var(--phone-bar-offset,0px)] md:z-10 md:bg-slate-50 md:py-1.5 md:dark:bg-slate-950' : undefined}
+      headerClassName={(inView || inTrash) ? 'md:flex-wrap md:gap-y-3 md:sticky md:top-[var(--phone-bar-offset,0px)] md:z-10 md:bg-slate-50 md:py-1.5 md:dark:bg-slate-950' : undefined}
       beside={(inView || inTrash) && (
         // `SegmentedTabLinks` (LC110): each view has its address. On a phone the views are a bar at the screen's foot,
-        // where the thumb is (LC33, after Todoist's «In arrivo · Oggi · Prossime»); from md the tabs beside the title.
+        // where the thumb is (LC33, after Todoist's «In arrivo · Oggi · Prossime»); from md a row of their own under the
+        // title and the trash (LC130).
         <div
           ref={tabs}
           className={cn(
-            'md:mr-auto',
+            'md:order-last md:basis-full',
             'max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:border-t max-md:border-slate-200 max-md:bg-card max-md:px-3 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:pt-1.5 max-md:dark:border-slate-800',
           )}
         >

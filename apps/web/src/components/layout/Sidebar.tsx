@@ -58,7 +58,7 @@ interface NavItemProps {
   onClick?: () => void;
   id?: string;
   badgeCount?: number;
-  /** What the count counts, for the name: «Scadenziario, 3 compiti per oggi o scaduti». Without it, «N notifiche». */
+  /** What the count counts, for the name: «Attività, 3 compiti per oggi o scaduti». Without it, «N notifiche». */
   badgeLabel?: string;
   /** Active on its own address only, not under it: «Dossier pubblici» (`/forum`) beside «Community» (`/forum/community`). */
   end?: boolean;
@@ -585,7 +585,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               <>
                 {/* Scadenziario, Ricerca, Dossier, then the tools that are coming (D-315, LC47, LC48). «Prossimi
                     giorni» and «Lista d'ingresso» are tabs of Work's page (`OpusPage`), «Rassegne» a link of the search page (LC8). */}
-                <NavItem to="/work/scadenziario" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Scadenziario" shortLabel="Scadenze" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
+                <NavItem to="/work/scadenziario" activeOn={['/work/prossimi', '/work/ingresso', '/work/cestino']} icon={CalendarCheck} label="Attività" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
                 {searchEntry('Ricerca', ['/rassegne'])}
                 <NavItem to="/pratiche" icon={Folder} label="Pratiche" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 <div aria-hidden className={cn("h-px bg-slate-200 dark:bg-slate-700", layout === 'rail' ? "mx-auto w-6" : "my-1.5 w-full")} />
