@@ -8,7 +8,7 @@ import { QuickAddField } from './QuickAddField';
 import { taskService } from '../../../services/taskService';
 import { appStore } from '../../../store/useAppStore';
 import type { Dossier } from '../../../types';
-import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
+import { REPEAT_CLOSE, REPEAT_OPEN } from '../../../lib/motion';
 import { FIELD_CONTROL, FIELD_SURFACE } from '../../ui/controlStyles';
 
 // «Dettagli» of the task's quick add (U1b): its fields in a panel in place under the row, the box growing.
@@ -53,15 +53,15 @@ describe('QuickAddField — «Dettagli»', () => {
     });
     const heights = () => calls.filter((c) => 'height' in c.frames[0]);
 
-    it('grows on the island\'s opening and shrinks on its closing', async () => {
+    it('grows and shrinks on a repeated action\'s times (LC132)', async () => {
       render(<QuickAddField view="today" today="2026-10-22" defaults={{}} />);
       const user = userEvent.setup();
       const details = screen.getByRole('button', { name: 'Dettagli' });
       await user.click(details);
       expect(heights()).toHaveLength(1);
-      expect(heights()[0].timing).toEqual(expect.objectContaining(ISLAND_OPEN));
+      expect(heights()[0].timing).toEqual(expect.objectContaining(REPEAT_OPEN));
       await user.click(details);
-      expect(heights()[1].timing).toEqual(expect.objectContaining(ISLAND_CLOSE));
+      expect(heights()[1].timing).toEqual(expect.objectContaining(REPEAT_CLOSE));
       act(() => calls.forEach((c) => c.anim.onfinish?.()));
       expect(document.getElementById(details.getAttribute('aria-controls')!)).toBeNull();
     });

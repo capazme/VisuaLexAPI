@@ -84,7 +84,7 @@ export function DossierPage() {
     <>
       {/* The list, a dossier and the trash slide one into the other (LC98); a dossier asked by its address comes in once
           the dossiers are read. */}
-      <ViewSlide view={showTrash ? 'trash' : selectedDossierId ? 'detail' : 'list'} order={VIEWS}>
+      <ViewSlide view={showTrash ? 'trash' : selectedDossierId ? 'detail' : 'list'} order={VIEWS} drill={['list', 'detail']}>
         {showTrash ? (
           <TrashPage trash={trash} onBack={() => setShowTrash(false)} showToast={showToast} />
         ) : selectedDossier || (reading && (selectedDossierId || readError)) ? (

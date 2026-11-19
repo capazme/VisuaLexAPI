@@ -61,6 +61,18 @@ describe('Button', () => {
     expect(className).toContain('ease-out');
   });
 
+  it('turns busy or disabled at once: no fade of its opacity, no transition while disabled (LC132)', () => {
+    const { rerender } = render(<Button>Salva</Button>);
+    const button = screen.getByRole('button', { name: 'Salva' });
+    const moved = () => button.className.match(/(?:^| )transition-\[([^\]]*)\]/)?.[1].split(',') ?? [];
+    expect(moved()).toEqual(expect.arrayContaining(['color', 'background-color', 'transform', 'scale']));
+    expect(moved()).not.toContain('opacity');
+    expect(button).toHaveClass('disabled:transition-none');
+    rerender(<Button loading>Salva</Button>);
+    expect(button).toBeDisabled();
+    expect(moved()).not.toContain('opacity');
+  });
+
   it('keeps a 20 px line at every size', () => {
     render(
       <>

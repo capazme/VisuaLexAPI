@@ -21,6 +21,27 @@ export const ISLAND_OPEN = { duration: 280, easing: `cubic-bezier(${ease.drawer.
 export const ISLAND_CLOSE = { duration: 220, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
 
 /**
+ * The frequency rule (LC132; Luca, 19 Nov: animations only where they help; agreed with the UI consultant). The more
+ * often a gesture comes, the less it moves:
+ * - a keystroke moves nothing (a letter, an arrow in a list: the change is there in the same frame);
+ * - a repeated action (a row that opens, a notification, ⌘K) takes at most 150–200 ms, with no spring and no cascade;
+ * - a change of place (a page, a view) takes 180 ms.
+ * Rare moments (a confirmation, a Gymnasium reward, the first draw of a page) keep their own times above. Reduced
+ * motion keeps its fades as they are. Every time below is one of these; a new one names its row of the rule.
+ */
+/** ⌘K's island, the field that grows out of the pill, and its band (a repeated action): at once, no wait. */
+export const SEARCH_OPEN = { duration: 180, easing: `cubic-bezier(${ease.drawer.join(', ')})` } as const;
+export const SEARCH_CLOSE = { duration: 120, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
+/** A repeated action that opens and closes: `Expand`'s space, the notifications. */
+export const REPEAT_OPEN = { duration: 200, easing: `cubic-bezier(${ease.drawer.join(', ')})` } as const;
+export const REPEAT_CLOSE = { duration: 150, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
+/** The notifications' stack moving into place, for Framer Motion: `REPEAT_OPEN`'s time, a tween, no bounce. */
+export const REPEAT_MOVE = { type: 'tween', duration: REPEAT_OPEN.duration / 1000, ease: ease.out } as const;
+/** A change of place inside a page (`ViewSlide`): `PageFade`'s 180 ms; sideways by `VIEW_SHIFT` px only list ↔ detail. */
+export const PLACE_CHANGE = { duration: dur.pop * 1000, easing: `cubic-bezier(${ease.out.join(', ')})` } as const;
+export const VIEW_SHIFT = 12;
+
+/**
  * The menus (LC102, variant A of the «⋯» page): they appear under their trigger, aligned to its edge, by a fade and a
  * shift of `MENU_SHIFT` px; under reduced motion only the fade, 150 ms linear (the app's rule in `index.css`).
  */

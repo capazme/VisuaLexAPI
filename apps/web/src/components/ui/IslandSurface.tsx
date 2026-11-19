@@ -26,8 +26,6 @@ import { now, useReducedMotionLive } from './islandMotion';
 const CONTENT_FROM = 0.25;
 const CONTENT_UNTIL = 0.8;
 const PILL_FROM = 0.99;
-/** The longest the opening waits for the mount's long frames to pass, so none of it is skipped. */
-const SETTLE_MS = 150;
 const SHAPE_KEYS = ['top', 'right', 'bottom', 'left', 'borderRadius', 'boxShadow', 'opacity'];
 
 type Inset = { top: number; right: number; bottom: number; left: number; radius: number };
@@ -97,8 +95,8 @@ export interface IslandSurfaceProps extends Omit<HTMLAttributes<HTMLDivElement>,
   hideSource?: boolean;
   /** Grows only from a source under its box (the search's pill or field); elsewhere it fades. */
   within?: boolean;
-  /** The opening waits for the mount's long frames (the search menu's), hidden meanwhile. */
-  settle?: boolean;
+  /** Its two ways' times: the island's by default; a repeated action takes shorter ones (`lib/motion.ts`, LC132). */
+  timing?: { open: KeyframeAnimationOptions; close: KeyframeAnimationOptions };
   /** The shape's look: ground, edge, corners, shadow. The content's corners must match its corners. */
   surfaceClassName?: string;
   contentClassName?: string;
@@ -112,7 +110,7 @@ export function IslandSurface({
   onClosed,
   hideSource = false,
   within = false,
-  settle = false,
+  timing: ways = { open: ISLAND_OPEN, close: ISLAND_CLOSE },
   className,
   surfaceClassName = cn('shadow-lg', CARD_RADIUS, ISLAND_SURFACE),
   contentClassName = cn('relative flex min-h-0 flex-1 flex-col overflow-hidden', CARD_RADIUS),
@@ -184,9 +182,6 @@ export function IslandSurface({
       if (was && (!was.content.clipPath || was.content.clipPath === 'none')) was.content.clipPath = clipAt(full);
       return { was, shadow: own.boxShadow, full, field, rest: others };
     };
-    let frame = 0;
-    let idle = 0;
-
     if (isPresent) {
       const grow = () => {
         started.current = true;
@@ -196,7 +191,7 @@ export function IslandSurface({
         root.style.pointerEvents = '';
         const from = still ? null : insetOf(source, root.getBoundingClientRect(), within);
         const element = source instanceof HTMLElement ? source : null;
-        const timing = { ...ISLAND_OPEN, fill: 'backwards' as const };
+        const timing = { ...ways.open, fill: 'backwards' as const };
         // LC81: the field, at its place now (nothing runs on it), and where it starts: on the pill, or where it is.
         const fieldHome = field && fieldOn(field, field.getBoundingClientRect());
         const fieldFrom = field && (was?.field ?? (from && element ? { ...fieldOn(field, element.getBoundingClientRect()), opacity: 1 } : null));
@@ -235,26 +230,9 @@ export function IslandSurface({
           running.current = [];
         };
       };
-      // Coming back while it closes goes on at once; so does a fade, which has nothing to skip, and under reduced motion
-      // the app's rule gives every opacity change a CSS transition (`index.css`), which an inline wait would start.
-      if (running.current.length > 0 || still || !settle) grow();
-      else {
-        // Hidden until it starts (the source shows meanwhile): mounting the search menu is long frames, and a way
-        // started under them is seen from a third of it. Started on the frame after the page is idle, at most
-        // `SETTLE_MS` later (no idle callback, Safari: after two frames).
-        root.style.opacity = '0';
-        const start = () => {
-          frame = requestAnimationFrame(grow);
-        };
-        if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(start, { timeout: SETTLE_MS });
-        else frame = requestAnimationFrame(() => {
-          frame = requestAnimationFrame(start);
-        });
-      }
-      return () => {
-        cancelAnimationFrame(frame);
-        if (idle && typeof cancelIdleCallback === 'function') cancelIdleCallback(idle);
-      };
+      // At once, with no wait for the mount's frames (LC132: ⌘K waited up to 150 ms before growing).
+      grow();
+      return undefined;
     }
 
     // Closing, from where it is, into the source where it is now, or a fade. Closed before it started: gone at once.
@@ -267,7 +245,7 @@ export function IslandSurface({
     const { was, shadow, full, field, rest: others } = take();
     const pill = hidden.current;
     const to = still ? null : insetOf(pill ?? source, root.getBoundingClientRect(), within);
-    const timing = { ...ISLAND_CLOSE, fill: 'forwards' as const };
+    const timing = { ...ways.close, fill: 'forwards' as const };
     const shapeNow = was?.shape ?? { ...shapeAt(full), boxShadow: shadow, opacity: 1 };
     const contentNow = was?.content ?? { clipPath: clipAt(full), opacity: 1 };
     // LC81: the field goes back onto the pill, seen to the end, and gives way to it in the same crossfade as the shape.

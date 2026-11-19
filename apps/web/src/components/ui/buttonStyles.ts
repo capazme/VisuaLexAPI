@@ -1,5 +1,5 @@
 import { cn } from '../../lib/utils';
-import { ACTIVE, DISABLED, FOCUS_RING, TRANSITION } from '../../constants/interactions';
+import { ACTIVE, DISABLED, FOCUS_RING } from '../../constants/interactions';
 import { CONTROL_BORDER, CONTROL_HEIGHT, CONTROL_RADIUS, type ControlSize } from './controlStyles';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'link';
@@ -68,10 +68,10 @@ export function buttonClassName(variant: ButtonVariant | ButtonAlias = 'primary'
   return cn(
     'inline-flex items-center justify-center gap-2 py-1.5 text-center font-medium',
     CONTROL_RADIUS,
-    TRANSITION,
     // The press answers in 120 ms (Y1, `--dur-press`) on `--ease-out`, and with it the button's colours (`TRANSITION`'s
-    // 150 elsewhere): one duration for every property it lists.
-    'duration-(--dur-press)',
+    // 150 elsewhere): one duration for every property it lists. Not the opacity (LC132): busy or disabled, and back, the
+    // button changes at once, with no fade; entering it, its colours do not move either (`disabled:transition-none`).
+    'transition-[color,background-color,border-color,transform,translate,scale] duration-(--dur-press) ease-out disabled:transition-none',
     FOCUS_RING,
     DISABLED,
     ACTIVE,

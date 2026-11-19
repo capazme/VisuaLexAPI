@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { cn } from '../../lib/utils';
-import { ISLAND_CLOSE, ISLAND_OPEN, MENU_FADE } from '../../lib/motion';
+import { ISLAND_OPEN, MENU_FADE, REPEAT_CLOSE, REPEAT_OPEN } from '../../lib/motion';
 import { prefersReducedMotion } from '../../features/sections/sectionTransition';
 
 /** Web Animations here (jsdom has none): without them it opens and closes at once. */
 /** The closing fade reduced motion keeps, as `index.css` gives every opacity change: the menus' own (150 ms, linear). */
 const REDUCED_FADE = MENU_FADE;
 const canAnimate = () => typeof Element.prototype.animate === 'function';
+const REPEAT = { open: REPEAT_OPEN, close: REPEAT_CLOSE };
 
 // Clipped only while its height moves, and on the height alone (`clip`, no scroll container): at rest nothing is cut, a
 // focus ring at its edges, a sticky toolbar inside it, a gloss's margin at the side.
@@ -25,20 +26,23 @@ export interface ExpandProps extends Omit<HTMLAttributes<HTMLDivElement>, 'child
   keepMounted?: boolean;
   /** Open, its height follows its content (default). Off where the content changes at a key (⌘K's band, LC129): it changes at once. */
   followContent?: boolean;
+  /** Its two ways' times with motion: a repeated action's by default (`REPEAT_OPEN`, `REPEAT_CLOSE`); ⌘K's band its island's. */
+  timing?: { open: KeyframeAnimationOptions; close: KeyframeAnimationOptions };
   children: ReactNode;
 }
 
 /**
  * «Lo spazio che si apre» (LC77, L-73): a part of the page that grows in height under what opened it and pushes the
- * rest down, never over it — no portal, no `fixed`. Its content fades in. Opening takes the island's time and curve
- * (`ISLAND_OPEN`, 280 ms on the drawer's curve), closing the island's other (`ISLAND_CLOSE`, 220 ms ease-out); a change
- * of mind halfway turns back from where the height and the fade are. Under reduced motion only the fade remains.
+ * rest down, never over it — no portal, no `fixed`. Its content fades in. It opens in 200 ms on the drawer's curve
+ * (`REPEAT_OPEN`) and closes in 150 ms ease-out (`REPEAT_CLOSE`): a repeated action under the frequency rule (LC132; it
+ * was the island's 280/220); a change of mind halfway turns back from where the height and the fade are. Under reduced
+ * motion only the fade remains, on its own times (below).
  *
  * On opening the focus goes to the space itself (`tabIndex={-1}`), or to `initialFocusRef`: never by itself into a
  * field, whose keyboard would rise over the page on a phone (LC105). On closing it goes back to what opened it. Esc
  * inside closes it.
  */
-export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, followContent = true, className, children, onKeyDown, ...rest }: ExpandProps) {
+export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false, followContent = true, timing: ways = REPEAT, className, children, onKeyDown, ...rest }: ExpandProps) {
   // Still drawn while it closes; derived during render where no animation will run (react-hooks/set-state-in-effect).
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
@@ -72,8 +76,9 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
     }
 
     // Brought into view from its start, clear of what sticks above it (its `scroll-margin-top`, the scroller's padding),
-    // while it still has its natural height: a page scrolled down would leave its title under a sticky heading.
-    const reveal = () => outer?.scrollIntoView?.({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    // while it still has its natural height: a page scrolled down would leave its title under a sticky heading. Only if
+    // it would leave the view (`nearest`), and at once (LC132: the browser's smooth scroll took 450–500 ms each time).
+    const reveal = () => outer?.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
     if (initial || !outer || !inner || !canAnimate()) {
       if (open && !initial) reveal();
       return;
@@ -94,12 +99,14 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
     // Under reduced motion the closing is the app's own fade (`index.css`: 150 ms): the island's 220 ms ease-out had the
     // content gone in a third of it and the space standing empty for the rest, read as a delay (Papiniano, #599). The
     // opening keeps the island's time: a shorter fade there showed a row's late content settling (46 px in Fonti).
-    const timing = open ? ISLAND_OPEN : prefersReducedMotion() ? REDUCED_FADE : ISLAND_CLOSE;
+    // With motion, the frequency rule's times (LC132).
+    const reduced = prefersReducedMotion();
+    const timing = reduced ? (open ? ISLAND_OPEN : REDUCED_FADE) : open ? ways.open : ways.close;
     const fill: FillMode = open ? 'none' : 'forwards';
     const fade = inner.animate([{ opacity: fromOpacity }, { opacity: open ? 1 : 0 }], { ...timing, fill });
     const anims = [fade];
     heightAnim.current = null;
-    if (!prefersReducedMotion()) {
+    if (!reduced) {
       // Opening ends on its natural height (none held in pixels): the content may still grow, a tree arriving late.
       const toHeight = open ? outer.offsetHeight : 0;
       heightAnim.current = outer.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], { ...timing, fill });
@@ -142,7 +149,7 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
       // height. The space is held where it was until the animation takes over.
       outer.style.height = `${from}px`;
       clip(outer);
-      const grow = outer.animate([{ height: `${from}px` }, { height: `${next}px` }], ISLAND_OPEN);
+      const grow = outer.animate([{ height: `${from}px` }, { height: `${next}px` }], ways.open);
       heightAnim.current = grow;
       const anims = [...running.current.filter((a) => a !== replaced), grow];
       running.current = anims;
@@ -156,7 +163,7 @@ export function Expand({ id, open, onClose, initialFocusRef, keepMounted = false
     });
     observer.observe(inner);
     return () => observer.disconnect();
-  }, [open, followContent]);
+  }, [open, followContent, ways]);
 
   if (!mounted && !keepMounted) return null;
 

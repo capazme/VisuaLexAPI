@@ -3,7 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { AnimatePresence } from 'framer-motion';
 import { IslandSurface } from '../IslandSurface';
 import { originOf } from '../islandMotion';
-import { ISLAND_CLOSE, ISLAND_OPEN } from '../../../lib/motion';
+import { ISLAND_CLOSE, ISLAND_OPEN, REPEAT_CLOSE, REPEAT_OPEN } from '../../../lib/motion';
 
 type Run = { el: Element; keyframes: Keyframe[]; options: KeyframeAnimationOptions; animation: Animation };
 let runs: Run[] = [];
@@ -138,6 +138,16 @@ describe('IslandSurface (LC85)', () => {
       </IslandSurface>,
     );
     expect(runOn(shapeOf()).keyframes[0]).toMatchObject({ top: '88px', right: '52px', bottom: '0px', left: '52px', borderRadius: '16px' });
+  });
+
+  it('takes the times it is given, at once with no wait: a notification\'s 200 and 150 ms (LC132)', () => {
+    const timing = { open: REPEAT_OPEN, close: REPEAT_CLOSE };
+    const { rerender } = render(<IslandSurface open source={trigger} timing={timing} role="menu"><p>Nota salvata</p></IslandSurface>);
+    expect(runOn(shapeOf()).options).toMatchObject(REPEAT_OPEN);
+    expect(runOn(shapeOf()).options.duration).toBe(200);
+    rerender(<IslandSurface open={false} source={trigger} timing={timing} role="menu"><p>Nota salvata</p></IslandSurface>);
+    expect(runOn(shapeOf()).options).toMatchObject(REPEAT_CLOSE);
+    expect(runOn(shapeOf()).options.duration).toBe(150);
   });
 
   it('driven by its owner, says when its closing is over', async () => {
