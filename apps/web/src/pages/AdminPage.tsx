@@ -40,7 +40,8 @@ type AdminSection = 'utenti' | 'problemi-segnalati' | 'pratiche-pubblicate' | 'p
 /** The «⋯» of a row: `IconButton`'s quiet look on `MenuButton`'s own trigger. */
 const ROW_MENU = cn(buttonClassName('quiet'), 'min-w-11 px-0 md:min-w-9');
 /** A filter's menu in a part's heading row: as wide as its longest choice needs. */
-const FILTER = 'w-40';
+// 36 px narrower on a phone, so two menus and «Aggiorna» keep one row at 390.
+const FILTER = 'w-36 md:w-40';
 const LIST = 'divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800';
 const MUTED = 'text-xs text-slate-500 dark:text-slate-400';
 const COLUMN_HEAD = 'hidden gap-4 pb-2 text-xs font-medium text-slate-500 md:grid dark:text-slate-400';
