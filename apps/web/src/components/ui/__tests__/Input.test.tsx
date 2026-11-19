@@ -26,6 +26,19 @@ describe('Input', () => {
     expect(screen.getByText('Numero')).toHaveAttribute('for', 'numero');
   });
 
+  // LC116: in the dark a field is darker than whatever it sits on, a card or the page: a veil of black, never the card's
+  // own ground nor the page's (`ink-950`, which the page is about); in the light the card's paper. An error's red
+  // ground still takes its place.
+  it('grounds the field below what it sits on in the dark, on the card\'s paper in the light', () => {
+    const { rerender } = render(<Input label="Titolo" />);
+    const field = () => screen.getByLabelText('Titolo');
+    expect(field()).toHaveClass('bg-card');
+    const darkGround = () => [...field().classList].filter((c) => c.startsWith('dark:bg-'));
+    expect(darkGround()).toEqual(['dark:bg-black/40']);
+    rerender(<Input label="Titolo" error="Obbligatorio" />);
+    expect(darkGround()).toEqual(['dark:bg-red-900/10']);
+  });
+
   it('marks the field invalid and described by its error', () => {
     render(<Input label="Numero" error="Il numero va da 1 a 999999" />);
     const field = screen.getByRole('textbox', { name: 'Numero' });

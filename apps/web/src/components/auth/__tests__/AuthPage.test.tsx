@@ -50,8 +50,24 @@ describe('AuthPage: two tabs on one page', () => {
     expect(tab('Accedi')).toHaveAttribute('aria-selected', 'true');
     expect(tab('Registrati')).toHaveAttribute('aria-selected', 'false');
     expect(panel()).toHaveAttribute('aria-labelledby', 'auth-tab-login');
-    expect(tab('Accedi')).toHaveAttribute('aria-controls', 'auth-panel-login');
+    // The common row (LC116) names the box of the two panels; each panel is named by its tab.
+    expect(tab('Accedi')).toHaveAttribute('aria-controls', 'auth');
+    expect(document.getElementById('auth')).toContainElement(panel());
     expect(within(panel()).getByRole('button', { name: 'Accedi' })).toBeInTheDocument();
+  });
+
+  // LC116: the common fields keep what a password manager reads: the same ids, types and `autocomplete`, no `name` added.
+  it('keeps every field\'s id, type and autocomplete as before', () => {
+    renderAuth('/login');
+    const fields = [...document.querySelectorAll('input')].map((input) => [input.id, input.type, input.getAttribute('autocomplete'), input.getAttribute('name')]);
+    expect(fields).toEqual([
+      ['login-email', 'email', 'email', null],
+      ['login-password', 'password', 'current-password', null],
+      ['register-email', 'email', 'email', null],
+      ['register-username', 'text', 'username', null],
+      ['register-password', 'password', 'new-password', null],
+      ['register-confirm-password', 'password', 'new-password', null],
+    ]);
   });
 
   it('opens «Registrati» from /register', () => {
@@ -113,13 +129,14 @@ describe('AuthPage: two tabs on one page', () => {
     expect(within(panel()).getByLabelText('Email')).toHaveFocus();
   });
 
-  it('slides the mark under the tabs with a transform', () => {
+  // LC116: the app's one row of tabs, small (44 px on a phone, 36 from md), its mark under the chosen tab.
+  it('draws the tabs with the common row, its mark under the chosen one', () => {
     renderAuth('/login');
-    const mark = screen.getByTestId('auth-tab-mark');
-    expect(mark.style.transform).toBe('translateX(0)');
-    expect(mark.className).toContain('transition-transform');
+    expect(tab('Accedi')).toHaveClass('min-h-11', 'md:min-h-8', 'rounded-md');
+    expect(tab('Accedi').querySelector('[data-segmented-mark]')).not.toBeNull();
     fireEvent.click(tab('Registrati'));
-    expect(mark.style.transform).toBe('translateX(100%)');
+    expect(tab('Accedi').querySelector('[data-segmented-mark]')).toBeNull();
+    expect(tab('Registrati').querySelector('[data-segmented-mark]')).not.toBeNull();
   });
 
   it('fades the form out, hidden and out of reach, while the next one comes in from the side of its tab', () => {
@@ -309,7 +326,7 @@ describe('AuthPage: two tabs on one page', () => {
     fireEvent.click(tab('Registrati'));
     // From the old height to the new, in 220 ms; the page's centre is still «Accedi»'s.
     expect(frame.style.height).toBe('300px');
-    expect(frame).toHaveClass('transition-[height]', 'duration-[220ms]');
+    expect(frame).toHaveClass('transition-[height]', 'duration-(--dur-panel)');
     await waitFor(() => expect(frame.style.height).toBe('560px'));
     expect(page.style.getPropertyValue('--login-card-h')).toBe('420px');
     // Let go at the end of the transition: at rest again, as tall as the form shown.
@@ -385,9 +402,8 @@ describe('AuthPage: two tabs on one page', () => {
     expect(panel()).toHaveAttribute('id', 'auth-panel-register');
     expect(panel().className).not.toContain('animate-in');
     expect(panel().className).not.toContain('slide-in');
-    // Nor a fade on the way out, nor a slide of the mark.
+    // Nor a fade on the way out (the mark is the common row's, drawn in place under reduced motion).
     expect(document.getElementById('auth-panel-login')!.className).toContain('motion-reduce:transition-none');
-    expect(screen.getByTestId('auth-tab-mark').className).toContain('motion-reduce:transition-none');
     // Nor a height that moves.
     const frame = document.getElementById('auth-panel-login')!.parentElement!;
     expect(frame).not.toHaveClass('transition-[height]');
