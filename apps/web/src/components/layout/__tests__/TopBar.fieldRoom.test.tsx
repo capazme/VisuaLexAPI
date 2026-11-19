@@ -74,3 +74,26 @@ describe('TopBar — the field\'s room (L-75)', () => {
     expect(slot.style.width).toBe(`${700 - 224 - 12 - 24}px`);
   });
 });
+
+// LC141 (Papiniano on #711: the centred pill covered «Novità» at 1024, and at 1280 with the wide sidebar): the bar is three
+// columns, so the controls cannot sit under the search. jsdom cannot measure: the structure is the check; the widths
+// are measured on screen.
+describe('TopBar — three columns, the search between (LC141)', () => {
+  it('lays the path, the search and the controls in a grid whose middle may shrink', () => {
+    const slot = drawBar(() => 1300);
+    const bar = slot.parentElement!;
+    // The path to 0, the search's column flexible (the pill in it at most 22 rem), the controls never below their whole width.
+    expect(bar).toHaveClass('lg:grid', 'grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(max-content,1fr)]');
+    expect(bar).not.toHaveClass('lg:flex');
+    const [path, search, controls] = Array.from(bar.children) as HTMLElement[];
+    expect(path).toHaveAttribute('data-bar-path');
+    expect(path).toHaveClass('min-w-0', 'overflow-hidden');
+    expect(search).toHaveAttribute('data-bar-search');
+    expect(search).toHaveClass('min-w-0');
+    expect(search.className).not.toMatch(/absolute|left-1\/2/);
+    expect(search.querySelector('button')).toHaveClass('w-full', 'min-w-0', 'max-w-[22rem]');
+    expect(controls).toHaveClass('shrink-0', 'justify-self-end', '[&>*]:shrink-0');
+    // «Novità» and «Tutto schermo» in it, none allowed to squeeze.
+    expect(controls.querySelector('button[aria-label="Novità"]')).not.toBeNull();
+  });
+});

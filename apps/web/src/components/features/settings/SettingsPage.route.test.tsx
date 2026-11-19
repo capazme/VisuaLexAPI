@@ -70,7 +70,7 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
       ['Aspetto', 'Significato dei colori'],
       ['Norme rapide', 'Alias'],
       ['Applicazioni collegate', 'Dati e privacy'],
-      ['Segnala un problema', 'Scorciatoie da tastiera', 'Aiuto', 'Informazioni'],
+      ['Dicci cosa ti serve', 'Scorciatoie da tastiera', 'Aiuto', 'Informazioni'],
     ]);
     const order = within(index).getAllByRole('link').map((link) => link.getAttribute('href')!.slice(1));
     const parts = [...document.querySelectorAll('section[id]')].map((part) => part.id).filter((id) => order.includes(id));
@@ -92,15 +92,15 @@ describe('Impostazioni — a page with its parts (LC84)', () => {
     expect(current).toHaveClass('aria-[current=location]:font-semibold', 'aria-[current=location]:border-slate-900');
   });
 
-  // LC92: the bug beside «Impostazioni» and the user menu open «Segnala un problema», a part of the page, not a dialog.
-  it('opens at «Segnala un problema», the form that was «Commenti»\'s dialog', () => {
+  // LC92: the bug beside «Impostazioni» and the user menu open «Dicci cosa ti serve», a part of the page, not a dialog.
+  it('opens at «Dicci cosa ti serve», the form that was «Commenti»\'s dialog', () => {
     app('segnala');
     enter();
     expect(where()).toHaveTextContent('/impostazioni#segnala');
     const part = document.getElementById('segnala');
-    expect(part).toContainElement(screen.getByRole('heading', { level: 3, name: 'Segnala un problema' }));
+    expect(part).toContainElement(screen.getByRole('heading', { level: 3, name: 'Dicci cosa ti serve' }));
     expect(part).toContainElement(screen.getByRole('button', { name: 'Invia' }));
-    expect(within(screen.getByRole('navigation', { name: 'Parti delle impostazioni' })).getByRole('link', { name: 'Segnala un problema' })).toHaveAttribute('href', '#segnala');
+    expect(within(screen.getByRole('navigation', { name: 'Parti delle impostazioni' })).getByRole('link', { name: 'Dicci cosa ti serve' })).toHaveAttribute('href', '#segnala');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
