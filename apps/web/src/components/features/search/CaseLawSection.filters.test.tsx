@@ -215,7 +215,7 @@ describe('CaseLawSection — on a phone', () => {
     render(<MemoryRouter><CaseLawSection norma={NORMA} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     const filtri = screen.getByRole('button', { name: 'Filtri' });
-    expect(filtri).toHaveClass('min-h-[44px]');
+    expect(filtri).toHaveClass('min-h-11');
     expect(filtri).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Anni' })).toBeNull();

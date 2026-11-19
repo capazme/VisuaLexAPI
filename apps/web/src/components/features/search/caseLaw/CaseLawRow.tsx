@@ -2,6 +2,8 @@ import { useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } fro
 import { FolderPlus } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../../constants/interactions';
+import { Button } from '../../../ui/Button';
+import { Expand } from '../../../ui/Expand';
 import { formatDateItalianLong } from '../../../../utils/dateUtils';
 import { DECISION_PAGE_AVAILABLE, formatDecisionShort, linkableDecisionPath, type LooseDecisionRef } from '../../../../utils/decisionLinks';
 import type { ReadingBackEntry } from '../../../../utils/readingBackStack';
@@ -75,22 +77,17 @@ function ClampedText({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <p ref={ref} id={textId} className={cn('text-sm leading-relaxed text-slate-700 dark:text-slate-300', !expanded && 'line-clamp-3')}>
-        {children}
-      </p>
+      {/* Always open: «Mostra tutto» and «Mostra meno» change the text's height, which `Expand` follows on the
+          island's timing instead of jumping (LC113). */}
+      <Expand open>
+        <p ref={ref} id={textId} className={cn('text-sm leading-relaxed text-slate-700 dark:text-slate-300', !expanded && 'line-clamp-3')}>
+          {children}
+        </p>
+      </Expand>
       {overflows && (
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls={textId}
-          onClick={() => setExpanded((v) => !v)}
-          className={cn(
-            'text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400',
-            TOUCH_TARGET_RESPONSIVE,
-          )}
-        >
+        <Button type="button" variant="link" size="sm" aria-expanded={expanded} aria-controls={textId} onClick={() => setExpanded((v) => !v)}>
           {expanded ? 'Mostra meno' : 'Mostra tutto'}
-        </button>
+        </Button>
       )}
     </>
   );
@@ -151,18 +148,17 @@ export function CaseLawRow({
         {heldIn && <HeldInMark label={heldIn} />}
         {/* Named at every width: a row of case law has no «⋯» to hold it. */}
         {target && (
-          <button
+          <Button
             type="button"
+            variant="quiet"
+            size="sm"
             onClick={(e) => adding.open(e.currentTarget)}
             aria-label={estremi ? `Aggiungi alla pratica ${estremi}` : undefined}
-            className={cn(
-              'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-              TOUCH_TARGET_RESPONSIVE,
-            )}
+            icon={<FolderPlus size={14} aria-hidden />}
+            className="gap-1 px-2 text-sm"
           >
-            <FolderPlus size={14} aria-hidden />
             Aggiungi alla pratica
-          </button>
+          </Button>
         )}
       </div>
       {adding.popover}

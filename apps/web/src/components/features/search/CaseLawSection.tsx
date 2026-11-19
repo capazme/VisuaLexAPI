@@ -3,6 +3,8 @@ import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 import type { NormaVisitata } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
+import { Expand } from '../../ui/Expand';
 import { citeNorm } from '../../../utils/sources';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
 import { searchNorma } from '../../../utils/decisionSearchNorma';
@@ -114,6 +116,7 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
     <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
       {/* A section's label, as the rest of the app writes it (R3): plain, `text-sm font-semibold`. */}
       <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+        {/* bare-button: the section's heading, the accordion's whole row (its name and the chevron at the far end). */}
         <button
           type="button"
           aria-expanded={open}
@@ -125,35 +128,40 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
           )}
         >
           <span>Giurisprudenza</span>
-          <ChevronDown size={16} className={cn('transition-transform duration-200', open && 'rotate-180')} />
+          <ChevronDown size={16} className={cn('transition-transform duration-(--dur-pop)', open && 'rotate-180')} />
         </button>
       </h3>
 
-      <div id={panelId} hidden={!open} className="mt-3 space-y-6">
-        {open && (
+      {/* The section opens in the page under its heading (LC113, `Expand`): Esc inside closes it, the focus back on it. */}
+      <Expand id={panelId} open={open} onClose={toggle}>
           <CaseLawFiltersContext.Provider value={provided}>
+          <div className="mt-3 space-y-6">
             {/* One set of controls for every block; on a phone they sit behind «Filtri» */}
             <div>
               {!desktop && (
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   aria-expanded={filtersOpen}
                   aria-controls={`${panelId}-filters`}
                   onClick={() => setFiltersOpen((v) => !v)}
-                  className={cn(
-                    'mb-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:text-slate-200',
-                    TOUCH_TARGET_RESPONSIVE,
-                  )}
+                  icon={<SlidersHorizontal size={14} aria-hidden="true" />}
+                  className="mb-2"
                 >
-                  <SlidersHorizontal size={14} aria-hidden="true" />
                   Filtri
                   {active > 0 && <span aria-hidden="true" className="rounded-full bg-primary-600 px-1.5 text-xs text-white">{active}</span>}
-                </button>
+                </Button>
               )}
-              {/* always there, so «Filtri» controls an element; hidden on a phone until it is opened */}
-              <div id={`${panelId}-filters`} hidden={!desktop && !filtersOpen}>
-                <CaseLawControls filters={filters} onChange={setFilters} counts={counts} />
-              </div>
+              {/* Always there, so «Filtri» controls an element; on a phone a space that opens under it (`Expand`). */}
+              {desktop ? (
+                <div id={`${panelId}-filters`}>
+                  <CaseLawControls filters={filters} onChange={setFilters} counts={counts} />
+                </div>
+              ) : (
+                <Expand id={`${panelId}-filters`} open={filtersOpen} onClose={() => setFiltersOpen(false)} keepMounted>
+                  <CaseLawControls filters={filters} onChange={setFilters} counts={counts} />
+                </Expand>
+              )}
             </div>
 
             {/* The Massimario's panel is its own heading ("Nelle rassegne della Cassazione", with the
@@ -173,22 +181,16 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
                   backEntry={backEntry}
                 />
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setSearched(true)}
-                  className={cn(
-                    'rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800',
-                    TOUCH_TARGET_RESPONSIVE,
-                  )}
-                >
+                <Button type="button" variant="secondary" onClick={() => setSearched(true)}>
                   Cerca nell’archivio della Cassazione
-                </button>
+                </Button>
               )}
             </section>}
 
             {/* The decisions on the article's subject, whether or not they cite it: a topic window beside.
                 The Cassazione's archive only, so not for an act of the Union. */}
             {offersCassazione && tema && (
+              // bare-button: a link-like row, the search's words over the topic quoted under them.
               <button
                 type="button"
                 onClick={() => {
@@ -197,7 +199,7 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
                   if (backEntry) pushReadingBack(backEntry);
                   openTopicSearch({ tema }, `Tema: ${tema}`, tabId ? { besideId: tabId } : undefined);
                 }}
-                className="group -mx-1 flex min-h-[44px] items-start gap-2 rounded-lg px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="group -mx-1 flex min-h-[44px] items-start gap-2 rounded-md px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 <Search size={14} aria-hidden="true" className="mt-1 shrink-0 text-primary-700 dark:text-primary-300" />
                 <span className="min-w-0">
@@ -218,9 +220,9 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
                 <EuCaseLawBlock norma={norma} besideId={tabId} backEntry={backEntry} />
               </section>
             )}
+          </div>
           </CaseLawFiltersContext.Provider>
-        )}
-      </div>
+      </Expand>
     </div>
   );
 }

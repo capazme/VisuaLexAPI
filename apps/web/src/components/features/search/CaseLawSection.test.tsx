@@ -50,6 +50,20 @@ beforeEach(() => {
 });
 
 describe('CaseLawSection', () => {
+  // LC113: the section is an `Expand` under its heading; Esc inside closes it and gives the focus back to the heading.
+  it('opens in the page under its heading; Esc inside closes it, the focus back on «Giurisprudenza»', async () => {
+    show();
+    await userEvent.click(toggle());
+    const panel = document.getElementById(toggle().getAttribute('aria-controls')!)!;
+    expect(panel).toHaveAttribute('tabindex', '-1');
+    expect(panel).not.toHaveAttribute('hidden');
+    const archive = screen.getByRole('button', { name: /Cerca nell’archivio della Cassazione/ });
+    archive.focus();
+    await userEvent.keyboard('{Escape}');
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle()).toHaveFocus();
+  });
+
   it('is closed by default, an accordion named by its heading', () => {
     show();
     expect(toggle()).toHaveAttribute('aria-expanded', 'false');
