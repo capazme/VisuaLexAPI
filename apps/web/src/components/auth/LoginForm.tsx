@@ -16,7 +16,7 @@ import { FormError, PasswordToggle } from './AuthFormParts';
 const ERROR_ID = 'login-error';
 
 interface LoginFormProps {
-  /** The page's one `useAuth`. */
+  /** The page's one `useAuth`, its `loading` the page's `busy`: only this form's request disables it (LC131). */
   auth: Pick<ReturnType<typeof useAuth>, 'login' | 'loading' | 'error'>;
   /** A request in flight, or none: the page holds the tabs still meanwhile. */
   onBusy: (busy: boolean) => void;
