@@ -13,7 +13,7 @@ const read = (name: string) => readFileSync(join(DIR, name), 'utf8');
 // LC112: Learn speaks the common components' language, as Pratiche (LC106) and Opus (LC110). A bare `<button>`,
 // `<select>` or `<input>` stays only with its reason written on the line above (`bare-button: …`): a radio, a row that
 // is a whole option, a chip, the lesson's grades.
-describe('Learn, no bare controls', () => {
+describe('Learn, the common components', () => {
   it('reads the sub-folders too', () => {
     expect(files).toEqual(expect.arrayContaining(['progress/ProgressPage.tsx', 'corsi/ModuleSession.tsx', 'lezione/LessonSession.tsx', 'missions/DayBlock.tsx']));
   });

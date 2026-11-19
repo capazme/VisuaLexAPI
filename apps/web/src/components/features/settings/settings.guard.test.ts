@@ -14,7 +14,7 @@ const WINDOWS = ['components/features/admin/CoursesSwitchAdmin.tsx', 'components
 // LC115: Impostazioni and Amministrazione speak the common components' language, as Pratiche (LC106), Opus (LC110),
 // Learn (LC112), the reader (LC113) and the Forum (LC114). A bare `<button>`, `<select>`, `<input>` or `<textarea>` stays
 // only with its reason written on the line above (`bare-input: …`): a checkbox, a row that is a whole entry.
-describe('Impostazioni and Amministrazione, no bare controls', () => {
+describe('Impostazioni and Amministrazione, the common components', () => {
   it('reads the settings, the admin page and its parts', () => {
     expect(files).toEqual(expect.arrayContaining([
       'components/features/settings/SettingsPage.tsx', 'components/features/settings/AliasSection.tsx',

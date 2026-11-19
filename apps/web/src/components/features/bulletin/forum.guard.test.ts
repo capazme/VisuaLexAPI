@@ -21,7 +21,7 @@ const STYLED = files.filter((name) => !WINDOWS.includes(name) || CALLS_A_DIALOG.
 // LC114: the Forum speaks the common components' language, as Pratiche (LC106), Opus (LC110), Learn (LC112) and the
 // reader (LC113). A bare `<button>`, `<select>` or `<input>` stays only with its reason written on the line above
 // (`bare-button: …`): a row that is a whole option, a checkbox.
-describe('Forum, no bare controls', () => {
+describe('Forum, the common components', () => {
   it('reads the Forum and the Community', () => {
     expect(files).toEqual(expect.arrayContaining(['ForumExploreView.tsx', 'CommunityThreadView.tsx', 'SuggestContentPanel.tsx']));
   });

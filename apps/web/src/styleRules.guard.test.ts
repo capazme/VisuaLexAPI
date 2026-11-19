@@ -15,8 +15,10 @@ const FOLDERS: Record<string, string> = {
 };
 
 const LABS = FOLDERS['features/merlt/'];
-const WINDOW = 'a window over the content (L-73, L-74): out of its area\'s checks of style, its own PR brings it into the page';
+const WINDOW = 'a window over the content (L-73, L-74): its area\'s PR left it as it was, for the PR that brings it into the page';
+const COMMON_WINDOW = 'a common window over the content (L-73, L-74): not among the common controls aligned so far';
 const TEXTAREA = 'a `<textarea>`: its area\'s PR held buttons, menus and inputs, not yet `Textarea`';
+const OPUS_FIELD = 'a field: Opus\'s PR (LC110) held buttons and menus';
 const NO_AREA = 'no area PR among LC104–LC117 took it in';
 const COMMON = 'a common component\'s own radius or time, not yet on `CONTROL_RADIUS`, `CARD_RADIUS` or the motion tokens';
 
@@ -47,23 +49,23 @@ const EXCEPTIONS: Record<string, Counts & { why: string }> = {
   'components/features/practice/PracticeDossierPicker.tsx': { bare: 2, radius: 1, why: WINDOW },
   'components/features/search/BlockAnnotationsSheet.tsx': { bare: 3, radius: 1, why: WINDOW },
   'components/features/search/NotesPeekPanel.tsx': { bare: 7, radius: 2, duration: 3, why: WINDOW },
-  'components/ui/AdvancedExportModal.tsx': { radius: 9, why: WINDOW },
-  'components/ui/AnnexSwitchDialog.tsx': { radius: 5, why: WINDOW },
-  'components/ui/CopyModal.tsx': { radius: 6, why: WINDOW },
-  'components/ui/Modal.tsx': { radius: 5, duration: 1, why: WINDOW },
-  'components/ui/PDFViewer.tsx': { radius: 4, duration: 1, why: WINDOW },
-  'components/ui/PreviewFrame.tsx': { radius: 2, duration: 1, why: WINDOW },
-  'components/ui/Sheet.tsx': { radius: 2, why: WINDOW },
+  'components/ui/AdvancedExportModal.tsx': { radius: 9, why: COMMON_WINDOW },
+  'components/ui/AnnexSwitchDialog.tsx': { radius: 5, why: COMMON_WINDOW },
+  'components/ui/CopyModal.tsx': { radius: 6, why: COMMON_WINDOW },
+  'components/ui/Modal.tsx': { radius: 5, duration: 1, why: COMMON_WINDOW },
+  'components/ui/PDFViewer.tsx': { radius: 4, duration: 1, why: COMMON_WINDOW },
+  'components/ui/PreviewFrame.tsx': { radius: 2, duration: 1, why: COMMON_WINDOW },
+  'components/ui/Sheet.tsx': { radius: 2, why: COMMON_WINDOW },
 
   'components/features/practice/RowDossierPanels.tsx': { bare: 1, why: TEXTAREA },
-  'components/features/planner/TaskSheet.tsx': { bare: 1, why: TEXTAREA },
+  'components/features/planner/TaskSheet.tsx': { bare: 1, why: OPUS_FIELD },
   'components/features/search/ArticleDiscussionPanel.tsx': { bare: 1, why: TEXTAREA },
   'components/features/search/NoteEditBox.tsx': { bare: 1, why: TEXTAREA },
   'components/features/search/discussionControls.tsx': { bare: 1, why: TEXTAREA },
   'components/features/studia/VoteBar.tsx': { bare: 1, why: TEXTAREA },
   'components/features/studia/corsi/ExamSession.tsx': { bare: 1, why: TEXTAREA },
   'components/features/studia/corsi/RecallStep.tsx': { bare: 1, why: TEXTAREA },
-  'components/features/planner/QuickAddField.tsx': { bare: 1, why: 'an `<input>`: Opus\'s PR (LC110) held buttons and menus' },
+  'components/features/planner/QuickAddField.tsx': { bare: 1, why: OPUS_FIELD },
   'components/features/dossier/DossierDecisionReader.tsx': { radius: 1, why: 'Pratiche\'s PR (LC106) held buttons and menus, not radii' },
   'components/features/dossier/DossierKindChoice.tsx': { radius: 1, why: 'Pratiche\'s PR (LC106) held buttons and menus, not radii' },
   'components/features/studia/ReviewSession.tsx': { duration: 1, why: 'Web Animations\' milliseconds: Learn\'s PR (LC112) held the `duration-*` classes' },
@@ -158,7 +160,7 @@ describe('styleViolations', () => {
   });
 
   it('fails on a radius other than 4 and 8 px, and on a duration by hand outside `lib/motion.ts`', () => {
-    expect(rules('pages/X.tsx', '"rounded-lg"\n"rounded-md rounded-[8px] rounded-full"\n"rounded-t-2xl"\n"rounded-[6px]"')).toEqual(['radius:1', 'radius:3', 'radius:4']);
+    expect(rules('pages/X.tsx', '"rounded-lg"\n"rounded-md rounded-[8px] rounded-full"\n"rounded-t-2xl rounded-s-xl"\n"rounded-[6px]"')).toEqual(['radius:1', 'radius:3', 'radius:4']);
     expect(rules('pages/X.tsx', '"duration-150"\ntransition={{ duration: 0.2 }}\ntoast(t, { duration: 4000 })')).toEqual(['duration:1', 'duration:2']);
     expect(rules('lib/motion.ts', 'export const X = { duration: 280 };')).toEqual([]);
   });

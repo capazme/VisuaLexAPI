@@ -28,7 +28,7 @@ const STYLED = files.filter((name) => !WINDOWS.includes(name) || ['search/Articl
 // LC113: the search and the reader speak the common components' language, as Pratiche (LC106), Opus (LC110) and Learn
 // (LC112). A bare `<button>`, `<select>` or `<input>` stays only with its reason written on the line above
 // (`bare-button: …`): a row that is a whole option, a mark in the text, a checkbox, a colour swatch.
-describe('Search and reader, no bare controls', () => {
+describe('Search and reader, the common components', () => {
   it('reads the sub-folders and the reader too', () => {
     expect(files).toEqual(expect.arrayContaining(['search/caseLaw/CaseLawRow.tsx', 'search/CommandPalette.tsx', 'practice/PracticeRowShell.tsx']));
   });

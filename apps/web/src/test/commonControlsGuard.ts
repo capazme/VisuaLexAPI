@@ -25,7 +25,7 @@ const BARE_TAG = /<(button|select|input|textarea|motion\.button)\b/;
 const FREE_INPUT = /\btype="(checkbox|radio|file|hidden)"/;
 // 4 px for what is pressed or typed in (`CONTROL_RADIUS`), 8 px for what holds things (`CARD_RADIUS`). A mark or a glyph
 // drawn under 4 px (a citation underlined in the text, a file's icon) is drawing, not a box.
-const OFF_RADIUS = /\brounded-(t-|b-|l-|r-|tl-|tr-|bl-|br-)?((lg|xl|2xl|3xl)\b|\[(?!([1-3]|4|8)px\]))/;
+const OFF_RADIUS = /\brounded-(t-|b-|l-|r-|s-|e-|tl-|tr-|bl-|br-|ss-|se-|es-|ee-)?((lg|xl|2xl|3xl)\b|\[(?!([1-3]|4|8)px\]))/;
 // The motion tokens (`--dur-*`, `lib/motion.ts`) or the components' own. A notice's time on screen is no motion.
 const HAND_DURATION = /\bduration-(\d|\[)|\bduration: *(0?\.\d|[1-9]\d{0,2}\b)/;
 
