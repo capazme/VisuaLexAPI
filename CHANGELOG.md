@@ -12,6 +12,16 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.50.0] - 2026-11-19
+
+The rest of the app on the common controls of the interface alignment. Web only, no migration. MERL-T stays
+off.
+
+### Interface
+
+- The pages not yet aligned use the common controls; small buttons are 32 px, or 44 px on a phone (LC117,
+  alignment 13 of 14).
+
 ## [1.49.0] - 2026-11-19
 
 Sign-in, the connection of apps, Impostazioni and Amministrazione on the common controls of the interface
