@@ -704,6 +704,19 @@ describe('«Le mie schede», a new card', () => {
 });
 
 describe('«Le mie schede», edit', () => {
+  // LC112: in the page the list stays in reach, so the edit belongs to its card.
+  it('closes the edit when another card is opened, and does not open it again on the next one', async () => {
+    const user = userEvent.setup();
+    renderView('/learn/schede/r1');
+    const detail = await screen.findByRole('article', { name: 'Scheda' });
+    await user.click(within(detail).getByRole('button', { name: 'Modifica' }));
+    expect(await screen.findByRole('region', { name: 'Modifica scheda' })).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: /Domanda r2\?/ }));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/learn/schede/r2'));
+    expect(screen.queryByRole('region', { name: 'Modifica scheda' })).toBeNull();
+    expect(await screen.findByRole('heading', { level: 3, name: 'Domanda r2?' })).toBeInTheDocument();
+  });
+
   it('opens the form on the draft', async () => {
     renderView('/learn/schede/r1');
     const detail = await screen.findByRole('article', { name: 'Scheda' });

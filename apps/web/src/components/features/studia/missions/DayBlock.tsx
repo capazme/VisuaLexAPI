@@ -131,7 +131,7 @@ export function DayBlock({
         <>
           <p role="alert" className={LARGE}>
             Non riesco a leggere i tuoi progressi.{' '}
-            <Button type="button" variant="link" onClick={onRetry} className="text-base">
+            <Button type="button" variant="link" onClick={onRetry} className="font-sans text-base">
               Riprova
             </Button>
           </p>

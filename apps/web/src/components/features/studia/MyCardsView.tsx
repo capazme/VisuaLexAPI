@@ -236,6 +236,8 @@ export function MyCardsView() {
   const closeForm = () => setForm(null);
   const formOpen = form !== null;
   const createPanelId = useId();
+  // An edit belongs to its card: another card opened, or none, closes it (the window it was covered the list).
+  if (form?.kind === 'edit' && form.card.id !== id) setForm(null);
   useEffect(() => {
     if (formOpen || !focusAfterCreate.current) return;
     focusAfterCreate.current = false;
