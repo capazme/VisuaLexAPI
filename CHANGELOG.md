@@ -12,6 +12,14 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.53.0] - 2026-11-19
+
+The PDF of an act opens inside the page. Web only, no migration. MERL-T stays off.
+
+### Work
+
+- The PDF of an act opens in a space inside the page, no longer in a separate window (LC124).
+
 ## [1.52.0] - 2026-11-19
 
 Two saved versions of a dossier side by side, and loading placeholders shaped like the content. Web only, no
