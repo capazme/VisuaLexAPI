@@ -4,9 +4,9 @@ import { resolve } from 'node:path';
 
 const SRC = resolve(process.cwd(), 'src');
 /**
- * Signing in, signing up and the consent page of a connection (LC116). `AdminRoute` and `ProtectedRoute` are guards
- * with no controls of their own; the rest of `features/connections` («Collega un'app AI», the connected apps in
- * Impostazioni) has its own PR.
+ * Signing in, signing up, the session kept while the account cannot be read, and the consent page of a connection
+ * (LC116). `AdminRoute`'s «Accesso negato» belongs to the admin page's PR; the rest of `features/connections` («Collega
+ * un'app AI», the connected apps in Impostazioni) to its own.
  */
 const FILES = [
   'components/auth/AuthPage.tsx',
@@ -14,6 +14,7 @@ const FILES = [
   'components/auth/RegisterForm.tsx',
   'components/auth/AuthFormParts.tsx',
   'components/auth/authForm.ts',
+  'components/auth/ProtectedRoute.tsx',
   'features/connections/ConnectPage.tsx',
 ];
 const read = (name: string) => readFileSync(resolve(SRC, name), 'utf8');

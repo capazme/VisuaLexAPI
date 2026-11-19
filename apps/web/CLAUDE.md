@@ -220,8 +220,11 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   entries and whether a page says it is unavailable. Outside the layout:
   `/login` and `/register` (one page, `components/auth/AuthPage`, A1: the colophon — the mark, «VisuaLex»
   and one sentence — beside a card with two
-  tabs, «Accedi» and «Registrati» (`LoginForm`, `RegisterForm`, their shared classes in `authForm.ts` and parts
-  in `AuthFormParts.tsx`); one parent route over both addresses, so a change of tab replaces the address — the
+  tabs, «Accedi» and «Registrati» (`LoginForm`, `RegisterForm`, on the common `ui/Input` and `ui/Button` since LC116, with
+  `authForm.ts`'s `focusField` and the parts in `AuthFormParts.tsx`; the tabs are `ui/SegmentedTabs size="sm"` over the
+  two panels' box `#auth`, held still with its `disabled` while a request travels; a click sends the cursor to the
+  form, the arrows keep the focus on the tabs; `auth/auth.guard.test.ts` keeps these files and `/connect`'s
+  `ConnectPage` on the common controls, 4 and 8 px corners, no duration by hand); one parent route over both addresses, so a change of tab replaces the address — the
   router state that carries the return after the login travels with it — and keeps the page mounted. The tab
   is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
   transition, so a tab read from the address would lag one render behind the click. `useAuth` runs
@@ -230,7 +233,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   both forms stay mounted, the one not shown out of the flow (`absolute` from the box's top), `invisible` and
   `inert`, and the box that holds them is as tall as the shown one (`height: auto`, always clipped by `overflow: clip`,
   which makes no scroller); only across a change of tab is its height written, from where the box is to the new
-  form's, read after the commit (a fresh «Registrati» after a sign-up), in 220 ms, let go at `transitionend` (at once
+  form's, read after the commit (a fresh «Registrati» after a sign-up), in `--dur-panel` (240 ms), let go at `transitionend` (at once
   under reduced motion); each form keeps what was typed in
   it, and its error (after a
   sign-up, the confirmation stays until the tab changes, and back on «Registrati» a new key mounts the form

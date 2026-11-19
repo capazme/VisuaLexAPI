@@ -10,7 +10,7 @@ import { getErrorMessage } from '../../utils/errors';
 import { PASSWORD_RULE, PASSWORD_RULE_ERROR, PASSWORD_RULE_HINT } from '../../services/api';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { FIELD_CONTROL_INVALID, FIELD_LABEL } from '../ui/controlStyles';
+import { CARD_RADIUS, FIELD_CONTROL_INVALID, FIELD_LABEL } from '../ui/controlStyles';
 import { focusField } from './authForm';
 import { FormError, PasswordToggle } from './AuthFormParts';
 
@@ -161,7 +161,7 @@ export function RegisterForm({ onBusy, onRegistered, onSwitch }: RegisterFormPro
             È in attesa di approvazione da parte di un amministratore.
           </strong>
         </p>
-        <p className="rounded-md border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className={cn('border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200', CARD_RADIUS)}>
           Riceverai l'accesso quando un amministratore approverà il tuo account. Nel frattempo, puoi tornare ad Accedi.
         </p>
         <Button type="button" variant="secondary" onClick={onSwitch} className="w-full">
