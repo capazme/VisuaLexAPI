@@ -1,6 +1,6 @@
-/** The error box and the password's eye, shared by the sign-in and the sign-up forms (`authForm.ts`). */
+/** The error box and the password's eye, shared by the sign-in and the sign-up forms. */
 import { AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { FOCUS_RING } from '../../constants/interactions';
+import { IconButton } from '../ui/IconButton';
 
 export function FormError({ id, message }: { id: string; message: string }) {
   return (
@@ -11,17 +11,15 @@ export function FormError({ id, message }: { id: string; message: string }) {
   );
 }
 
-/** The eye inside a password field: a 44 px box over the field's right end. */
+/** The eye inside a password field: a square as tall as the field (44 px on a phone, 36 from md) over its right end. */
 export function PasswordToggle({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
   return (
-    <button
-      type="button"
+    <IconButton
       onClick={onToggle}
       aria-label={shown ? 'Nascondi la password' : 'Mostra la password'}
       aria-pressed={shown}
-      className={`absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 ${FOCUS_RING}`}
-    >
-      {shown ? <EyeOff aria-hidden="true" size={16} /> : <Eye aria-hidden="true" size={16} />}
-    </button>
+      icon={shown ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+      className="absolute bottom-0 right-0 h-11 w-11 md:h-9 md:w-9"
+    />
   );
 }

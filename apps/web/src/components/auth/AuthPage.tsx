@@ -12,12 +12,12 @@
  * The card takes the height of the form shown (A1c, Luca, 22 Oct 2026: «il tab di accedi centrato, e poi fallo
  * espandere verso il basso se si clicca registrati»): both forms stay mounted, so each keeps what was typed in it,
  * but the one not shown leaves the flow (out of reach, `inert`, hidden by `visibility` once faded), and the box
- * that holds them takes the shown one's measured height in 220 ms. The card is centred, with the colophon, by the
+ * that holds them takes the shown one's measured height in `--dur-panel` (240 ms). The card is centred, with the colophon, by the
  * height it has on «Accedi» (`--login-card-h`): on «Registrati» its top and its tabs hold still and it grows
  * downwards, the page scrolling when the window is too low. «Crediti» is the last row of a grid as tall as the
  * window; and the page scrolls in its own box with `scrollbar-gutter: stable`, so a window too low for it does not
- * shift sideways when a bar appears. The motion, once per change of tab: the mark under the tabs slides
- * (`transform`, 200 ms), the card's height follows (220 ms), the form leaving fades (120 ms) while the one coming
+ * shift sideways when a bar appears. The motion, once per change of tab: the tabs' mark slides
+ * (`SegmentedTabs`, the app's spring), the card's height follows (`--dur-panel`), the form leaving fades (`--dur-press`) while the one coming
  * in fades from 8 px on the side of its tab (180 ms). Under reduced motion the change is immediate. Once, as the page opens, the LexCraft logo plays its
  * intro (LC16, `LexCraftLogo`): the word opens, the column comes down to its place and selects CRAFT.
  */
@@ -27,6 +27,8 @@ import { BookMark } from '../ui/BookMark';
 import { LexCraftLogo } from '../ui/LexCraftLogo';
 import { logoSweepDue, markLogoSweep } from '../ui/logoSweep';
 import { FOCUS_RING } from '../../constants/interactions';
+import { SegmentedTabs } from '../ui/SegmentedTabs';
+import { CARD_RADIUS } from '../ui/controlStyles';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 import { authPageTab, isLoginPage } from '../../utils/returnTo';
@@ -158,8 +160,8 @@ export function AuthPage() {
     });
     return () => cancelAnimationFrame(frame);
   }, [tab]);
-  const tabRefs = useRef<Record<AuthTab, HTMLButtonElement | null>>({ login: null, register: null });
   const focusFirstField = useRef(false);
+  const choiceByKeys = useRef(false);
   const pendingFocus = useRef<HTMLInputElement | null>(null);
 
   const firstField = (id: AuthTab) => frameRef.current?.querySelector<HTMLInputElement>(`#auth-panel-${id} input`) ?? null;
@@ -204,20 +206,6 @@ export function AuthPage() {
     focusFirstField.current = false;
     focusField(firstField(tab), pendingFocus);
   }, [tab]);
-
-  const onTabKeyDown = (e: React.KeyboardEvent) => {
-    const index = TABS.findIndex((t) => t.id === tab);
-    let next: AuthTab | null = null;
-    if (e.key === 'ArrowRight') next = TABS[(index + 1) % TABS.length].id;
-    else if (e.key === 'ArrowLeft') next = TABS[(index - 1 + TABS.length) % TABS.length].id;
-    else if (e.key === 'Home') next = TABS[0].id;
-    else if (e.key === 'End') next = TABS[TABS.length - 1].id;
-    if (!next) return;
-    e.preventDefault();
-    if (busy) return;
-    switchTo(next, 'tab');
-    tabRefs.current[next]?.focus();
-  };
 
   const onSignedIn = (to: string) => {
     setEntering(true);
@@ -266,48 +254,29 @@ export function AuthPage() {
               </p>
             </header>
 
-            <main ref={cardRef} className="min-w-0 rounded-2xl border border-slate-200 bg-card p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+            <main ref={cardRef} className={cn('min-w-0 border border-slate-200 bg-card p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900', CARD_RADIUS)}>
+              {/* LC116: the app's one row of tabs (`SegmentedTabs`, small), over the two panels below (`panelId` names
+                  their box; each panel is still named by its tab). A click sends the cursor to the form, the keys keep
+                  the focus on the tabs: which of the two chose is caught here, before the row hears it (a click, Enter
+                  and Space included, always comes after its keys). */}
               <div
-                role="tablist"
-                aria-label="Accedi o registrati"
-                onKeyDown={onTabKeyDown}
-                className="relative mb-6 flex border-b border-slate-200 dark:border-slate-800"
+                className="mb-6"
+                onKeyDownCapture={() => { choiceByKeys.current = true; }}
+                onClickCapture={() => { choiceByKeys.current = false; }}
               >
-                {TABS.map((t) => {
-                  const selected = t.id === tab;
-                  return (
-                    <button
-                      key={t.id}
-                      ref={(el) => {
-                        tabRefs.current[t.id] = el;
-                      }}
-                      type="button"
-                      role="tab"
-                      id={`auth-tab-${t.id}`}
-                      aria-selected={selected}
-                      aria-controls={`auth-panel-${t.id}`}
-                      tabIndex={selected ? 0 : -1}
-                      aria-disabled={busy || undefined}
-                      onClick={() => switchTo(t.id, 'field')}
-                      className={`min-h-[44px] flex-1 rounded-t-md px-2 pb-3 pt-1 font-serif text-2xl font-medium transition-colors aria-disabled:cursor-not-allowed ${
-                        selected
-                          ? 'text-slate-900 dark:text-slate-50'
-                          : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
-                      } ${FOCUS_RING}`}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
-                <span
-                  aria-hidden="true"
-                  data-testid="auth-tab-mark"
-                  className="pointer-events-none absolute -bottom-px left-0 h-0.5 w-1/2 rounded-full bg-primary-600 transition-transform duration-200 ease-out motion-reduce:transition-none dark:bg-primary-400"
-                  style={{ transform: tab === 'register' ? 'translateX(100%)' : 'translateX(0)' }}
+                <SegmentedTabs
+                  size="sm"
+                  label="Accedi o registrati"
+                  panelId="auth"
+                  tabs={TABS}
+                  value={tab}
+                  onChange={(next) => switchTo(next, choiceByKeys.current ? 'tab' : 'field')}
+                  disabled={busy}
+                  tabClassName="flex-1"
                 />
               </div>
 
-              {/* The box of the forms takes the shown one's height (A1c), in 220 ms from a change of tab on (none on
+              {/* The box of the forms takes the shown one's height (A1c), in `--dur-panel` from a change of tab on (none on
                   the first paint, none under reduced motion). The form hidden leaves the flow, from the box's top:
                   it keeps what was typed in it, fades out (its `visibility` follows at the end of the fade) and is
                   out of reach meanwhile (`inert`). The panels' 8 px padding keeps the fields' focus rings, and the 8
@@ -315,9 +284,10 @@ export function AuthPage() {
                   across a change of tab is it written, and it always clips. */}
               <div
                 ref={frameRef}
+                id="auth"
                 // Always clipped, and by `clip`, which makes no scroller: the form out of the flow, taller, would
                 // otherwise hang under the card and give a low window a scroll into empty space.
-                className={cn('-m-2 relative overflow-clip', boxHeight !== null && 'transition-[height] duration-[220ms] ease-out')}
+                className={cn('-m-2 relative overflow-clip', boxHeight !== null && 'transition-[height] duration-(--dur-panel) ease-out')}
                 style={boxHeight !== null ? { height: boxHeight } : undefined}
                 onTransitionEnd={(event) => {
                   if (event.target === event.currentTarget && event.propertyName === 'height') letBoxGo();
@@ -342,7 +312,7 @@ export function AuthPage() {
                           ? animated
                             ? `animate-in fade-in ${enterFrom}`
                             : ''
-                          : 'pointer-events-none absolute inset-x-0 top-0 invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-out motion-reduce:transition-none'
+                          : 'pointer-events-none absolute inset-x-0 top-0 invisible opacity-0 transition-[opacity,visibility] duration-(--dur-press) ease-out motion-reduce:transition-none'
                       }`}
                     >
                       {t.id === 'login' ? (

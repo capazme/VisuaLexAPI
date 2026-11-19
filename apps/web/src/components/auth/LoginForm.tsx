@@ -4,10 +4,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { useAuth } from '../../hooks/useAuth';
 import { useLocation } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
 import { getErrorMessage } from '../../utils/errors';
 import { locationToPath, takeReturnTo } from '../../utils/returnTo';
-import { FIELD, LABEL, PRIMARY_BUTTON, SWITCH_LINK, focusField } from './authForm';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { FIELD_CONTROL_INVALID, FIELD_LABEL } from '../ui/controlStyles';
+import { focusField } from './authForm';
 import { FormError, PasswordToggle } from './AuthFormParts';
 
 const ERROR_ID = 'login-error';
@@ -92,37 +95,35 @@ export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps
       {error && <FormError id={ERROR_ID} message={error} />}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <label htmlFor="login-email" className={LABEL}>
-            Email
-          </label>
-          <input
-            ref={emailRef}
-            id="login-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={FIELD}
-            placeholder="nome@studio.it"
-            disabled={loading}
-            autoComplete="email"
-            aria-invalid={invalid === 'email' || undefined}
-            aria-describedby={describedBy('email')}
-          />
-        </div>
+        {/* The error is said by the box above the form (`FormError`), not under the field: no `error` here, only its red edge. */}
+        <Input
+          ref={emailRef}
+          id="login-email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className={cn(invalid === 'email' && FIELD_CONTROL_INVALID)}
+          placeholder="nome@studio.it"
+          disabled={loading}
+          autoComplete="email"
+          aria-invalid={invalid === 'email' || undefined}
+          aria-describedby={describedBy('email')}
+        />
 
-        <div className="space-y-1.5">
-          <label htmlFor="login-password" className={LABEL}>
+        <div>
+          {/* The label outside the field's box, so the eye sits on the field alone. */}
+          <label htmlFor="login-password" className={FIELD_LABEL}>
             Password
           </label>
           <div className="relative">
-            <input
+            <Input
               ref={passwordRef}
               id="login-password"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`${FIELD} pr-12`}
+              className={cn('pr-12', invalid === 'password' && FIELD_CONTROL_INVALID)}
               placeholder="••••••••"
               disabled={loading}
               autoComplete="current-password"
@@ -133,16 +134,16 @@ export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps
           </div>
         </div>
 
-        <button type="submit" disabled={loading} className={PRIMARY_BUTTON}>
-          {loading ? <BookOpen aria-label="Accesso in corso" size={18} className="animate-pulse" /> : 'Accedi'}
-        </button>
+        <Button type="submit" loading={loading} className="w-full">
+          Accedi
+        </Button>
       </form>
 
       <p className="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-slate-600 dark:text-slate-400">
         Non hai un account?
-        <button type="button" onClick={onSwitch} className={SWITCH_LINK}>
+        <Button type="button" variant="link" onClick={onSwitch}>
           Registrati
-        </button>
+        </Button>
       </p>
     </>
   );
