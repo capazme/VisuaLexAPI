@@ -1,13 +1,18 @@
 import { useState, useCallback, useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Tag, Pencil, Trash2, ArrowRight, AlertCircle, Plus, Package, BookOpen, Search, Info } from 'lucide-react';
+import { Tag, Pencil, Trash2, ArrowRight, Plus, Package, BookOpen, Search, Info } from 'lucide-react';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { cn } from '../../../lib/utils';
 import type { CustomAlias } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
+import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
 
 // Relative "ultima <when>" recency label from an ISO timestamp. Returns
 // null when the timestamp is absent or unparseable so the caller can omit
@@ -115,16 +120,16 @@ export function AliasSection() {
         return null;
     }, [trigger, isAliasTriggerTaken]);
 
+    // For acts requiring details, number and date are required
+    const needsDetails = ['legge', 'decreto legge', 'decreto legislativo',
+        'decreto del presidente della repubblica', 'regio decreto',
+        'Regolamento UE', 'Direttiva UE'].includes(actType);
     const canSubmit = useMemo(() => {
         if (!trigger || triggerError) return false;
         if (!actType) return false;
-        // For acts requiring details, number and date are required
-        const needsDetails = ['legge', 'decreto legge', 'decreto legislativo',
-            'decreto del presidente della repubblica', 'regio decreto',
-            'Regolamento UE', 'Direttiva UE'].includes(actType);
         if (needsDetails && (!actNumber || !actDate)) return false;
         return true;
-    }, [trigger, triggerError, actType, actNumber, actDate]);
+    }, [trigger, triggerError, actType, needsDetails, actNumber, actDate]);
 
     const resetForm = useCallback(() => {
         setTrigger('');
@@ -220,36 +225,23 @@ export function AliasSection() {
                 </p>
 
                 {/* Add New Alias Form */}
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                <div className={cn('bg-slate-50 p-4 dark:bg-slate-800/50', CARD_RADIUS, CONTROL_BORDER)}>
                     <h4 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">Nuovo alias</h4>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Trigger + Display Name */}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Abbreviazione <span className="text-red-500">*</span>
-                                </label>
-                                <input
+                                <Input
+                                    label="Abbreviazione"
+                                    required
+                                    aria-required
                                     type="text"
                                     value={trigger}
                                     onChange={(e) => setTrigger(e.target.value.toLowerCase())}
                                     placeholder="es. mio-contratto"
-                                    className={cn(
-                                        "w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm",
-                                        "bg-white dark:bg-slate-800 border",
-                                        triggerError
-                                            ? "border-red-300 dark:border-red-700 focus:ring-red-500"
-                                            : "border-slate-200 dark:border-slate-700 focus:ring-primary-500",
-                                        "focus:outline-none focus:ring-2 focus:ring-offset-0"
-                                    )}
+                                    error={triggerError ?? undefined}
                                 />
-                                {triggerError && (
-                                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                                        <AlertCircle size={12} />
-                                        {triggerError}
-                                    </p>
-                                )}
                                 {/* A notice, not an error: creating it is allowed,
                                     it is just usually pointless or a takeover the
                                     user should make knowingly. */}
@@ -260,91 +252,29 @@ export function AliasSection() {
                                     </p>
                                 )}
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Nome mostrato
-                                </label>
-                                <input
-                                    type="text"
-                                    value={displayName}
-                                    onChange={(e) => setDisplayName(e.target.value)}
-                                    placeholder="es. GDPR, Privacy"
-                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                />
-                            </div>
+                            <Input label="Nome mostrato (facoltativo)" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="es. GDPR, Privacy" />
                         </div>
 
                         {/* Norm Reference Fields */}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div>
-                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Tipo di atto <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={actType}
-                                    onChange={(e) => setActType(e.target.value)}
-                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    <option value="">Scegli…</option>
-                                    {ACT_TYPES.map(at => (
-                                        <option key={at.value} value={at.value}>{at.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Numero
-                                </label>
-                                <input
-                                    type="text"
-                                    value={actNumber}
-                                    onChange={(e) => setActNumber(e.target.value)}
-                                    placeholder="es. 679"
-                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                    Anno o data
-                                </label>
-                                <input
-                                    type="text"
-                                    value={actDate}
-                                    onChange={(e) => setActDate(e.target.value)}
-                                    placeholder="es. 2016"
-                                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                />
-                            </div>
+                            <Select label="Tipo di atto" required aria-required value={actType} onChange={(e) => setActType(e.target.value)}>
+                                <option value="">Scegli…</option>
+                                {ACT_TYPES.map(at => (
+                                    <option key={at.value} value={at.value}>{at.label}</option>
+                                ))}
+                            </Select>
+                            <Input label={needsDetails ? 'Numero' : 'Numero (facoltativo)'} required={needsDetails} aria-required={needsDetails} type="text" value={actNumber} onChange={(e) => setActNumber(e.target.value)} placeholder="es. 679" />
+                            <Input label={needsDetails ? 'Anno o data' : 'Anno o data (facoltativo)'} required={needsDetails} aria-required={needsDetails} type="text" value={actDate} onChange={(e) => setActDate(e.target.value)} placeholder="es. 2016" />
                         </div>
 
                         {/* Default Article (optional) */}
-                        <div>
-                            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                                Articolo predefinito (facoltativo)
-                            </label>
-                            <input
-                                type="text"
-                                value={defaultArticle}
-                                onChange={(e) => setDefaultArticle(e.target.value)}
-                                placeholder="es. 1"
-                                className="w-24 min-h-[44px] md:min-h-0 px-3 py-2 rounded-lg text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            />
+                        <div className="sm:w-1/3">
+                            <Input label="Articolo predefinito (facoltativo)" type="text" value={defaultArticle} onChange={(e) => setDefaultArticle(e.target.value)} placeholder="es. 1" />
                         </div>
 
-                        <button
-                            type="submit"
-                            disabled={!canSubmit}
-                            className={cn(
-                                "w-full min-h-[44px] md:min-h-0 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors",
-                                "flex items-center justify-center gap-2",
-                                canSubmit
-                                    ? "bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
-                                    : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
-                            )}
-                        >
-                            <Plus size={16} />
+                        <Button type="submit" className="w-full" icon={<Plus size={16} aria-hidden />} disabled={!canSubmit}>
                             Aggiungi l’alias
-                        </button>
+                        </Button>
                     </form>
                 </div>
 
@@ -386,13 +316,15 @@ export function AliasSection() {
                     already works — which is how duplicates are born. */}
                 <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-2 mb-3">
-                        <Search size={14} className="text-slate-400" />
-                        <input
-                            value={catalogFilter}
-                            onChange={(e) => setCatalogFilter(e.target.value)}
-                            placeholder="Cerca fra gli alias in dotazione e i nomi riconosciuti…"
-                            className="flex-1 min-h-[44px] md:min-h-0 px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                        />
+                        <Search size={14} className="text-slate-400" aria-hidden />
+                        <div className="min-w-0 flex-1">
+                            <Input
+                                value={catalogFilter}
+                                onChange={(e) => setCatalogFilter(e.target.value)}
+                                placeholder="Cerca fra gli alias in dotazione e i nomi riconosciuti…"
+                                aria-label="Cerca fra gli alias in dotazione e i nomi riconosciuti"
+                            />
+                        </div>
                     </div>
 
                     {catalogLoading && (
@@ -408,7 +340,7 @@ export function AliasSection() {
                     </p>
                     <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
                         {filteredPresets.map(([trigger, preset]) => (
-                            <div key={trigger} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 text-xs">
+                            <div key={trigger} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-50 dark:bg-slate-800/60 text-xs">
                                 <span className="font-mono font-bold text-slate-600 dark:text-slate-300 min-w-24">{trigger}</span>
                                 <ArrowRight size={10} className="text-slate-400 shrink-0" />
                                 <span className="flex-1 min-w-0 truncate text-slate-500 dark:text-slate-400">
@@ -485,47 +417,23 @@ function AliasItem({
             // Esc gives up the change and stays on the page (taken here, before the page's own Esc goes back).
             <div
                 onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onCancelEdit(); } }}
-                className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 border border-primary-200 dark:border-primary-800"
+                className={cn('bg-primary-50 p-3 border border-primary-200 dark:bg-primary-900/20 dark:border-primary-800', CARD_RADIUS)}
             >
                 <div className="mb-2 flex flex-col gap-2 sm:flex-row">
-                    <input
-                        type="text"
-                        value={editTrigger}
-                        onChange={(e) => onEditTriggerChange(e.target.value.toLowerCase())}
-                        className="flex-1 min-h-[44px] md:min-h-0 px-2 py-1 rounded text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                        placeholder="Abbreviazione"
-                    />
-                    <input
-                        type="text"
-                        value={editDisplayName}
-                        onChange={(e) => onEditDisplayNameChange(e.target.value)}
-                        className="flex-1 min-h-[44px] md:min-h-0 px-2 py-1 rounded text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-                        placeholder="Nome mostrato"
-                    />
+                    <Input type="text" value={editTrigger} onChange={(e) => onEditTriggerChange(e.target.value.toLowerCase())} placeholder="Abbreviazione" aria-label="Abbreviazione" />
+                    <Input type="text" value={editDisplayName} onChange={(e) => onEditDisplayNameChange(e.target.value)} placeholder="Nome mostrato" aria-label="Nome mostrato" />
                 </div>
                 <div className="flex gap-2 justify-end">
-                    <button
-                        type="button"
-                        onClick={onCancelEdit}
-                        className="min-h-[44px] md:min-h-0 px-3 py-1 text-xs rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300"
-                    >
-                        Annulla
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onSaveEdit}
-                        className="min-h-[44px] md:min-h-0 px-3 py-1 text-xs rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 text-white hover:bg-primary-700"
-                    >
-                        Salva
-                    </button>
+                    <Button type="button" variant="quiet" onClick={onCancelEdit}>Annulla</Button>
+                    <Button type="button" onClick={onSaveEdit}>Salva</Button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="group flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 transition-colors">
-            <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center font-mono text-sm font-bold">
+        <div className={cn('group flex items-center gap-3 p-3 bg-card hover:border-primary-300 dark:hover:border-primary-700 transition-colors', CARD_RADIUS, CONTROL_BORDER)}>
+            <div className="w-10 h-10 rounded-md bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center font-mono text-sm font-bold">
                 {alias.trigger.slice(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -559,23 +467,8 @@ function AliasItem({
             </div>
             {/* In sight at every width: on a page, not under a pointer only (a phone has none, the keyboard neither). */}
             <div className="flex gap-1">
-                <button
-                    type="button"
-                    onClick={() => onStartEdit(alias)}
-                    data-alias-edit={alias.id}
-                    aria-label={`Modifica l’alias ${alias.trigger}`}
-                    className="grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                >
-                    <Pencil size={14} />
-                </button>
-                <button
-                    type="button"
-                    onClick={onDelete}
-                    aria-label={`Elimina l’alias ${alias.trigger}`}
-                    className="grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-500 hover:bg-red-100 hover:text-red-600 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-red-900/30"
-                >
-                    <Trash2 size={14} />
-                </button>
+                <IconButton icon={<Pencil size={14} />} onClick={() => onStartEdit(alias)} data-alias-edit={alias.id} aria-label={`Modifica l’alias ${alias.trigger}`} />
+                <IconButton icon={<Trash2 size={14} />} onClick={onDelete} aria-label={`Elimina l’alias ${alias.trigger}`} className="hover:text-red-600 dark:hover:text-red-400" />
             </div>
         </div>
     );

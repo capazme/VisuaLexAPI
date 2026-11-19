@@ -46,6 +46,8 @@ export interface SegmentedTabsProps<T extends string> {
    * from md (`CONTROL_HEIGHT.md`) — and their 4 px corners (`CONTROL_RADIUS`).
    */
   size?: 'md' | 'sm';
+  /** Held still (a request on its way): each segment says so (`aria-disabled`) and neither a click nor a key moves it. */
+  disabled?: boolean;
 }
 
 const tabId = (panelId: string, id: string) => `${panelId}-tab-${id}`;
@@ -83,7 +85,7 @@ function SegmentedMark({ choice, small = false, className }: { choice: string; s
   );
 }
 
-export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, panelId, id, className, tabClassName, size = 'md' }: SegmentedTabsProps<T>) {
+export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, panelId, id, className, tabClassName, size = 'md', disabled = false }: SegmentedTabsProps<T>) {
   const small = size === 'sm';
   const group = useId();
   const base = panelId ?? group;
@@ -101,6 +103,7 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
               : null;
     if (next === null) return;
     event.preventDefault();
+    if (disabled) return;
     onChange(tabs[next].id);
     document.getElementById(tabId(base, tabs[next].id))?.focus();
   };
@@ -119,8 +122,9 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
                 ? { role: 'tab', 'aria-selected': active, 'aria-controls': panelId }
                 : { role: 'radio', 'aria-checked': active })}
               tabIndex={active ? 0 : -1}
-              onClick={() => onChange(tab.id)}
-              className={cn(SEGMENT, small && cn(SEGMENT_SM, CONTROL_RADIUS), FOCUS_RING, segmentTone(active), tabClassName)}
+              aria-disabled={disabled || undefined}
+              onClick={() => { if (!disabled) onChange(tab.id); }}
+              className={cn(SEGMENT, small && cn(SEGMENT_SM, CONTROL_RADIUS), FOCUS_RING, segmentTone(active), 'aria-disabled:cursor-not-allowed', tabClassName)}
             >
               {active && <SegmentedMark choice={value} small={small} />}
               <span className="relative flex items-center gap-2">{tab.label}</span>

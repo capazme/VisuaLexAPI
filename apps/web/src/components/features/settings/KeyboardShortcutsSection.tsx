@@ -112,8 +112,8 @@ export function KeyboardShortcutsSection() {
   return (
       <div className="space-y-6">
         {/* Header info */}
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-900/30">
-          <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+        <div className="flex items-center gap-3 p-3 rounded-[8px] bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-900/30">
+          <div className="w-10 h-10 rounded-md bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
             <Keyboard size={20} className="text-primary-600 dark:text-primary-400" />
           </div>
           <div>

@@ -5,6 +5,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { BookMark } from '../ui/BookMark';
 import { LexCraftLogo } from '../ui/LexCraftLogo';
+import { Button } from '../ui/Button';
 import { CONNECTION_FAILED_MESSAGE } from '../../services/api';
 
 interface ProtectedRouteProps {
@@ -58,13 +59,9 @@ export function SessionKeptUnreachable() {
         <LexCraftLogo className="h-auto w-[160px]" />
         <div role="alert" className="text-center text-slate-700 dark:text-slate-200">
           <p className="mb-4">{CONNECTION_FAILED_MESSAGE}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="min-h-11 rounded-xl bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-6 font-medium text-white hover:bg-primary-700"
-          >
+          <Button type="button" onClick={() => window.location.reload()}>
             Riprova
-          </button>
+          </Button>
         </div>
       </div>
     </div>

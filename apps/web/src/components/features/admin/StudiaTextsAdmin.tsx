@@ -8,7 +8,8 @@ import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
 import { Button } from '../../ui/Button';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Input } from '../../ui/Input';
-import { FIELD_LABEL } from '../../ui/controlStyles';
+import { CARD_RADIUS, FIELD_LABEL } from '../../ui/controlStyles';
+import { Textarea } from '../../ui/Textarea';
 import { Toast } from '../../ui/Toast';
 import { TextParagraphs } from '../studia/TextParagraphs';
 
@@ -24,7 +25,8 @@ const KEY_LABEL: Record<string, string> = {
 // The server's limits (`POST /api/admin/studia/testi/:chiave`).
 const LIMITS = { titolo: 200, corpo: 8000, conferma: 120, azione: 120 } as const;
 
-const PANEL = 'rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800';
+/** A box that holds things: `Card`'s 8 px corners (`CARD_RADIUS`). */
+const PANEL = cn('border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800', CARD_RADIUS);
 
 /** The day a version was saved, in Rome, as DD/MM/YYYY. */
 const dayOf = (createdAt: string) => formatDateForDisplay(todayInRome(new Date(createdAt)));
@@ -32,7 +34,7 @@ const dayOf = (createdAt: string) => formatDateForDisplay(todayInRome(new Date(c
 /** The text as the user will see it: the dialog's title, paragraphs, checkbox and button, inert. */
 function TextPreview({ text, label }: { text: StudiaTextBody; label: string }) {
   return (
-    <div role="group" aria-label={label} className="space-y-3 rounded-lg border border-dashed border-gray-300 p-4 dark:border-gray-600">
+    <div role="group" aria-label={label} className="space-y-3 rounded-[8px] border border-dashed border-gray-300 p-4 dark:border-gray-600">
       <h4 className="text-base font-semibold text-slate-900 dark:text-slate-100">{text.titolo}</h4>
       <div className="space-y-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
         <TextParagraphs body={text.corpo} />
@@ -42,7 +44,7 @@ function TextPreview({ text, label }: { text: StudiaTextBody; label: string }) {
         <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{text.conferma}</span>
       </div>
       <div>
-        <span className="inline-flex rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white opacity-60">{text.azione}</span>
+        <span className="inline-flex rounded-md bg-primary-600 px-3 py-1.5 text-sm font-medium text-white opacity-60">{text.azione}</span>
       </div>
     </div>
   );
@@ -54,6 +56,7 @@ function EarlierVersion({ version }: { version: StudiaTextVersion }) {
   const Chevron = open ? ChevronDown : ChevronRight;
   return (
     <li className="py-2">
+      {/* bare-button: the whole row opens the version, its number, day and author. */}
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -67,7 +70,7 @@ function EarlierVersion({ version }: { version: StudiaTextVersion }) {
         </span>
       </button>
       {open && (
-        <div role="group" aria-label={`Versione ${version.versione}`} className="mt-2 space-y-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-900/40">
+        <div role="group" aria-label={`Versione ${version.versione}`} className="mt-2 space-y-3 rounded-[8px] bg-gray-50 p-4 dark:bg-gray-900/40">
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{version.titolo}</p>
           <div className="space-y-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             <TextParagraphs body={version.corpo} />
@@ -136,18 +139,14 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-4">
           <Input label="Titolo" value={draft.titolo} maxLength={LIMITS.titolo} onChange={(e) => edit('titolo')(e.target.value)} />
-          <div>
-            <label htmlFor={`${headingId}-corpo`} className={FIELD_LABEL}>Testo</label>
-            <textarea
-              id={`${headingId}-corpo`}
-              value={draft.corpo}
-              maxLength={LIMITS.corpo}
-              rows={10}
-              onChange={(e) => edit('corpo')(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 focus:border-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100"
-            />
-            <p className="ml-1 mt-1 text-xs text-slate-500 dark:text-slate-400">Una riga vuota separa i paragrafi. Il testo è semplice: niente grassetti, link o formattazione.</p>
-          </div>
+          <Textarea
+            label="Testo"
+            value={draft.corpo}
+            maxLength={LIMITS.corpo}
+            rows={10}
+            onChange={(e) => edit('corpo')(e.target.value)}
+            helperText="Una riga vuota separa i paragrafi. Il testo è semplice: niente grassetti, link o formattazione."
+          />
           <Input label="Etichetta della casella" value={draft.conferma} maxLength={LIMITS.conferma} onChange={(e) => edit('conferma')(e.target.value)} />
           <Input label="Etichetta del pulsante" value={draft.azione} maxLength={LIMITS.azione} onChange={(e) => edit('azione')(e.target.value)} />
         </div>
@@ -158,12 +157,11 @@ function TextSection({ group, onSaved, onReload }: TextSectionProps) {
       </div>
 
       {problem && (
-        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
           <p>{problem === 'conflict' ? 'Un’altra versione è stata salvata nel frattempo. Ricarica per vederla: le tue modifiche restano nel modulo.' : 'Non sono riuscito a salvare la versione. Riprova.'}</p>
           {problem === 'conflict' && (
             <Button
               variant="outline"
-              size="sm"
               onClick={() => {
                 setProblem(null);
                 onReload();
@@ -241,7 +239,7 @@ export function StudiaTextsAdmin() {
       {failed && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
           <p>Non riesco a leggere i testi. Riprova.</p>
-          <Button variant="outline" size="sm" onClick={readAgain}>
+          <Button variant="outline" onClick={readAgain}>
             Riprova
           </Button>
         </div>

@@ -12,6 +12,19 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.49.0] - 2026-11-19
+
+Sign-in, the connection of apps, Impostazioni and Amministrazione on the common controls of the interface
+alignment, and a theme that can follow the device. Web only, no migration. MERL-T stays off.
+
+### Interface
+
+- Sign-in and the connection of an app use the common controls; the fields have a new dark surface across the
+  app (LC116, alignment 12 of 14).
+- Impostazioni and Amministrazione use the common controls, with the common back link and confirmation across
+  the app (LC115, alignment 10 of 14).
+- The theme is «Chiaro», «Scuro» or «Di sistema», which follows the device (LC115).
+
 ## [1.48.0] - 2026-11-19
 
 The Forum on the common controls of the interface alignment. Web only, no migration. MERL-T stays off.

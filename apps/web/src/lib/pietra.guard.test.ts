@@ -157,8 +157,7 @@ describe('Pietra\'s colours', () => {
   it('a switch that is on is the light ink in the dark, its knob dark on it', () => {
     const switches = [
       join('features', 'merlt', 'ops', 'OpsConfigPanel.tsx'),
-      join('components', 'features', 'settings', 'SettingsPage.tsx'),
-      // LC112: Learn's switches are the common one; its knob is checked here.
+      // LC112, LC115: Learn's and Impostazioni' switches are the common one; its knob is checked here.
       join('components', 'ui', 'Switch.tsx'),
       join('components', 'features', 'compare', 'CompareBody.tsx'),
       join('components', 'features', 'documents', 'DocumentReviewPage.tsx'),

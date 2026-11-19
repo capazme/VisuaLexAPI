@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { dur, ease, spring } from '../../../lib/motion';
@@ -211,5 +211,22 @@ describe('SegmentedTabs, small', () => {
     expect(row).toHaveClass('md:p-0.5', 'rounded-md');
     expect(row).not.toHaveClass('p-1', 'p-0.5', 'rounded-lg');
     for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveClass('min-h-11', 'md:min-h-8', 'rounded-md');
+  });
+});
+
+// LC116: the sign-in page's tabs hold still while a request is on its way.
+describe('SegmentedTabs, held still', () => {
+  const ROW = [{ id: 'a', label: 'Uno' }, { id: 'b', label: 'Due' }] as const;
+
+  it('held still, says so on each segment and moves neither the choice nor the focus', () => {
+    const onChange = vi.fn();
+    render(<SegmentedTabs label="Riga" tabs={ROW} value="a" onChange={onChange} disabled />);
+    const one = screen.getByRole('radio', { name: 'Uno' });
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveAttribute('aria-disabled', 'true');
+    one.focus();
+    fireEvent.click(screen.getByRole('radio', { name: 'Due' }));
+    fireEvent.keyDown(one, { key: 'ArrowRight' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(one).toHaveFocus();
   });
 });

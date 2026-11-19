@@ -1,8 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Bug, Lightbulb, HelpCircle, Send, Loader2 } from 'lucide-react';
+import { Bug, Lightbulb, HelpCircle, Send } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { submitFeedback, type FeedbackType } from '../../../services/feedbackService';
 import { getErrorMessage } from '../../../utils/errors';
+import { Button } from '../../ui/Button';
+import { Textarea } from '../../ui/Textarea';
+import { CARD_RADIUS, CONTROL_BORDER } from '../../ui/controlStyles';
 
 const feedbackTypes: { value: FeedbackType; label: string; icon: React.ElementType; color: string }[] = [
   { value: 'bug', label: 'Bug', icon: Bug, color: 'text-red-500' },
@@ -65,18 +68,14 @@ export function ReportProblemSection() {
 
   if (success) {
     return (
-      <div ref={confirmation} tabIndex={-1} role="status" className="flex items-start gap-3 rounded-xl border border-slate-200 p-4 focus:outline-none dark:border-slate-700">
+      <div ref={confirmation} tabIndex={-1} role="status" className={cn('flex items-start gap-3 p-4 focus:outline-none', CARD_RADIUS, CONTROL_BORDER)}>
         <Send size={18} className="mt-0.5 shrink-0 text-green-600" aria-hidden />
         <div className="min-w-0 space-y-2">
           <p className="text-sm font-medium text-slate-900 dark:text-white">Grazie, la segnalazione è arrivata.</p>
           <p className="text-sm text-slate-500 dark:text-slate-400">La esamineremo al più presto.</p>
-          <button
-            type="button"
-            onClick={reset}
-            className="min-h-[44px] text-sm font-medium text-primary-600 hover:underline md:min-h-0 dark:text-primary-400"
-          >
+          <Button type="button" variant="link" onClick={reset}>
             Scrivi un'altra segnalazione
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -95,26 +94,18 @@ export function ReportProblemSection() {
             const Icon = ft.icon;
             const isSelected = type === ft.value;
             return (
-              <button
+              // A choice of three that wraps at 390 px, so `Button`s pressed or not rather than a segmented row.
+              <Button
                 key={ft.value}
                 type="button"
+                variant="secondary"
                 aria-pressed={isSelected}
                 onClick={() => setType(ft.value)}
-                className={cn(
-                  'flex-auto flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-colors',
-                  isSelected
-                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                )}
+                icon={<Icon size={16} aria-hidden className={isSelected ? ft.color : 'text-slate-400'} />}
+                className={cn('flex-auto', isSelected ? 'border-ink-900 text-ink-950 dark:border-ink-100 dark:text-ink-50' : 'text-slate-500 dark:text-slate-400')}
               >
-                <Icon size={18} className={isSelected ? ft.color : 'text-slate-400'} />
-                <span className={cn(
-                  'text-sm font-medium',
-                  isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
-                )}>
-                  {ft.label}
-                </span>
-              </button>
+                {ft.label}
+              </Button>
             );
           })}
         </div>
@@ -122,11 +113,9 @@ export function ReportProblemSection() {
 
       {/* Message */}
       <div>
-        <label htmlFor={messageId} className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          Descrizione
-        </label>
-        <textarea
+        <Textarea
           id={messageId}
+          label="Descrizione"
           ref={field}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -138,13 +127,7 @@ export function ReportProblemSection() {
               : 'Scrivi il tuo messaggio…'
           }
           rows={5}
-          className={cn(
-            'w-full px-4 py-3 rounded-xl border transition-colors resize-none',
-            'bg-slate-50 dark:bg-slate-800',
-            'border-slate-200 dark:border-slate-700',
-            'text-slate-900 dark:text-white placeholder-slate-400',
-            'focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none'
-          )}
+          className="resize-none"
         />
         <p className="mt-1 text-xs text-slate-400">
           Minimo 10 caratteri ({message.length}/10)
@@ -153,34 +136,16 @@ export function ReportProblemSection() {
 
       {/* Error */}
       {error && (
-        <div role="alert" className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+        <div role="alert" className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
           {error}
         </div>
       )}
 
       {/* Actions */}
       <div className="flex justify-end">
-        <button
-          type="submit"
-          disabled={isSubmitting || message.trim().length < 10}
-          className={cn(
-            'flex min-h-[44px] items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-[color,background-color,border-color,opacity] md:min-h-0',
-            'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
-          )}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Invio...
-            </>
-          ) : (
-            <>
-              <Send size={18} />
-              Invia
-            </>
-          )}
-        </button>
+        <Button type="submit" icon={<Send size={16} aria-hidden />} loading={isSubmitting} disabled={message.trim().length < 10}>
+          {isSubmitting ? 'Invio…' : 'Invia'}
+        </Button>
       </div>
     </form>
   );

@@ -103,6 +103,8 @@ describe('ConnectPage', () => {
     renderAt('/connect?request=req-1');
     const box = await screen.findByRole('checkbox', { name: REQUEST.deletion.label });
     expect(box).not.toBeChecked();
+    // LC116: the browser draws the box dark in the dark theme, as the fields (`controlStyles`), not a white square.
+    expect(box).toHaveClass('dark:[color-scheme:dark]');
     fireEvent.click(box);
     expect(box).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: /autorizza/i }));

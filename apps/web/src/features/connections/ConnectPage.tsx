@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Link2, ShieldAlert } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
+import { CARD_RADIUS } from '../../components/ui/controlStyles';
+import { cn } from '../../lib/utils';
 import { getErrorMessage } from '../../utils/errors';
 import { connectionsService, type AuthorizationRequestView } from './connectionsService';
 
@@ -73,15 +76,13 @@ export function ConnectPage() {
 
   return (
     <main className="min-h-svh flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4 py-10">
-      <section
-        aria-labelledby="connect-title"
-        className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
-      >
+      {/* `Card`'s box (LC116): a region named by its heading, as the `section` it was. */}
+      <Card role="region" aria-labelledby="connect-title" className="w-full max-w-lg p-6 shadow-sm">
         <h1 id="connect-title" className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
           <Link2 size={20} aria-hidden /> Collegare un’applicazione a LexCraft
         </h1>
 
-        {state.status === 'loading' && <p className="mt-4 text-sm text-slate-500">Caricamento della richiesta…</p>}
+        {state.status === 'loading' && <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Caricamento della richiesta…</p>}
 
         {state.status === 'redirecting' && (
           <p role="status" className="mt-4 text-sm text-slate-600 dark:text-slate-300">
@@ -90,7 +91,7 @@ export function ConnectPage() {
         )}
 
         {state.status === 'error' && (
-          <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+          <p role="alert" className={cn('mt-4 flex items-start gap-2 bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300', CARD_RADIUS)}>
             <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
             <span>{state.message}</span>
           </p>
@@ -99,7 +100,7 @@ export function ConnectPage() {
         {(state.status === 'ready' || state.status === 'deciding') && (
           <div className="mt-4 space-y-4">
             <div>
-              <p className="text-sm text-slate-500">L’applicazione</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">L’applicazione</p>
               <p className="text-base font-semibold text-slate-900 dark:text-white break-words">
                 {state.request.client.name ?? 'Applicazione senza nome'}
               </p>
@@ -110,7 +111,7 @@ export function ConnectPage() {
             </div>
 
             {state.request.client.registeredAutomatically && (
-              <p className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <p className={cn('flex items-start gap-2 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300', CARD_RADIUS)}>
                 <ShieldAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
                 <span>
                   Applicazione registrata automaticamente, non verificata: il nome lo ha scelto l’applicazione stessa.
@@ -129,10 +130,11 @@ export function ConnectPage() {
             </div>
 
             {state.request.deletion && (
-              <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+              <label className={cn('flex items-start gap-2 border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200', CARD_RADIUS)}>
+                {/* bare-input: a permission to grant is a checkbox (its role and its label read as one), not a switch. */}
                 <input
                   type="checkbox"
-                  className="mt-0.5"
+                  className="mt-0.5 dark:[color-scheme:dark]"
                   checked={allowDelete}
                   onChange={(event) => setAllowDelete(event.target.checked)}
                   disabled={state.status === 'deciding'}
@@ -144,7 +146,7 @@ export function ConnectPage() {
             <p
               role="note"
               aria-label="Dati personali"
-              className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+              className={cn('flex items-start gap-2 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-300', CARD_RADIUS)}
             >
               <ShieldAlert size={16} className="mt-0.5 shrink-0" aria-hidden />
               <span>
@@ -154,7 +156,7 @@ export function ConnectPage() {
               </span>
             </p>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Puoi revocare il collegamento, o togliergli il permesso di eliminare, in qualsiasi momento da Impostazioni → Applicazioni collegate.
             </p>
 
@@ -168,7 +170,7 @@ export function ConnectPage() {
             </div>
           </div>
         )}
-      </section>
+      </Card>
     </main>
   );
 }

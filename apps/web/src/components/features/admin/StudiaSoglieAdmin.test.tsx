@@ -154,9 +154,11 @@ describe('StudiaSoglieAdmin, the review fixes', () => {
     expect(approvazioni).toBeEnabled();
   });
 
-  it('gives the two buttons the 44 px touch target a phone needs', async () => {
+  // LC115: the common `Button`, 44 px on a phone and 36 from md, as tall as the fields beside it.
+  it('gives «Salva» the 44 px touch target a phone needs, and 36 from md', async () => {
     await renderSection();
-    expect(screen.getByRole('button', { name: 'Salva' }).className).toContain('min-h-[44px]');
+    expect(screen.getByRole('button', { name: 'Salva' })).toHaveClass('min-h-11', 'md:min-h-9');
+    expect(screen.getByRole('button', { name: 'Salva' })).not.toHaveClass('md:min-h-0');
   });
 
   it('writes one card in the singular', async () => {

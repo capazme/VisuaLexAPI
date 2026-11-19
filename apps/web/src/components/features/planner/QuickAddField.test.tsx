@@ -142,7 +142,7 @@ describe('QuickAddField — the line read', () => {
   it('draws its box on the ground of the common fields', () => {
     render(<QuickAddField view="today" today={TODAY} defaults={{}} />);
     expect(title().closest('form')).toHaveClass(FIELD_SURFACE);
-    expect(FIELD_CONTROL.split(' ')).toContain(FIELD_SURFACE);
+    expect(FIELD_CONTROL.split(' ')).toEqual(expect.arrayContaining(FIELD_SURFACE.split(' ')));
   });
 
   // LC111: after «Aggiungi il compito» the focus is back in the field, for the next task (it was on the body).
