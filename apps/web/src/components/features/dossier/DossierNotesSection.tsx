@@ -7,6 +7,7 @@ import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { hasAssistantNote } from '../../../utils/aiReview';
 import { useNoteRemovalFocus } from './useNoteRemovalFocus';
 import { NOTE_FOLDED_EM, NoteText } from './NoteText';
+import { FOCUS_RING } from '../studia/progress/tokens';
 import { ROW, ROW_LINE, ROW_REMOVE, ROW_TITLE, SECTION_COUNT, SECTION_HEADING } from './dossierStyles';
 import { IconButton } from '../../ui/IconButton';
 import { Button } from '../../ui/Button';
@@ -69,7 +70,7 @@ function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => v
   // A note an application wrote has its state and its own bin among the controls under it (D7b).
   if (hasAssistantNote(note)) {
     return (
-      <li ref={rowRef} className={cn(ROW, 'pl-1 pr-1')}>
+      <li ref={rowRef} data-dossier-entry={note.id} className={cn(ROW, FOCUS_RING, 'pl-1 pr-1')}>
         <div className="min-w-0 py-2.5">
           <AiNoteEntryReview note={note} meta={meta} onRemove={onRemove}>{words}</AiNoteEntryReview>
         </div>
@@ -77,7 +78,7 @@ function NoteRow({ note, onRemove, rowRef }: { note: NoteItem; onRemove: () => v
     );
   }
   return (
-    <li ref={rowRef} className={cn(ROW, 'flex items-start gap-1 pl-1')}>
+    <li ref={rowRef} data-dossier-entry={note.id} className={cn(ROW, FOCUS_RING, 'flex items-start gap-1 pl-1')}>
       <div className="min-w-0 flex-1 py-2.5">
         {words}
         {meta}

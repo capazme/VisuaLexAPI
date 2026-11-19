@@ -130,6 +130,13 @@ describe('the mark: «Non nella pratica» for what arrived while reading, nothin
     expect(marked[0].textContent).toContain('100');
   });
 
+  it('a row names the dossier entries it shows, for «Cronologia»\'s «Apri nella pratica» (LC137)', () => {
+    render(<Page />);
+    const decision = document.querySelector<HTMLElement>(`[data-practice-row="${decisionRowKey(bound().id, bound().decisions[0].id)}"]`)!;
+    expect(decision).toBe(document.querySelector('[data-dossier-entries~="s1"]'));
+    expect(document.querySelector('[data-dossier-entries~="n24-5"]')).toHaveAttribute('data-practice-row');
+  });
+
   it('the index of the reading view marks its entries too', () => {
     render(<Page />);
     arrive();
