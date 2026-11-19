@@ -144,6 +144,11 @@ describe('DueForecast', () => {
     expect(screen.getByText('oggi')).toHaveClass('font-semibold');
   });
 
+  it('draws its columns still: no growth on every visit (LC145, the frequency rule)', () => {
+    const { container } = render(<DueForecast prossimi={prossimi} />);
+    expect(container.querySelector('.vlx-grow-y, [class*="animate-"]')).toBeNull();
+  });
+
   it('draws a day with nothing due as a hollow mark, not a gap', () => {
     const empty = prossimi.map((d, i) => ({ ...d, schede: i === 3 ? 0 : d.schede }));
     const { container } = render(<DueForecast prossimi={empty} />);

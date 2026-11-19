@@ -1511,12 +1511,11 @@
   .vlx-plate-in { animation: vlx-plate-in 600ms cubic-bezier(0.23, 1, 0.32, 1) both; }
   .vlx-smoke-rise { transform-origin: 50% 100%; animation: vlx-smoke-rise 2600ms ease-out both; }
 }
-/* LC37: Progressi's bars grow in once as the page opens, from the left or from the base; still under reduced motion. */
+/* LC37: Progressi's bars grow in once as the page opens, from the left; still under reduced motion. The forecast's
+   columns no longer grow from the base (LC145: on every visit, against the frequency rule). */
 @keyframes vlx-grow-x { from { transform: scaleX(0.02); } }
-@keyframes vlx-grow-y { from { transform: scaleY(0.02); } }
 @media (prefers-reduced-motion: no-preference) {
   .vlx-grow-x { transform-origin: left center; animation: vlx-grow-x 700ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-  .vlx-grow-y { transform-origin: center bottom; animation: vlx-grow-y 700ms cubic-bezier(0.23, 1, 0.32, 1) both; }
 }
 @keyframes vlx-book-breathe { to { opacity: 0.3; } }
 /* LC36: the sign-in page's library drifts, a breath over 40 s, back and forth; still under reduced motion. */
