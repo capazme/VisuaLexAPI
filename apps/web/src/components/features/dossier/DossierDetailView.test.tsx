@@ -66,7 +66,13 @@ vi.mock('../../../services/dossierService', () => ({
 }));
 
 // The «Lettura» tab's own view (its tests: `DossierReadingView.test.tsx`): here, only when it is mounted.
-vi.mock('./DossierReadingView', () => ({ DossierReadingView: ({ dossier: shown }: { dossier: { id: string } }) => <div data-testid="lettura">{shown.id}</div> }));
+// An article's row stands in as the reading draws it (`PracticeRowShell`): its key and the dossier entries it shows.
+vi.mock('./DossierReadingView', () => ({ DossierReadingView: ({ dossier: shown }: { dossier: { id: string } }) => (
+  <div data-testid="lettura">
+    {shown.id}
+    <div data-practice-row="p1/act/3" data-dossier-entries="a3"><button type="button" aria-expanded="false">art. 3</button></div>
+  </div>
+) }));
 vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn(async () => ({ dossierId: 'd1' })) } }));
 
 import { appStore } from '../../../store/useAppStore';
@@ -433,10 +439,10 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
 describe('DossierDetailView — one «Fonti» for the sources and the reading (LC86)', () => {
   afterEach(() => { window.history.replaceState(null, '', '/'); });
 
-  it('offers three views in order: Fonti, Atti, Compiti; the narrow padding keeps them whole on a phone', () => {
+  it('offers four views in order: Fonti, Atti, Compiti, Cronologia; the narrow padding keeps them whole on a phone', () => {
     renderView();
     const tabs = within(screen.getByRole('tablist', { name: 'Viste della pratica' })).getAllByRole('tab');
-    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Atti', 'Compiti']);
+    expect(tabs.map((t) => t.textContent?.replace(/\d+/g, '').trim())).toEqual(['Fonti', 'Atti', 'Compiti', 'Cronologia']);
     for (const tab of tabs) expect(tab).toHaveClass('px-2.5', 'sm:px-4');
   });
 
@@ -545,5 +551,77 @@ describe('DossierDetailView — one «Fonti» for the sources and the reading (L
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
     expect(screen.queryByRole('menuitem', { name: 'Apri anche in Ricerca' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Apri tutto in Ricerca' })).toBeNull();
+  });
+});
+
+describe('DossierDetailView — «Cronologia» (LC137)', () => {
+  const dated: Dossier = {
+    ...dossier,
+    items: [
+      ...dossier.items,
+      { id: 'n2', type: 'note', addedAt: '2026-11-01T09:00:00Z', data: '12/03/2025 — Notifica della diffida' },
+      { id: 'n3', type: 'note', addedAt: '2026-11-02T09:00:00Z', data: '**2024-06-30**: firma del contratto' },
+      { id: 'n4', type: 'note', addedAt: '2026-11-03T09:00:00Z', aboutItemId: 'a3', data: '01/02/2023 — Termine dell\'art. 3' },
+      { id: 's1', type: 'sentenza', addedAt: '', data: { corte: 'cassazione', archivio: 'civile', numero: 123, anno: 2024, data_deposito: '2024-09-15', etichetta: 'Cass. civ., n. 123/2024' } },
+    ],
+  };
+
+  it('shows the dated facts by year, oldest first, in the page under the tabs, never in a dialog', () => {
+    renderView(dated);
+    fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
+    const y2024 = screen.getByRole('region', { name: '2024 (2)' });
+    const y2025 = screen.getByRole('region', { name: '2025 (1)' });
+    expect(screen.getByRole('region', { name: '2023 (1)' }).compareDocumentPosition(y2024) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(y2024.compareDocumentPosition(y2025) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(y2024).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      expect.stringContaining('firma del contratto'),
+      expect.stringContaining('Cass. civ., n. 123/2024'),
+    ]);
+    expect(within(y2024).getByText(/30 giugno 2024/).closest('span')).toHaveTextContent('Nota');
+    expect(within(y2024).getByText(/15 settembre 2024/).closest('span')).toHaveTextContent('Sentenza');
+    expect(screen.getByText(/1 nota senza data non compare/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // One command per fact, the row itself, named by the fact; no repeated link under each.
+    expect(screen.queryByRole('button', { name: 'Apri nella pratica' })).toBeNull();
+    expect(screen.getByRole('button', { name: '12 marzo 2025, Nota: Notifica della diffida — apri nella pratica' })).toHaveClass('min-h-11', 'w-[calc(100%+1rem)]');
+    // The toggle says the order a press gives.
+    fireEvent.click(screen.getByRole('button', { name: 'Dal più recente' }));
+    expect(screen.getAllByRole('region', { name: /^\d{4} / }).map((r) => r.getAttribute('aria-labelledby'))).toEqual(['chronology-2025', 'chronology-2024', 'chronology-2023']);
+    fireEvent.click(screen.getByRole('button', { name: 'Dal più vecchio' }));
+    expect(screen.getAllByRole('region', { name: /^\d{4} / })[0]).toHaveAccessibleName('2023 (1)');
+  });
+
+  it('opens a note in «Fonti», clearing the filter, the focus on its row', () => {
+    renderView(dated);
+    fireEvent.change(screen.getByLabelText('Filtra le fonti della pratica'), { target: { value: 'decorrenza' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
+    fireEvent.click(screen.getByRole('button', { name: /^12 marzo 2025, Nota/ }));
+    expect(screen.getByRole('tab', { name: /^Fonti/ })).toHaveAttribute('aria-selected', 'true');
+    const note = document.querySelector('[data-dossier-entry="n2"]')!;
+    expect(note).toBeVisible();
+    expect(screen.getByLabelText('Filtra le fonti della pratica')).toHaveValue('');
+    expect(document.activeElement).toBe(note);
+    // The rows' shared focus ring, not the browser's outline.
+    expect(note).toHaveClass('focus-visible:ring-2', 'focus-visible:outline-none');
+  });
+
+  it('opens the article\'s row for a note about it, the focus on the row\'s toggle', () => {
+    renderView(dated);
+    fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
+    fireEvent.click(screen.getByRole('button', { name: /^1 febbraio 2023, Nota/ }));
+    expect(appStore.getState().practiceRows['p1/act/3']).toBe(true);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'art. 3' }));
+  });
+
+  it('says how dates are read when nothing has one', () => {
+    renderView();
+    fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
+    expect(screen.getByText(/Le note che iniziano con una data, come 12\/03\/2025/)).toBeVisible();
+    expect(screen.getByText('1 nota senza data non compare.')).toBeVisible();
+  });
+
+  it('is not offered in a pratica di studio', () => {
+    renderView({ ...dated, kind: 'studio' });
+    expect(screen.queryByRole('tab', { name: 'Cronologia' })).toBeNull();
   });
 });
