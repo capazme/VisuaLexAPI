@@ -278,7 +278,7 @@ describe('EuCaseLawBlock — the section\'s controls', () => {
     service.mockResolvedValue(found([judgment, opinion]));
     show();
     await screen.findByText('Corte giust. UE, C-97/23');
-    expect(screen.getByRole('button', { name: /Conclusioni/ })).toHaveClass('min-h-[44px]');
+    expect(screen.getByRole('button', { name: /Conclusioni/ })).toHaveClass('min-h-11');
     expect(screen.getByText('Corte giust. UE, C-97/23').closest('a')).toHaveClass('min-h-[44px]');
   });
 });

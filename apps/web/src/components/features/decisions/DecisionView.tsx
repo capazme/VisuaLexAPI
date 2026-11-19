@@ -45,7 +45,7 @@ export interface DecisionViewProps {
 
 function Alert({ children }: { children: React.ReactNode }) {
   return (
-    <div role="alert" className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+    <div role="alert" className="flex items-start gap-2 rounded-[8px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
       <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden />
       <div>{children}</div>
     </div>
@@ -159,7 +159,7 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
             href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-md px-3 text-sm text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400"
           >
             <ExternalLink size={16} aria-hidden /> Apri sulla fonte
           </a>

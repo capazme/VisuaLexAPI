@@ -17,6 +17,7 @@ import { CloudOff, FileText, RotateCcw } from 'lucide-react';
 import { formatCitationLabel, type CitationMatch } from '../../../utils/citationMatcher';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../ui/Button';
+import { Switch } from '../../ui/Switch';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { dur, ease } from '../../../lib/motion';
 import { cn } from '../../../lib/utils';
@@ -48,7 +49,6 @@ import { writeDocxLinksFile } from './docx/docxWriterClient';
 import { DocxError } from './docx/docxErrors';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { notify, UNDO_MS } from '../../ui/notifications/notifications';
-import { FOCUS_RING as RING } from '../../../constants/interactions';
 
 interface LoadedDocument {
   fileName: string;
@@ -126,12 +126,12 @@ function pulse(mark: HTMLElement) {
       { boxShadow: `0 0 0 7px color-mix(in oklch, ${colour} 0%, transparent)` },
     ],
     // After the smooth scroll has brought it into view.
-    { duration: 700, delay: 280, easing: `cubic-bezier(${ease.out.join(', ')})` },
+    { duration: dur.scene * 2000, delay: 280, easing: `cubic-bezier(${ease.out.join(', ')})` },
   );
 }
 
 // Each column scrolls on its own: a document of 300 pages never makes the page scroll.
-const PANEL = 'flex min-h-0 flex-col overflow-hidden rounded-[10px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
+const PANEL = 'flex min-h-0 flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
 const PANEL_HEAD = 'flex min-h-11 shrink-0 items-center border-b border-slate-200 px-4 text-sm font-medium text-slate-700 dark:border-slate-800 dark:text-slate-300';
 // Contained on a computer only: on a phone the stacked panels hand a swipe on to the page at their ends.
 const PANEL_BODY = 'relative min-h-0 flex-1 overflow-y-auto lg:overscroll-contain';
@@ -688,6 +688,7 @@ export function DocumentReviewPage() {
         </Link>
       )}
 
+      {/* bare-input: the hidden file picker the drop zone and «Scegli un altro documento» open. */}
       <input
         ref={fileInputRef}
         type="file"
@@ -808,7 +809,7 @@ export function DocumentReviewPage() {
                 {reviewing && (
                   <p role="status" className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
                     Mostro le citazioni da confermare.{' '}
-                    <button type="button" onClick={() => setReviewing(false)} className={cn('inline-flex min-h-[44px] items-center font-medium text-primary-700 underline underline-offset-2 md:min-h-0 dark:text-primary-300', RING)}>Mostra tutte</button>
+                    <Button variant="link" size="sm" onClick={() => setReviewing(false)}>Mostra tutte</Button>
                   </p>
                 )}
                 <div ref={listBodyRef} className={PANEL_BODY}>
@@ -874,20 +875,13 @@ export function DocumentReviewPage() {
 function LocalSwitch({ on, onChange, disabled }: { on: boolean; onChange: (on: boolean) => void; disabled: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-describedby="doc-local-hint"
-        disabled={disabled}
-        onClick={() => onChange(!on)}
-        className={cn('inline-flex min-h-11 items-center gap-2.5 rounded-lg pr-2 text-sm font-medium text-slate-800 disabled:cursor-wait disabled:opacity-60 dark:text-slate-200', RING)}
-      >
-        <span aria-hidden="true" className={cn('relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600')}>
-          <span className={cn('absolute top-0.5 size-5 rounded-full bg-white shadow-sm transition-[left] motion-reduce:transition-none', on ? 'left-[1.125rem] dark:bg-ink-950' : 'left-0.5')} />
-        </span>
-        Riconosci solo nel browser
-      </button>
+      {/* The words are the switch's `<label>`: a press on them turns it too, as on the hand-made one before (LC117). */}
+      <span className="inline-flex min-h-11 items-center gap-2.5">
+        <Switch id="doc-local" checked={on} onCheckedChange={onChange} disabled={disabled} aria-describedby="doc-local-hint" className="disabled:cursor-wait" />
+        <label htmlFor="doc-local" className={cn('text-sm font-medium text-slate-800 dark:text-slate-200', disabled ? 'cursor-wait opacity-60' : 'cursor-pointer')}>
+          Riconosci solo nel browser
+        </label>
+      </span>
       <p id="doc-local-hint" className="min-w-0 flex-1 basis-64 text-[13px] leading-snug text-slate-600 dark:text-slate-400">
         {on
           ? 'Il riconoscimento è più limitato, e i link non si possono inserire.'

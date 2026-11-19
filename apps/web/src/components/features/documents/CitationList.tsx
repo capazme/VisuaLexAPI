@@ -4,6 +4,9 @@ import { formatCitationLabel, type CitationMatch } from '../../../utils/citation
 import { FOCUS_RING, TRANSITION } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
 import { MenuButton, type MenuItem } from '../../ui/MenuButton';
+import { Button } from '../../ui/Button';
+import { buttonClassName } from '../../ui/buttonStyles';
+import { REGIONAL_LAW_REFUSAL } from '../../../utils/regionalLaw';
 import { RECOGNISED_EXAMPLES, citedPassage, type ActGroup, type CitedPassage } from './citationGroups';
 import {
   NO_LINK_WORDS, actName, articleLabel, linksToAct, linksToFirst, type Choices, type ReviewedRow,
@@ -39,16 +42,9 @@ export interface CitationListProps {
 }
 
 const ROW = 'relative flex items-stretch border-t border-slate-100 dark:border-slate-800/80';
-const SELECT = cn('min-h-[44px] min-w-0 flex-1 py-2.5 pl-4 pr-2 text-left', TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0');
-const ACTION = cn(
-  'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1 px-3 text-sm font-medium',
-  'text-primary-700 hover:bg-primary-50 hover:text-primary-800 dark:text-primary-300 dark:hover:bg-primary-950/50 dark:hover:text-primary-200',
-  TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0',
-);
-const MENU_TRIGGER = cn(
-  'inline-flex size-11 shrink-0 items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
-  TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0',
-);
+const ROW_SELECT = cn('min-h-[44px] min-w-0 flex-1 py-2.5 pl-4 pr-2 text-left', TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0');
+/** A row's «⋯»: `IconButton`'s quiet square, centred on the row. */
+const ROW_MENU = cn(buttonClassName('quiet'), 'min-w-11 shrink-0 self-center px-0 md:min-w-9');
 const TAG = 'mt-1 block text-[12px] leading-snug text-slate-600 [overflow-wrap:anywhere] dark:text-slate-400';
 
 function Passage({ passage }: { passage: CitedPassage }) {
@@ -117,7 +113,7 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
   const cascade = () => {
     const at = order++;
     return at < CASCADE
-      ? { className: 'motion-safe:animate-in fade-in slide-in-from-bottom-1 duration-200', style: { animationDelay: `${at * 40}ms` } }
+      ? { className: 'motion-safe:animate-in fade-in slide-in-from-bottom-1 duration-(--dur-pop)', style: { animationDelay: `${at * 40}ms` } }
       : { className: '', style: undefined };
   };
   const selection = (index: number) => index === selected;
@@ -137,23 +133,28 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
               return (
                 <li key={row.key} data-cite-row={row.index} className={cn(ROW, motion.className)} style={motion.style}>
                   <Stripe on={on} />
-                  <button type="button" aria-current={on || undefined} onClick={() => onSelect(row.index)} className={cn(SELECT, selectClass(on))}>
+                  {/* bare-button: the row itself, a whole entry that selects its citation. */}
+                  <button type="button" aria-current={on || undefined} onClick={() => onSelect(row.index)} className={cn(ROW_SELECT, selectClass(on))}>
                     <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">{label}</span>
                     <Passage passage={citedPassage(text, row.start, row.end)} />
                     {row.followedBy && <span className={TAG}>seguito da «{row.followedBy}»</span>}
+                    {/* A regional law: no reader covers one, and «Completa» would make it a State law (G-577, #650). */}
+                    {row.regional && <span className={TAG}>{REGIONAL_LAW_REFUSAL}</span>}
                   </button>
-                  <button
-                    type="button"
-                    onClick={(event) => { onSelect(row.index); onPick(row.index, 'complete', event.currentTarget.closest('li') ?? event.currentTarget); }}
-                    aria-label={`Completa ${label}`}
-                    className={ACTION}
-                  >
-                    Completa <PencilLine aria-hidden="true" size={15} />
-                  </button>
+                  {!row.regional && (
+                    <Button
+                      variant="quiet"
+                      onClick={(event) => { onSelect(row.index); onPick(row.index, 'complete', event.currentTarget.closest('li') ?? event.currentTarget); }}
+                      aria-label={`Completa ${label}`}
+                      className="shrink-0 self-center"
+                    >
+                      Completa <PencilLine aria-hidden="true" size={16} />
+                    </Button>
+                  )}
                   <MenuButton
                     label={`Altre azioni per ${label}`}
                     placement="auto"
-                    triggerClassName={MENU_TRIGGER}
+                    triggerClassName={ROW_MENU}
                     items={[{ label: 'Non è una norma', icon: XCircle, onSelect: () => onDismiss(row.index) }]}
                   >
                     <MoreHorizontal aria-hidden size={18} />
@@ -192,7 +193,8 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
               return (
                 <li key={row.key} data-cite-row={entry.index} className={cn(ROW, motion.className)} style={motion.style}>
                   <Stripe on={on} />
-                  <button type="button" aria-current={on || undefined} onClick={() => onSelect(entry.index)} className={cn(SELECT, selectClass(on))}>
+                  {/* bare-button: the row itself, a whole entry that selects its citation. */}
+                  <button type="button" aria-current={on || undefined} onClick={() => onSelect(entry.index)} className={cn(ROW_SELECT, selectClass(on))}>
                     <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">{entry.article}</span>
                     <Passage passage={entry.passage} />
                     {row.origin === 'context' && row.act && <span className={TAG}>dal contesto: {actName(row.act)}</span>}
@@ -200,15 +202,15 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
                     {links && linkLine(row, links[entry.index])}
                   </button>
                   {linksOn && waits && (
-                    <button type="button" onClick={() => onConfirm(row.index)} aria-label={`Conferma il link di ${label}`} className={ACTION}>
+                    <Button variant="quiet" onClick={() => onConfirm(row.index)} aria-label={`Conferma il link di ${label}`} className="shrink-0 self-center">
                       Conferma
-                    </button>
+                    </Button>
                   )}
-                  <button type="button" onClick={() => onOpen(entry.citation)} aria-label={`Apri ${label}`} className={ACTION}>
-                    Apri <ArrowUpRight aria-hidden="true" size={15} />
-                  </button>
+                  <Button variant="quiet" onClick={() => onOpen(entry.citation)} aria-label={`Apri ${label}`} className="shrink-0 self-center">
+                    Apri <ArrowUpRight aria-hidden="true" size={16} />
+                  </Button>
                   {items.length > 0 && (
-                    <MenuButton label={`Altre azioni per ${label}`} placement="auto" triggerClassName={MENU_TRIGGER} items={items}>
+                    <MenuButton label={`Altre azioni per ${label}`} placement="auto" triggerClassName={ROW_MENU} items={items}>
                       <MoreHorizontal aria-hidden size={18} />
                     </MenuButton>
                   )}
@@ -223,6 +225,7 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
         <div className="mt-2 border-t border-slate-200 dark:border-slate-800">
           {/* The accordion pattern (`DossierActBlock`): the toggle inside the heading, its name the heading's words. */}
           <h3 className="m-0">
+            {/* bare-button: the accordion's heading, a whole row. */}
             <button
               type="button"
               aria-expanded={showDismissed}
@@ -244,9 +247,9 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
                       <span className="block text-sm font-medium text-slate-600 line-through decoration-slate-400 dark:text-slate-400">{label}</span>
                       <Passage passage={citedPassage(text, row.start, row.end)} />
                     </div>
-                    <button type="button" onClick={() => onRestore(row.index)} aria-label={`Ripristina ${label}`} className={ACTION}>
-                      Ripristina <RotateCcw aria-hidden="true" size={14} />
-                    </button>
+                    <Button variant="quiet" onClick={() => onRestore(row.index)} aria-label={`Ripristina ${label}`} className="shrink-0 self-center">
+                      Ripristina <RotateCcw aria-hidden="true" size={16} />
+                    </Button>
                   </li>
                 );
               })}

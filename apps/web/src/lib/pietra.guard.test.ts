@@ -157,10 +157,9 @@ describe('Pietra\'s colours', () => {
   it('a switch that is on is the light ink in the dark, its knob dark on it', () => {
     const switches = [
       join('features', 'merlt', 'ops', 'OpsConfigPanel.tsx'),
-      // LC112, LC115: Learn's and Impostazioni' switches are the common one; its knob is checked here.
+      // LC112, LC115, LC117: Learn's, Impostazioni', the comparison's and Analizza's switches are the common one; its knob
+      // is checked here.
       join('components', 'ui', 'Switch.tsx'),
-      join('components', 'features', 'compare', 'CompareBody.tsx'),
-      join('components', 'features', 'documents', 'DocumentReviewPage.tsx'),
     ];
     const ON_TRACK = /\?\s*['"]bg-primary-600\b[^'"]*['"]/;
     const grey = sources(src).map((file) => relative(src, file)).flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')

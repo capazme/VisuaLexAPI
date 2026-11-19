@@ -598,6 +598,8 @@ export interface DocumentCitation {
   fallback?: boolean;
   /** The query string of an explicit candidate the page could not read; none for a bare article. */
   query?: string;
+  /** An incomplete row that cites a regional law: no reader covers it, and it is never completed as a State law (G-577). */
+  regional?: true;
   /** A bare article followed by something else: «del contratto». */
   followedBy?: string;
 }
@@ -765,6 +767,8 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
   // explicit candidate that holds one is to complete, never read as the State's law of that number (G-577).
   const regional = regionalLawSpans(text);
   const holdsRegionalLaw = (c: Candidate) => regional.some(([start]) => start >= c.start && start < c.end);
+  // A bare article whose next words are a regional law («l’art. 3 della l.r. Toscana 65/2014»): to complete, never a State law.
+  const followedByRegionalLaw = (c: Candidate) => regional.some(([start]) => start >= c.end && /^[\s,]*(?:(?:del(?:la)?|dell['’]|dalla)\s*)?$/iu.test(text.slice(c.end, start)));
 
   for (const candidate of candidates) {
     const at = lineAt(candidate.start);
@@ -796,7 +800,10 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
         }
       }
       for (const { start, end, item } of marks(candidate)) {
-        citations.push({ start, end, article: item.article, ...(item.following ? { following: true } : {}), state: 'incomplete', query: candidate.query });
+        citations.push({
+          start, end, article: item.article, ...(item.following ? { following: true } : {}), state: 'incomplete', query: candidate.query,
+          ...(holdsRegionalLaw(candidate) ? { regional: true as const } : {}),
+        });
       }
       continue;
     }
@@ -815,6 +822,7 @@ export function settleCitations(text: string, candidates: readonly Candidate[], 
         ...(item.following ? { following: true } : {}),
         ...(inherits ? { state: 'inherited' as const, act: inherits } : { state: 'incomplete' as const }),
         ...(candidate.followedBy ? { followedBy: candidate.followedBy } : {}),
+        ...(!inherits && followedByRegionalLaw(candidate) ? { regional: true as const } : {}),
       });
     }
   }

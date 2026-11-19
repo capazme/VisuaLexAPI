@@ -6,7 +6,6 @@
 import { useState } from 'react';
 import { Check, ClipboardCopy, Download, Eye, Link2, RotateCcw, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui/Button';
-import { FOCUS_RING, TRANSITION } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
 import type { LinkSummary, NoLinkReason } from './documentLinks';
 import { NO_LINK_WORDS } from './documentReview';
@@ -62,13 +61,9 @@ function RowButtons({ rows, onSelect }: { rows: readonly UnlinkedRow[]; onSelect
     <ul className="mt-1 flex flex-wrap gap-1.5">
       {rows.map((row) => (
         <li key={row.index}>
-          <button
-            type="button"
-            onClick={() => onSelect(row.index)}
-            className={cn('inline-flex min-h-[44px] items-center rounded-md border border-slate-200 px-2.5 text-[13px] text-slate-700 hover:bg-slate-50 md:min-h-8 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800', TRANSITION, FOCUS_RING)}
-          >
+          <Button variant="secondary" size="sm" onClick={() => onSelect(row.index)}>
             {row.label}
-          </button>
+          </Button>
         </li>
       ))}
     </ul>
@@ -80,7 +75,7 @@ export function LinksPanel(props: LinksPanelProps) {
   const [why, setWhy] = useState(false);
 
   return (
-    <section aria-labelledby="doc-links" className="rounded-[10px] border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+    <section aria-labelledby="doc-links" className="rounded-[8px] border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
       <h2 id="doc-links" className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200">
         <Link2 aria-hidden size={16} className="text-slate-500 dark:text-slate-400" />
         Link alle fonti
@@ -110,9 +105,9 @@ export function LinksPanel(props: LinksPanelProps) {
             {summary.notLinked > 0 && (
               <>
                 {' · '}{summary.notLinked} no:{' '}
-                <button type="button" aria-expanded={why} aria-controls="doc-links-why" onClick={() => setWhy((v) => !v)} className={cn('inline-flex min-h-[44px] items-center font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800 md:min-h-0 dark:text-primary-300', FOCUS_RING)}>
+                <Button variant="link" size="sm" aria-expanded={why} aria-controls="doc-links-why" onClick={() => setWhy((v) => !v)}>
                   {why ? 'nascondi perché' : 'vedi perché'}
-                </button>
+                </Button>
               </>
             )}
           </p>
@@ -128,7 +123,7 @@ export function LinksPanel(props: LinksPanelProps) {
           )}
 
           {toConfirm > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[8px] bg-slate-50 px-3 py-2 dark:bg-slate-950/40">
               <p className={cn(LINE, 'min-w-0 flex-1 basis-56')}>
                 {toConfirm === 1 ? '1 citazione non avrà il link finché non la confermi' : `${toConfirm} citazioni non avranno il link finché non le confermi`}
                 <span className="block text-[13px] text-slate-600 dark:text-slate-400">Prese dal contesto o applicate a più citazioni: guarda che l’atto sia quello giusto.</span>
@@ -180,7 +175,7 @@ export function LinksPanel(props: LinksPanelProps) {
                   <ul className="mt-1 flex flex-col gap-1">
                     {report.skipped.map((row) => (
                       <li key={row.index} className={HINT}>
-                        <button type="button" onClick={() => onSelect(row.index)} className={cn('inline-flex min-h-[44px] items-center font-medium text-slate-800 underline underline-offset-2 md:min-h-0 dark:text-slate-200', FOCUS_RING)}>{row.label}</button>
+                        <Button variant="link" size="sm" onClick={() => onSelect(row.index)}>{row.label}</Button>
                         : {row.reason}
                       </li>
                     ))}

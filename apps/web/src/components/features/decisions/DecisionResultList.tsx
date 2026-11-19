@@ -117,8 +117,9 @@ function Segmented<T extends string>({ label, options, pressed, disabled, onPick
   onPick: (value: T) => void;
 }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex overflow-hidden rounded-lg border border-slate-300 dark:border-slate-600">
+    <div role="group" aria-label={label} className="inline-flex overflow-hidden rounded-md border border-slate-300 dark:border-slate-600">
       {options.map((o) => (
+        // bare-button: a segment of a two-way choice, pressed or not.
         <button
           key={o.value}
           type="button"

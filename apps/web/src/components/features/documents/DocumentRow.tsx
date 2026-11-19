@@ -1,5 +1,6 @@
 import { Check, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { IconButton } from '../../ui/IconButton';
 import { formatSize, type DocumentJob, type DocumentKind, type DocumentStage } from './documentJob';
 
 /** DOCX in ink, HTML in amber, Markdown and TXT in slate. */
@@ -29,7 +30,7 @@ export function DocumentRow({ job, onDismiss }: { job: DocumentJob; onDismiss: (
     <div
       data-stage={job.stage}
       className={cn(
-        'flex min-h-14 items-center gap-3 rounded-[10px] border px-3 py-2',
+        'flex min-h-14 items-center gap-3 rounded-[8px] border px-3 py-2',
         failed ? 'vlx-shake border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30' : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900',
       )}
     >
@@ -63,14 +64,12 @@ export function DocumentRow({ job, onDismiss }: { job: DocumentJob; onDismiss: (
       </span>
       {job.stage === 'done' && <Check aria-hidden size={20} className="shrink-0 text-emerald-700 dark:text-emerald-400" />}
       {failed && (
-        <button
-          type="button"
+        <IconButton
           onClick={onDismiss}
           aria-label="Chiudi l’avviso"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-red-800 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:text-red-200 dark:hover:bg-red-900/40"
-        >
-          <X aria-hidden size={18} />
-        </button>
+          icon={<X aria-hidden />}
+          className="shrink-0 text-red-800 hover:bg-red-100 hover:text-red-900 dark:text-red-200 dark:hover:bg-red-900/40 dark:hover:text-red-100"
+        />
       )}
     </div>
   );

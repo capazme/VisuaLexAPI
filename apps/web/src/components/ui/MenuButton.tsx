@@ -162,7 +162,7 @@ export function MenuButton({ label, title, items, children, triggerClassName, al
         onClick={() => (open ? close(false) : openMenu('first'))}
         onKeyDown={onTriggerKey}
         className={cn(
-          'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+          'inline-flex items-center gap-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
           triggerClassName,
         )}
       >
