@@ -92,10 +92,9 @@ export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps
     <>
       {/* The tab says it on screen; the heading lets a screen reader's list of headings reach the form. */}
       <h2 className="sr-only">Accedi</h2>
-      {error && <FormError id={ERROR_ID} message={error} />}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* The error is said by the box above the form (`FormError`), not under the field: no `error` here, only its red edge. */}
+        {/* The error is said by the box under the submit button (`FormError`), not under the field: no `error` here, only its red edge. */}
         <Input
           ref={emailRef}
           id="login-email"
@@ -137,6 +136,7 @@ export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps
         <Button type="submit" loading={loading} className="w-full">
           Accedi
         </Button>
+        {error && <FormError id={ERROR_ID} message={error} />}
       </form>
 
       <p className="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-slate-600 dark:text-slate-400">

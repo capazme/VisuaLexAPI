@@ -93,7 +93,9 @@ export function AuthPage() {
   // message, so hiding the same words again loses nothing.
   const [loginKey, setLoginKey] = useState(0);
   const [spentError, setSpentError] = useState<string | null>(null);
-  const loginAuth = { login: auth.login, loading: auth.loading, error: auth.error === spentError ? null : auth.error };
+  // Disabled only by its own request (`busy`), never by the session check `useAuth` runs on mounting: that one drew
+  // «Accedi» at half opacity for a frame, then faded it in (LC131).
+  const loginAuth = { login: auth.login, loading: busy, error: auth.error === spentError ? null : auth.error };
   const onRegistered = () => {
     setSignedUp(true);
     setLoginKey((k) => k + 1);

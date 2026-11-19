@@ -66,4 +66,15 @@ describe('LoginForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Credenziali non valide');
     expect(form().getByLabelText(/^password$/i)).toHaveFocus();
   });
+
+  it('draws the error under the submit button, so nothing above it moves (LC131)', async () => {
+    login.mockRejectedValueOnce(new Error('Credenziali non valide'));
+    renderAuth('/login');
+    fireEvent.change(form().getByLabelText(/email/i), { target: { value: 'a@b.it' } });
+    fireEvent.change(form().getByLabelText(/^password$/i), { target: { value: 'wrong' } });
+    fireEvent.submit(form().getByLabelText(/email/i).closest('form')!);
+    const alert = await screen.findByRole('alert');
+    const submit = form().getByRole('button', { name: 'Accedi' });
+    expect(submit.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });
