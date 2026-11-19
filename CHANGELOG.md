@@ -12,6 +12,20 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.55.0] - 2026-11-19
+
+«Scadenze» becomes «Attività», and the change of page never shows two pages at once. Web only, no migration.
+MERL-T stays off.
+
+### Work
+
+- «Scadenze» becomes «Attività», with the title above the views (LC130, part 1).
+
+### Interface
+
+- The change of page never draws two pages at once; after «Indietro» or Esc the focus goes to the page title
+  (LC127).
+
 ## [1.54.0] - 2026-11-19
 
 A light transition at every change of page, the last windows of Pratiche inside the page, and steadier tests.
