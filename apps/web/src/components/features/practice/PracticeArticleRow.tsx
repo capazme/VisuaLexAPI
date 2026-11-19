@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useSimpleReading } from './simpleReading';
 import { retryRowText, useRowText } from './useRowText';
 import { RowTextStatus } from './RowTextStatus';
+import { Button } from '../../ui/Button';
 import { Star, Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -116,29 +117,26 @@ export function PracticeArticleRow({
           <p className="mb-2 flex flex-wrap items-center gap-2 text-sm">
             <NotInDossier />
             {dossier.add && (
-              <button
-                type="button"
-                onClick={dossier.add}
-                className="inline-flex min-h-[44px] items-center rounded-md px-2 font-medium text-primary-700 hover:bg-primary-50 md:min-h-0 md:py-0.5 dark:text-primary-300 dark:hover:bg-primary-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
+              <Button type="button" variant="quiet" onClick={dossier.add} className="px-2 text-sm">
                 Aggiungi alla pratica
-              </button>
+              </Button>
             )}
           </p>
         )}
         {/* No row «⋯» here: the star stands over the text with its name (LC58), as the act's commands do. */}
         {dossier?.inDossier && (
           <p className="mb-2 text-sm">
-            <button
+            {/* One name, the state in `aria-pressed` and the star's fill (LC61). */}
+            <Button
               type="button"
+              variant="quiet"
               aria-pressed={dossier.important}
               onClick={dossier.toggleImportant}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 font-medium text-slate-700 hover:bg-amber-50 md:min-h-0 md:py-0.5 dark:text-slate-200 dark:hover:bg-amber-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              icon={<Star size={14} aria-hidden className={dossier.important ? 'fill-amber-400 text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'} />}
+              className="gap-1.5 px-2 text-sm hover:bg-amber-50 dark:hover:bg-amber-900/20"
             >
-              <Star size={14} aria-hidden className={dossier.important ? 'fill-amber-400 text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'} />
-              {/* One name, the state in `aria-pressed` and the star's fill (LC61). */}
               Importante
-            </button>
+            </Button>
           </p>
         )}
         {annexSuggestion}

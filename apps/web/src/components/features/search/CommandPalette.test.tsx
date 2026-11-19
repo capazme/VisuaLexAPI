@@ -748,6 +748,19 @@ describe('CommandPalette — in the page, not over it (L-75)', () => {
     pill.remove();
   });
 
+  // LC113 (Papiniano on #660, a regression of #559): opened by ⌘K with the focus on the body, Esc gives it to the pill.
+  it('closed with no choice, opened by ⌘K from the body, gives the focus back to the search pill it grew from', () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    const pill = document.createElement('button');
+    pill.id = 'search-island';
+    document.body.append(pill);
+    const onClose = vi.fn();
+    const { rerender } = render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
+    expect(pill).toHaveFocus();
+    pill.remove();
+  });
+
   it('closed with no choice, opened from the body, does not move the focus to the page\'s title nor to <main> (LC94)', () => {
     (document.activeElement as HTMLElement | null)?.blur();
     const onClose = vi.fn();
@@ -828,9 +841,9 @@ describe('CommandPalette — sizes on a phone (the owner\'s pass of 20 October 2
   it('gives the crumb and «Gestisci» 44 px on a phone, and names the close button', async () => {
     appStore.setState({ quickNorms: [] });
     renderPalette();
-    expect(screen.getByRole('button', { name: 'Gestisci' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: 'Gestisci' })).toHaveClass('min-h-11', 'md:min-h-9');
     fireEvent.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
-    expect(await screen.findByRole('button', { name: 'Torna indietro: Codice civile' })).toHaveClass('min-h-[44px]');
+    expect(await screen.findByRole('button', { name: 'Torna indietro: Codice civile' })).toHaveClass('min-h-11');
     // LC81: as tall as the field (40 px), 44 px to the finger.
     expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('size-10', 'after:-inset-0.5');
   });

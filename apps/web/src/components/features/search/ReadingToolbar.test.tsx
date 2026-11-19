@@ -127,7 +127,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         expect(phoneRow(container)).toHaveClass('-mr-3');
         expect(phoneRow(container)).not.toHaveClass('gap-1');
         expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Evidenziatore (giallo)', 'Alla pratica', 'Glosse', 'Altre azioni sull’articolo']);
-        buttons.forEach((b) => expect(b).toHaveClass('min-h-[44px]', 'min-w-[44px]'));
+        buttons.forEach((b) => expect(b).toHaveClass('min-h-11', 'min-w-11'));
     });
 
     it('on a phone, the note tool\'s toggle shows while the tool is on, so it can be turned off where there is no Esc', () => {
@@ -148,7 +148,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
     it('the visible tools are 36 px on a computer, neutral (no colour of their own)', () => {
         const { container } = setup();
         within(desktopRow(container)).getAllByRole('button').forEach((b) => {
-            expect(b).toHaveClass('md:h-9');
+            expect(b).toHaveClass('md:min-h-9');
             expect(b.className).not.toMatch(/(amber|purple|blue|emerald|violet)-/);
         });
     });
@@ -235,7 +235,7 @@ describe('ReadingToolbar — «Glosse», a button of its own before «⋯» (LC7
         expect(within(desktopRow(container)).getByRole('button', { name: 'Glosse, 3' })).toHaveTextContent('Glosse3');
         const phone = within(phoneRow(container)).getByRole('button', { name: 'Glosse, 3' });
         expect(phone).toHaveTextContent('3');
-        expect(phone).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+        expect(phone).toHaveClass('min-h-11', 'min-w-11');
     });
 
     it('stays pressed while the margin is open', () => {

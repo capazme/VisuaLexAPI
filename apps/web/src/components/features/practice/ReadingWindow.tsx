@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, type ComponentProps } from 'react';
 import { X } from 'lucide-react';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { IconButton } from '../../ui/IconButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -58,7 +58,7 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTo
       aria-label={title}
       data-testid="reading-window"
       data-window-id={besideRef.id}
-      className="flex h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+      className="flex h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-0 flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
     >
       <header
         data-reading-window-header
@@ -70,19 +70,14 @@ export function ReadingWindow({ practiceId, besideRef, onCrossReference, clearTo
         <h3 title={title} data-page-title="" className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">
           {title}
         </h3>
-        <button
-          type="button"
+        <IconButton
           // The last one brings the overview back through the passage (L-62); the focus goes to what is left.
           onClick={() => closePracticeWindow(practiceId, besideRef)}
           aria-label={`Chiudi la finestra ${title}`}
           title="Chiudi la finestra"
-          className={cn(
-            'flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-2 dark:text-slate-300 dark:hover:bg-slate-700',
-            FOCUS_RING,
-          )}
-        >
-          <X size={16} aria-hidden />
-        </button>
+          icon={<X aria-hidden />}
+          className="shrink-0"
+        />
       </header>
       <div data-reading-window-body className={cn('min-h-0 flex-1 overflow-y-auto px-3 pt-3', BODY_PADDING_BOTTOM)}>
         <ReadingWindowBody practiceId={practiceId} besideRef={besideRef} subject={subject} onCrossReference={onCrossReference} />

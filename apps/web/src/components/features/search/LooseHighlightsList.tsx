@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import type { Highlight } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { retiredSectionLabel } from '../../../utils/articleAnnotations';
+import { IconButton } from '../../ui/IconButton';
 
 export interface LooseHighlightsListProps {
     /** `highlightsWithoutSign`: the highlights no block's sign shows. */
@@ -26,7 +27,7 @@ function originLabel(highlight: Highlight, articleId: string): string {
 export function LooseHighlightsList({ highlights, articleId, onRemove }: LooseHighlightsListProps) {
     if (highlights.length === 0) return null;
     return (
-        <section className="hidden md:block mt-8 mb-6 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+        <section className="hidden md:block mt-8 mb-6 rounded-[8px] border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50">
             <h6 className="mb-2 font-semibold text-slate-600 dark:text-slate-300">Altre evidenziazioni</h6>
             <ul className="custom-scrollbar max-h-40 space-y-2 overflow-y-auto">
                 {highlights.map((h) => (
@@ -36,15 +37,14 @@ export function LooseHighlightsList({ highlights, articleId, onRemove }: LooseHi
                             <p className="line-clamp-2 text-xs text-slate-700 dark:text-slate-300">&ldquo;{h.text}&rdquo;</p>
                             <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{originLabel(h, articleId)}</p>
                         </div>
-                        <button
-                            type="button"
+                        <IconButton
+                            size="sm"
                             onClick={() => onRemove(h.id)}
                             aria-label="Rimuovi evidenziazione"
                             title="Rimuovi evidenziazione"
-                            className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20"
-                        >
-                            <X size={14} aria-hidden />
-                        </button>
+                            icon={<X aria-hidden />}
+                            className="shrink-0 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                        />
                     </li>
                 ))}
             </ul>

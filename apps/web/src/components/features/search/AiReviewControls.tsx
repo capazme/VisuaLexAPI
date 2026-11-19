@@ -2,7 +2,9 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Check, Flag, Pencil, Trash2 } from 'lucide-react';
 import type { AiReviewState } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { FIELD_TEXT } from '../../../constants/interactions';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
 
 export interface AiReviewControlsProps {
     state: AiReviewState;
@@ -40,8 +42,8 @@ function stateWords(state: AiReviewState, edited: boolean): string {
     return state === 'review' ? 'Da rivedere' : 'Da validare';
 }
 
-// 44 px at every width: the card sits in a popover a finger uses as often as a mouse.
-const ACTION = 'flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2';
+// `IconButton`'s `lg`, 44 px at every width: the card sits in a popover a finger uses as often as a mouse.
+const DANGER = 'hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400';
 
 /**
  * What the user does with an item an application wrote (D7b, its note's three states): a real checkbox, «Proposto dall'IA,
@@ -75,15 +77,17 @@ export function AiReviewControls({
         <div>
             {original !== null && (
                 <div className="mt-1">
-                    <button
+                    <Button
                         type="button"
+                        variant="link"
+                        size="lg"
                         aria-expanded={showOriginal}
                         aria-controls={showOriginal ? originalId : undefined}
                         onClick={() => setShowOriginal((v) => !v)}
-                        className="inline-flex min-h-[44px] items-center rounded px-0.5 text-xs font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:hover:text-primary-200"
+                        className="text-xs"
                     >
                         {showOriginal ? "Nascondi la versione dell'IA" : "Vedi la versione dell'IA"}
-                    </button>
+                    </Button>
                     {showOriginal && (
                         <div id={originalId} className="rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Versione dell'IA</p>
@@ -97,6 +101,7 @@ export function AiReviewControls({
             <div className="mt-1 flex flex-wrap items-center gap-x-0.5">
                 {/* The label is the 44 px target; the input is the checkbox a screen reader and the keyboard reach. */}
                 <label className={cn('flex min-h-[44px] min-w-[10.5rem] flex-1 items-center gap-2 rounded pr-1', busy ? 'cursor-wait opacity-60' : 'cursor-pointer')}>
+                    {/* bare-input: the real checkbox, drawn by the box beside it; the label is the 44 px target. */}
                     <input
                         type="checkbox"
                         checked={validated}
@@ -122,43 +127,18 @@ export function AiReviewControls({
                     </span>
                 </label>
                 <div className="ml-auto flex">
-                    <button
-                        type="button"
+                    <IconButton
+                        size="lg"
                         onClick={() => { if (!busy) onFlag(!flagged); }}
                         aria-pressed={flagged}
                         aria-disabled={busy || undefined}
                         aria-label="Da rivedere"
                         title="Da rivedere"
-                        className={cn(
-                            ACTION,
-                            'focus-visible:ring-red-500',
-                            busy && 'cursor-wait opacity-60',
-                            flagged
-                                ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400'
-                                : 'text-slate-500 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/30 dark:hover:text-red-400',
-                        )}
-                    >
-                        <Flag size={14} aria-hidden className={cn(flagged && 'fill-current')} />
-                    </button>
-                    <button
-                        ref={pencilRef}
-                        type="button"
-                        onClick={onEdit}
-                        aria-label={editLabel}
-                        title={editLabel}
-                        className={cn(ACTION, 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100')}
-                    >
-                        <Pencil size={14} aria-hidden />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onRemove}
-                        aria-label={removeLabel}
-                        title={removeLabel}
-                        className={cn(ACTION, 'text-slate-500 hover:bg-red-50 hover:text-red-600 focus-visible:ring-red-500 dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-400')}
-                    >
-                        <Trash2 size={14} aria-hidden />
-                    </button>
+                        icon={<Flag aria-hidden className={cn('!size-3.5', flagged && 'fill-current')} />}
+                        className={cn(busy && 'cursor-wait opacity-60', flagged ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400' : DANGER)}
+                    />
+                    <IconButton ref={pencilRef} size="lg" onClick={onEdit} aria-label={editLabel} title={editLabel} icon={<Pencil aria-hidden className="!size-3.5" />} />
+                    <IconButton size="lg" onClick={onRemove} aria-label={removeLabel} title={removeLabel} icon={<Trash2 aria-hidden className="!size-3.5" />} className={DANGER} />
                 </div>
             </div>
             {flagged && (
@@ -192,9 +172,9 @@ export function ReviewComment({ saved, onSave }: { saved: string | null; onSave:
         }
     };
     return (
-        <label className="mt-1 block text-xs text-slate-700 dark:text-slate-300">
-            Cosa non va?
-            <input
+        <div className="mt-1">
+            <Input
+                label="Cosa non va?"
                 type="text"
                 value={comment}
                 maxLength={500}
@@ -204,9 +184,8 @@ export function ReviewComment({ saved, onSave }: { saved: string | null; onSave:
                     if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
                     if (e.key === 'Escape') commit();
                 }}
-                // 16 px on a phone (`FIELD_TEXT`): iOS zooms the page into a smaller field as it takes the focus.
-                className={cn('mt-0.5 block min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100', FIELD_TEXT)}
+                className="px-2 md:min-h-11"
             />
-        </label>
+        </div>
     );
 }

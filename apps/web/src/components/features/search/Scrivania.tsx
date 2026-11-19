@@ -14,6 +14,8 @@ import { kindLabel } from '../dossier/dossierKinds';
 import { greeting } from './scrivaniaGreeting';
 import { HIDDEN_SCROLLBAR, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
+import { buttonClassName } from '../../ui/buttonStyles';
 import { useOpenSettings } from '../settings/settingsRoute';
 
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
@@ -21,11 +23,8 @@ const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 
 // LC21: no cascade (it was 40 ms a block): the desk is opened tens of times a day, its blocks are there at once.
 
-/** The examples' look, underlined in the action's ink (from md, and on a phone too: they are links, not pills). */
-const TOOL_LINK = cn(
-  TOUCH_TARGET_RESPONSIVE,
-  'inline-flex items-center whitespace-nowrap font-serif text-lg text-primary-700 max-md:font-sans max-md:text-[15px] max-md:font-medium underline decoration-primary-300 decoration-1 underline-offset-4 transition-colors hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-700',
-);
+/** The Corpus tools: `Button`'s link look, in the desk's serif from md (links, not pills, on a phone too). */
+const CORPUS_LINK = cn(buttonClassName('link', 'lg'), 'whitespace-nowrap font-serif text-lg font-normal max-md:font-sans max-md:text-[15px] max-md:font-medium');
 
 const ROW =
   'group flex w-full min-h-[44px] items-center gap-4 border-t border-slate-200 py-3.5 max-md:py-2.5 text-left transition-colors hover:bg-slate-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-800 dark:hover:bg-slate-900/60';
@@ -66,12 +65,9 @@ export function Scrivania() {
 
         {/* On a phone the field is right above: no second way to it. */}
         <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 max-md:hidden">
-          <button
-            onClick={() => focusSearchFieldOrPalette()}
-            className="inline-flex h-11 items-center gap-2 rounded-md bg-primary-600 px-4 text-sm font-semibold text-white transition-[background-color,transform] hover:bg-primary-700 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-primary-400 dark:text-slate-950 dark:hover:bg-primary-300"
-          >
+          <Button type="button" size="lg" onClick={() => focusSearchFieldOrPalette()} className="text-sm font-semibold">
             Inizia una ricerca
-          </button>
+          </Button>
           {/* A keyboard's shortcut: not on a touch screen. */}
           <span className="text-sm text-slate-500 [@media(pointer:coarse)]:hidden dark:text-slate-400">
             o premi <kbd className="rounded border border-slate-300 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">⌘K</kbd> da qualsiasi pagina
@@ -90,6 +86,7 @@ export function Scrivania() {
         >
           <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Prova</span>
           {EXAMPLES.map((example) => (
+            // bare-button: an example, a word in the interface's type from md and a stone chip on a phone (LC21, M1).
             <button
               key={example}
               // The example goes into the field, ready to search with Enter or to be changed.
@@ -110,7 +107,7 @@ export function Scrivania() {
         {/* The Corpus tools beside the search (LC8: Work's bar no longer lists them). */}
         <nav aria-label="Altri strumenti della Ricerca" className="mt-3 flex flex-wrap gap-x-5 gap-y-2 max-md:mt-2 max-md:gap-x-4">
           {[['/documents', 'Analizza un documento'], ['/rassegne', 'Rassegne']].map(([to, label]) => (
-            <Link key={to} to={to} className={TOOL_LINK}>{label}</Link>
+            <Link key={to} to={to} className={CORPUS_LINK}>{label}</Link>
           ))}
         </nav>
 
@@ -120,6 +117,7 @@ export function Scrivania() {
             <ul className="border-b border-slate-200 dark:border-slate-800">
               {recent.map((d) => (
                 <li key={d.id}>
+                  {/* bare-button: a row of the list that is a whole option, the dossier's name and its count. */}
                   <button className={ROW} onClick={() => navigate(`/pratiche?dossier=${d.id}`)}>
                     <span className="hidden w-36 shrink-0 text-sm text-slate-500 sm:block dark:text-slate-400">{kindLabel(d.kind)}</span>
                     <span className="min-w-0 flex-1">
@@ -139,12 +137,9 @@ export function Scrivania() {
         <section id="tour-quick-norms" className="mt-14 max-md:mt-10" aria-labelledby="scrivania-frequenti">
           <div className="mb-3 flex items-baseline justify-between gap-4">
             <h2 id="scrivania-frequenti" className="font-serif text-2xl font-medium text-slate-900 max-md:text-xl dark:text-slate-50">Ricerche frequenti</h2>
-            <button
-              onClick={() => openSettings('norme-rapide')}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:py-1 dark:text-primary-300 dark:hover:bg-primary-950"
-            >
-              <Plus aria-hidden="true" size={14} /> Gestisci
-            </button>
+            <Button type="button" variant="quiet" onClick={() => openSettings('norme-rapide')} icon={<Plus aria-hidden="true" size={14} />} className="gap-1.5 px-2 text-sm">
+              Gestisci
+            </Button>
           </div>
           {quickNorms.length === 0 ? (
             <p className="border-t border-slate-200 pt-4 text-[15px] leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -154,6 +149,7 @@ export function Scrivania() {
             <ul className="border-b border-slate-200 dark:border-slate-800">
               {quickNorms.slice(0, 6).map((qn) => (
                 <li key={qn.id}>
+                  {/* bare-button: a row of the list that is a whole option, the norm's name and its act. */}
                   <button
                     className={ROW}
                     onClick={() => {

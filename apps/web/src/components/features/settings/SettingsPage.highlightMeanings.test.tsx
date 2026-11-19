@@ -45,7 +45,7 @@ afterEach(() => {
 describe('Impostazioni › «Significato dei colori»', () => {
   it('lists the four colours, each with its meaning: VisuaLex\'s by default', () => {
     const { region } = open();
-    expect(within(region).getAllByRole('textbox').map((f) => [f.closest('div')?.textContent, (f as HTMLInputElement).value]))
+    expect(within(region).getAllByRole('textbox').map((f) => [f.closest('.sm\\:flex-row')?.textContent, (f as HTMLInputElement).value]))
       .toEqual([['Giallo', 'Punto centrale'], ['Verde', 'Condizione o presupposto'], ['Rosso', 'Da rivedere'], ['Blu', 'Definizione o eccezione']]);
     // Each field says what it is for, its limit and that only the words change.
     expect(field(region, 'Giallo')).toHaveAccessibleDescription(/fino a 40 caratteri.*Le evidenziazioni non cambiano/);
@@ -125,8 +125,8 @@ describe('Impostazioni › «Significato dei colori»', () => {
 
   it('44 px on a phone: every field and the button', () => {
     const { region } = open();
-    for (const f of within(region).getAllByRole('textbox')) expect(f).toHaveClass('min-h-[44px]', 'md:min-h-0');
-    expect(within(region).getByRole('button', { name: 'Ripristina predefiniti' })).toHaveClass('min-h-[44px]');
+    for (const f of within(region).getAllByRole('textbox')) expect(f).toHaveClass('min-h-11', 'md:min-h-9');
+    expect(within(region).getByRole('button', { name: 'Ripristina predefiniti' })).toHaveClass('min-h-11');
   });
 
   it('opened by the reader\'s gear (`#colori`), it focuses the first field, «Giallo», a control of the Tab order', async () => {

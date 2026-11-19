@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
 import { ChevronDown, ChevronUp, LocateFixed, PenLine, Plus, Send, X } from 'lucide-react';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { ArticleDiscussionThread, ThreadPassage } from '../../../types';
 import { articleDiscussionService, type DiscussionAnchor } from '../../../services/articleDiscussionService';
 import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../hooks/useAuth';
-import { ReplyForm, ReportButton, TOUCH, VoteButton } from './discussionControls';
+import { ReplyForm, ReportButton, VoteButton } from './discussionControls';
 import { AlignedGlosses, type GlossAlignment } from './AlignedGlosses';
 import { voteFailure } from './voteFailure';
 import { Select } from '../../ui/Select';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { Input } from '../../ui/Input';
 import { MATERIA_LABEL } from '../studia/studiaLabels';
 import type { Materia } from '../../../types/studia';
 
@@ -400,9 +402,9 @@ export function ArticleDiscussionPanel({
 
   // The composer, the notices and a discussion's card: the side view's and the margin's.
   const composer = (
-        <form onSubmit={createThread} ref={composerRef} className="mb-4 rounded-xl border border-primary-200 dark:border-primary-900/50 bg-primary-50/50 dark:bg-primary-950/20 p-4 space-y-3">
+        <form onSubmit={createThread} ref={composerRef} className="mb-4 rounded-[8px] border border-primary-200 dark:border-primary-900/50 bg-primary-50/50 dark:bg-primary-950/20 p-4 space-y-3">
           {draft && (
-            <div className="rounded-lg border border-primary-300 dark:border-primary-800 bg-white/70 dark:bg-slate-900/70 p-2.5">
+            <div className="rounded-[8px] border border-primary-300 dark:border-primary-800 bg-white/70 dark:bg-slate-900/70 p-2.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">
                 Glossa sul passo
               </span>
@@ -411,7 +413,7 @@ export function ArticleDiscussionPanel({
               </p>
             </div>
           )}
-          <input
+          <Input
             value={title}
             onChange={event => setTitle(event.target.value)}
             required={!draft}
@@ -419,7 +421,7 @@ export function ArticleDiscussionPanel({
             maxLength={200}
             placeholder={draft ? "Titolo (facoltativo)" : "Titolo della glossa"}
             aria-label={draft ? "Titolo (facoltativo)" : "Titolo della glossa"}
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+            className="px-3"
           />
           <textarea
             value={body}
@@ -430,11 +432,10 @@ export function ArticleDiscussionPanel({
             placeholder="Condividi una domanda o un'osservazione…"
             aria-label="Testo della glossa"
             rows={4}
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           {/* Optional: the Forum's Community filters by it (the server keeps it only when sent). */}
           <Select
-            size="sm"
             aria-label="Materia (facoltativa)"
             value={materia}
             onChange={event => setMateria(event.target.value as Materia | '')}
@@ -443,40 +444,40 @@ export function ArticleDiscussionPanel({
             {(Object.keys(MATERIA_LABEL) as Materia[]).map(key => <option key={key} value={key}>{MATERIA_LABEL[key]}</option>)}
           </Select>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={cancelComposer} className="px-3 py-1.5 text-xs text-slate-500">
+            <Button type="button" variant="quiet" onClick={cancelComposer}>
               Annulla
-            </button>
-            <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-semibold text-white">
-              <Send size={13} /> Pubblica
-            </button>
+            </Button>
+            <Button type="submit" icon={<Send size={13} aria-hidden />}>
+              Pubblica
+            </Button>
           </div>
         </form>
   );
 
   const statuses = (
     <>
-      {error && <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">{error}</div>}
+      {error && <div role="alert" className="mb-3 rounded-[8px] border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">{error}</div>}
       {passageThreadsLoading && (
-        <p role="status" className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+        <p role="status" className="mb-3 rounded-[8px] border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
           Aggiornamento glosse sui passaggi…
         </p>
       )}
       {passageLoadError && (
-        <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+        <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-[8px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
           <span>Impossibile caricare le glosse sui passaggi. I segni potrebbero non mostrarle.</span>
           {onRetryPassageLoad && (
-            <button type="button" onClick={onRetryPassageLoad} className="font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <Button type="button" variant="link" onClick={onRetryPassageLoad} className="font-semibold text-amber-900 decoration-amber-400 dark:text-amber-200">
               Riprova
-            </button>
+            </Button>
           )}
         </div>
       )}
       {passageLoadError && threads.length === 0 && !isLoading && (
-        <p className="mb-3 rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 dark:border-slate-700">
+        <p className="mb-3 rounded-[8px] border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 dark:border-slate-700">
           Le glosse non sono disponibili al momento, quindi l’elenco potrebbe essere incompleto.
         </p>
       )}
-      {notice && <div role="status" className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">{notice}</div>}
+      {notice && <div role="status" className="mb-3 rounded-[8px] border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">{notice}</div>}
     </>
   );
 
@@ -518,13 +519,14 @@ export function ArticleDiscussionPanel({
                 id={`article-thread-${thread.id}`}
                 data-lit={isMargin && litThreadId === thread.id ? '' : undefined}
                 className={cn(
-                  'rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900',
+                  'rounded-[8px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900',
                   isMargin ? 'p-3' : 'p-4',
                   // Its passage lit in the text: the same tint as the words' underline.
                   isMargin && litThreadId === thread.id && 'border-[hsl(var(--primary)/0.55)] dark:border-[hsl(var(--primary)/0.55)]',
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
+                  {/* bare-button: the gloss's heading, a whole row that opens it (its title, passage and author). */}
                   <button
                     type="button"
                     onClick={() => toggleExpand(thread)}
@@ -551,7 +553,7 @@ export function ArticleDiscussionPanel({
                 {(isDetached || (withholdDetachedPassage && isUnknown)) && (
                   <div
                     role="note"
-                    className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
+                    className="mt-2 rounded-[8px] border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300"
                   >
                     {quoteWithheld ? (
                       <p className="font-medium">
@@ -581,21 +583,22 @@ export function ArticleDiscussionPanel({
                       </>
                     )}
                     {canRelease && (
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
+                        size="lg"
                         onClick={() => void setPassageReleased(thread.id, !thread.passageReleased)}
-                        disabled={releasing.has(thread.id)}
-                        aria-busy={releasing.has(thread.id)}
-                        className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-amber-300 px-3 text-xs font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-60 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/30"
+                        loading={releasing.has(thread.id)}
+                        className="mt-2 border-amber-300 bg-transparent px-3 text-xs font-semibold text-amber-900 hover:border-amber-400 hover:bg-amber-100 hover:text-amber-950 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/30"
                       >
                         {thread.passageReleased ? 'Nascondi di nuovo' : 'Mostra a tutti'}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
 
                 {isTextDifferent && (
-                  <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                  <div className="mt-2 rounded-[8px] border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
                     {textChangedNotice}
                   </div>
                 )}
@@ -607,7 +610,7 @@ export function ArticleDiscussionPanel({
                     </p>
                     <div className="mt-4 space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800">
                       {thread.comments.map(comment => (
-                        <div key={comment.id} className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3">
+                        <div key={comment.id} className="rounded-[8px] bg-slate-50 dark:bg-slate-800/60 p-3">
                           <div className="flex justify-between gap-2">
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{comment.user.username}</span>
                             <VoteButton voted={comment.userVoted} count={comment.voteCount} label={`Vota la risposta di ${comment.user.username}`} own={comment.isOwner} onVote={() => void voteComment(thread.id, comment.id)} />
@@ -617,18 +620,14 @@ export function ArticleDiscussionPanel({
                       ))}
                     </div>
                     <div className={cn('mt-3 flex items-center gap-4 md:gap-2', isMargin && 'flex-wrap gap-y-2')}>
-                      <button type="button" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)} className={cn('px-2 text-xs text-primary-600 hover:underline md:px-0', TOUCH)}>
+                      <Button type="button" variant="link" onClick={() => setReplyingTo(replyingTo === thread.id ? null : thread.id)}>
                         Rispondi
-                      </button>
+                      </Button>
                       <ReportButton label="Segnala la glossa" inline={isMargin} onReport={() => void reportThread(thread.id)} />
                       {isLocated && onGoToPassage && (
-                        <button
-                          type="button"
-                          onClick={() => onGoToPassage(thread.id)}
-                          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                        >
-                          <LocateFixed size={12} /> Vai al passo
-                        </button>
+                        <Button type="button" variant="link" onClick={() => onGoToPassage(thread.id)} icon={<LocateFixed size={12} aria-hidden />} className="ml-auto gap-1">
+                          Vai al passo
+                        </Button>
                       )}
                     </div>
                     {replyingTo === thread.id && (
@@ -669,22 +668,21 @@ export function ArticleDiscussionPanel({
       >
         <div data-gloss-row="" className="flex items-center justify-between gap-2">
           <h3 id={marginHeadingId} className="font-serif text-lg leading-tight text-slate-900 dark:text-white">Glosse</h3>
-          <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="-mr-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 md:min-h-0 md:min-w-0 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-              <X size={16} />
-            </button>
+          <IconButton size="sm" onClick={onClose} aria-label="Chiudi glosse" icon={<X aria-hidden />} className="-mr-2" />
         </div>
           {/* The order, small and in the page (L-73: no menu over it): three words, the chosen one pressed. */}
           <div data-gloss-row="" role="group" aria-label="Ordine delle glosse" className="-ml-1.5 -mt-2 flex flex-wrap items-center">
             {([['recent', 'Recenti'], ['active', 'Attive'], ['popular', 'Più votate']] as const).map(([value, name]) => (
-              <button
+              <Button
                 key={value}
                 type="button"
+                variant="quiet"
                 aria-pressed={sort === value}
                 onClick={() => setSort(value)}
-                className={cn('rounded-md px-1.5 text-xs text-slate-500 hover:text-slate-800 aria-pressed:font-semibold aria-pressed:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 dark:aria-pressed:text-white', TOUCH)}
+                className="px-1.5 font-normal text-slate-500 aria-pressed:font-semibold aria-pressed:text-slate-900 dark:text-slate-400 dark:aria-pressed:text-white"
               >
                 {name}
-              </button>
+              </Button>
             ))}
           </div>
         {/* L-8: the glosses are public; a private remark is a note. */}
@@ -694,11 +692,12 @@ export function ArticleDiscussionPanel({
         <div data-gloss-row="">
           {composerOpen ? composer : (
             // Closed until asked for: one line (Luca, 17-11: less in the way).
+            // bare-button: the composer's closed line, drawn as the field it opens into.
             <button
               ref={writeLineRef}
               type="button"
               onClick={() => setComposerOpen(true)}
-              className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-slate-200 px-3 text-left text-sm text-slate-500 hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-9 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+              className="flex min-h-11 w-full items-center gap-2 rounded-md border border-slate-200 px-3 text-left text-sm text-slate-500 hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-9 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
             >
               <PenLine size={14} aria-hidden /> Scrivi una glossa…
             </button>
@@ -729,16 +728,20 @@ export function ArticleDiscussionPanel({
   return createPortal(
     // A side view, not a box over the text (Luca, 15-11: «sarebbe meglio averlo in visualizzazione laterale»): the
     // window's right edge, its whole height, in from the right; the text stays where it is, in sight.
-    <motion.section
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+    // In from the right in CSS, on the motion tokens (`--dur-pop`, `--ease-out`): the keyframes end on the panel's own
+    // style, so nothing is left to write at the end. Framer's entrance gave the opacity back to 0 for a frame once it
+    // finished (Papiniano, #660).
+    <section
       ref={panelRef}
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="article-discussions-title"
-      className={cn('fixed inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-slate-200 bg-card shadow-lg outline-none sm:w-[24rem] dark:border-slate-800', Z_INDEX.structure)}
+      className={cn(
+        'fixed inset-y-0 right-0 flex w-full flex-col overflow-hidden border-l border-slate-200 bg-card shadow-lg outline-none sm:w-[24rem] dark:border-slate-800',
+        'animate-in fade-in slide-in-from-right-6 duration-(--dur-pop) ease-(--ease-out)',
+        Z_INDEX.structure,
+      )}
     >
       <div className="flex-1 overflow-y-auto p-5 sm:p-6">
       {/* The title and its close on one line; the order and «Nuova glossa» under them. */}
@@ -748,32 +751,32 @@ export function ArticleDiscussionPanel({
             <h3 id="article-discussions-title" className="inline font-serif text-xl leading-tight text-slate-900 dark:text-white">{heading}</h3>
             {label && <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{label}</span>}
           </div>
-          <button type="button" onClick={onClose} aria-label="Chiudi glosse" className="-mr-2 -mt-1 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 md:min-h-0 md:min-w-0 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-            <X size={18} />
-          </button>
+          <IconButton onClick={onClose} aria-label="Chiudi glosse" icon={<X aria-hidden />} className="-mr-2 -mt-1" />
         </div>
         <div className="flex items-center justify-between gap-2">
-          <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className={cn('text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-card px-2 py-1.5', TOUCH)}>
-            <option value="recent">Recenti</option>
-            <option value="active">Attive</option>
-            <option value="popular">Più votate</option>
-          </select>
-          <button type="button" onClick={() => setComposerOpen(value => !value)} className={cn('inline-flex items-center gap-1.5 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700', TOUCH)}>
-            <Plus size={14} /> Nuova glossa
-          </button>
+          <div className="w-36">
+            <Select aria-label="Ordine delle glosse" value={sort} onChange={event => setSort(event.target.value as typeof sort)}>
+              <option value="recent">Recenti</option>
+              <option value="active">Attive</option>
+              <option value="popular">Più votate</option>
+            </Select>
+          </div>
+          <Button type="button" onClick={() => setComposerOpen(value => !value)} icon={<Plus size={14} aria-hidden />}>
+            Nuova glossa
+          </Button>
         </div>
       </div>
 
       {composerOpen && composer}
 
       {statuses}
-      {isLoading ? <p className="text-sm text-slate-400">Caricamento glosse…</p> : threads.length === 0 && (passageLoadError || passageThreadsLoading) ? null : threads.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-500">Nessuna glossa ancora. Puoi essere il primo a porre una domanda.</p> : (
+      {isLoading ? <p className="text-sm text-slate-400">Caricamento glosse…</p> : threads.length === 0 && (passageLoadError || passageThreadsLoading) ? null : threads.length === 0 ? <p className="rounded-[8px] border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-500">Nessuna glossa ancora. Puoi essere il primo a porre una domanda.</p> : (
         <div className="space-y-3">
           {threads.map(renderThread)}
         </div>
       )}
       </div>
-    </motion.section>,
+    </section>,
     document.body,
   );
 }

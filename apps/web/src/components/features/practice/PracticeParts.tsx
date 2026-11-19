@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { Toast } from '../../ui/Toast';
+import { Button } from '../../ui/Button';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { practiceLabel } from '../../../utils/practice';
@@ -46,16 +47,11 @@ export function PracticeNotice() {
 /** An empty practice (spec §3.1): it says so and offers the search page's field. */
 export function PracticeEmpty() {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center dark:border-slate-700">
+    <div className="flex flex-col items-center gap-3 rounded-[8px] border border-dashed border-slate-300 px-4 py-12 text-center dark:border-slate-700">
       <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Pratica vuota</p>
-      <button
-        type="button"
-        onClick={() => focusSearchFieldOrPalette()}
-        className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-700 md:min-h-0 md:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-      >
-        <Search size={16} aria-hidden />
+      <Button type="button" onClick={() => focusSearchFieldOrPalette()} icon={<Search size={16} aria-hidden />}>
         Cerca una norma o una sentenza
-      </button>
+      </Button>
     </div>
   );
 }
@@ -68,7 +64,7 @@ export function PracticeStreamingBar({ streaming, practiceId }: { streaming: Pra
   return (
     <div aria-hidden data-testid="practice-streaming" className="h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
       <div
-        className={cn('h-full bg-primary-500 transition-[width] duration-300', share === null && 'w-1/3 animate-pulse')}
+        className={cn('h-full bg-primary-500 transition-[width] duration-(--dur-scene)', share === null && 'w-1/3 animate-pulse')}
         style={share === null ? undefined : { width: `${share}%` }}
       />
     </div>
@@ -97,6 +93,7 @@ export function PracticeNameInput({ initial, onDone, className }: {
     onDone(name !== null && practiceLabel(name) ? name : null);
   };
   return (
+    // bare-input: a name edited in place, in the title's own type and width (the caller's class).
     <input
       ref={ref}
       type="text"

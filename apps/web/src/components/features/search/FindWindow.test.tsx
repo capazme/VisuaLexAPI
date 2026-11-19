@@ -525,12 +525,13 @@ describe('FindWindow — on a phone', () => {
     expect(win()).toHaveClass('inset-x-0', 'top-0', 'w-full');
     expect(win().style.left).toBe('');
     expect(screen.queryByRole('button', { name: 'Sposta la finestra di ricerca' })).not.toBeInTheDocument();
-    expect(field()).toHaveClass('basis-full', 'min-h-[44px]');
+    expect(field().closest('.basis-full')).not.toBeNull();
+    expect(field()).toHaveClass('min-h-11');
     for (const name of ['Risultato precedente', 'Risultato successivo', 'Chiudi la ricerca']) {
-      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-11', 'min-w-11');
     }
     for (const name of ['Questo tavolo', 'Tutti i tavoli']) {
-      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]');
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-11');
     }
   });
 });

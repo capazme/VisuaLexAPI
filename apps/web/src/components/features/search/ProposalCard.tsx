@@ -3,6 +3,8 @@ import { MoveHorizontal, Sparkles, Trash2 } from 'lucide-react';
 import type { Highlight, HighlightProposal } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { AiReviewControls } from './AiReviewControls';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
 import { NoteEditBox } from './NoteEditBox';
 import { assistantProposalsStore } from '../../../store/assistantProposals';
 
@@ -54,7 +56,7 @@ export function ProposalCard({
     };
     if (!aiNote) {
         return (
-            <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-1 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="relative overflow-hidden rounded-[8px] border border-slate-200 bg-slate-50 py-1 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
                 <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(highlight.color) }} />
                 <p className="line-clamp-3 pr-1.5 pt-1 text-slate-800 dark:text-slate-200">&ldquo;{highlight.text}&rdquo;</p>
                 <PassageBounds originalText={proposal.originalText} onMove={onMove} />
@@ -62,21 +64,19 @@ export function ProposalCard({
                     <p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                         <Sparkles size={12} aria-hidden className="shrink-0" /> Evidenziato dall'IA
                     </p>
-                    <button
-                        type="button"
+                    <IconButton
                         onClick={onRemove}
                         aria-label="Rimuovi il passaggio"
                         title="Rimuovi il passaggio"
-                        className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 motion-reduce:transition-none dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                    >
-                        <Trash2 size={14} aria-hidden />
-                    </button>
+                        icon={<Trash2 aria-hidden />}
+                        className="shrink-0 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                    />
                 </div>
             </div>
         );
     }
     return (
-        <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-2 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="relative overflow-hidden rounded-[8px] border border-slate-200 bg-slate-50 py-2 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
             <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(highlight.color) }} />
             <p className="line-clamp-3 pr-1.5 text-slate-800 dark:text-slate-200">&ldquo;{highlight.text}&rdquo;</p>
             <PassageBounds originalText={proposal.originalText} onMove={onMove} />
@@ -122,8 +122,6 @@ export function ProposalCard({
     );
 }
 
-const LINK = 'inline-flex min-h-[44px] items-center gap-1.5 rounded px-0.5 text-xs font-medium text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:hover:text-primary-200';
-
 /**
  * The passage's boundaries: «Sposta l'evidenziazione», which has the user select its new words in the reader, and, once
  * they were moved, the words the application had marked (the server keeps them). Moving them changes no state.
@@ -136,20 +134,20 @@ function PassageBounds({ originalText, onMove }: { originalText?: string; onMove
         <div className="pr-1.5">
             <div className="flex flex-wrap items-center gap-x-3">
                 {onMove && (
-                    <button type="button" onClick={onMove} className={LINK}>
-                        <MoveHorizontal size={14} aria-hidden /> Sposta l'evidenziazione
-                    </button>
+                    <Button type="button" variant="link" onClick={onMove} icon={<MoveHorizontal size={14} aria-hidden />}>
+                        Sposta l'evidenziazione
+                    </Button>
                 )}
                 {originalText !== undefined && (
-                    <button
+                    <Button
                         type="button"
+                        variant="link"
                         aria-expanded={showOriginal}
                         aria-controls={showOriginal ? originalId : undefined}
                         onClick={() => setShowOriginal((v) => !v)}
-                        className={`${LINK} underline underline-offset-2`}
                     >
                         {showOriginal ? "Nascondi l'evidenziazione dell'IA" : "Vedi l'evidenziazione dell'IA"}
-                    </button>
+                    </Button>
                 )}
             </div>
             {showOriginal && originalText !== undefined && (

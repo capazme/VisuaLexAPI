@@ -85,7 +85,7 @@ function focusRowOf(practiceId: string, ref: BesideRef): void {
   const act = ref.kind === 'article'
     ? Array.from(document.querySelectorAll<HTMLElement>('[data-act-id]')).find((el) => el.dataset.actId === ref.actId)
     : undefined;
-  // The row's toggle, or the act heading's (the drag handle is a `<button>`, not a `role="button"`).
+  // The row's toggle, or the act heading's (the drag handle is a `button` element, not a `role="button"`).
   (row ?? act)?.querySelector<HTMLElement>('[role="button"]')?.focus({ preventScroll: true });
 }
 

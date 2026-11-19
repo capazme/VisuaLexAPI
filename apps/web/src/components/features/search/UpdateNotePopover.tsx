@@ -14,6 +14,7 @@ import type { RefObject } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { IconButton } from '../../ui/IconButton';
 
 export interface UpdateNotePopoverProps {
     noteId: string;
@@ -73,23 +74,16 @@ export function UpdateNotePopover({ noteId, paragraphs, anchorEl, onClose, porta
                     <div
                         style={{ transformOrigin }}
                         className={cn(
-                            'w-[min(24rem,calc(100vw-2rem))] max-h-[60vh] overflow-y-auto rounded-lg border shadow-md',
+                            'w-[min(24rem,calc(100vw-2rem))] max-h-[60vh] overflow-y-auto rounded-[8px] border shadow-md',
                             'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
-                            'animate-in fade-in zoom-in-95 duration-150',
+                            'animate-in fade-in zoom-in-95 duration-(--dur-pop)',
                         )}
                     >
                         <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-slate-100 bg-white px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900">
                             <span id={titleId} className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                 Aggiornamento ({noteId})
                             </span>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                aria-label="Chiudi nota"
-                                className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:min-w-0 md:p-1 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                            >
-                                <X size={14} aria-hidden />
-                            </button>
+                            <IconButton size="sm" onClick={onClose} aria-label="Chiudi nota" icon={<X aria-hidden />} className="text-slate-400" />
                         </div>
                         <div className="space-y-2 px-3 py-2.5 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                             {paragraphs.length > 0 ? (

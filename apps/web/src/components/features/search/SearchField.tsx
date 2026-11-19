@@ -74,6 +74,7 @@ export function SearchField({ compact = false }: { compact?: boolean } = {}) {
   return (
     <div className={cn('relative', compact ? 'w-[22rem]' : 'w-full max-w-3xl')}>
       <form id={SEARCH_FIELD_FORM_ID} role="search" aria-label="Ricerca" data-compact={compact ? '' : undefined} onSubmit={(event) => event.preventDefault()} className="flex items-center">
+        {/* bare-button: it stands for the search field, the pill the menu of ⌘K opens from (LC81). */}
         <button
           ref={buttonRef}
           type="button"

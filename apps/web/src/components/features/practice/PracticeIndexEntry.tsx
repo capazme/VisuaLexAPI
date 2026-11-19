@@ -1,6 +1,8 @@
 import { useMemo, type ReactNode } from 'react';
 import { MoreHorizontal, PanelRightOpen, X } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
+import { IconButton } from '../../ui/IconButton';
+import { buttonClassName } from '../../ui/buttonStyles';
 import { rowDossierItems, useArticleInDossier, useDecisionInDossier, type RowDossier } from './inDossier';
 import { NotInDossier } from './PracticeRowShell';
 import { cn } from '../../../lib/utils';
@@ -13,12 +15,8 @@ import { shortNorm } from '../../../utils/sources';
 import { historicalItemLabel } from '../../../utils/versionDisplay';
 import { articleLabel } from '../dossier/dossierLayout';
 
-/** The entry's «Togli dal tavolo»: shown on hover and focus, as a row's (`PracticeRowShell`). */
-const REMOVE_BUTTON =
-  'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20';
-
-const MENU_TRIGGER =
-  'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100';
+/** The entry's «Azioni»: `IconButton`'s square, 36 px on a computer, 44 on a phone. */
+const ENTRY_MENU = cn(buttonClassName('quiet'), 'min-w-11 shrink-0 px-0 md:min-w-9');
 
 interface IndexEntryProps {
   /** A window shows the subject: the entry is marked, and a press takes the focus to that window. */
@@ -45,6 +43,7 @@ function IndexEntry({ shown, onOpen, label, title, removeName, onRemove, dossier
   const outside = dossier !== undefined && !dossier.inDossier;
   return (
     <li className="group flex items-center gap-1">
+      {/* bare-button: an entry of the index that is a whole option, its label and its window's sign. */}
       <button
         type="button"
         onClick={onOpen}
@@ -72,19 +71,18 @@ function IndexEntry({ shown, onOpen, label, title, removeName, onRemove, dossier
         )}
       </button>
       {dossier ? (
-        <MenuButton label={`Azioni su ${removeName}`} triggerClassName={MENU_TRIGGER} items={rowDossierItems(dossier, onRemove)}>
+        <MenuButton label={`Azioni su ${removeName}`} triggerClassName={ENTRY_MENU} items={rowDossierItems(dossier, onRemove)}>
           <MoreHorizontal size={14} aria-hidden />
         </MenuButton>
       ) : (
-        <button
-          type="button"
+        // Shown on hover and focus, as a row's (`PracticeRowShell`).
+        <IconButton
           onClick={onRemove}
           aria-label={`Togli dal tavolo ${removeName}`}
           title="Togli dal tavolo"
-          className={REMOVE_BUTTON}
-        >
-          <X size={14} aria-hidden />
-        </button>
+          icon={<X aria-hidden />}
+          className="shrink-0 text-slate-400 opacity-0 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-red-900/20"
+        />
       )}
     </li>
   );
