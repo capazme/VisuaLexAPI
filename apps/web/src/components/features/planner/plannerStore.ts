@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import type { Task } from '../../../types/tasks';
+import { countBySection, type TaskSection } from './taskSection';
 
 const GROUPING_KEY = 'visualex-opus-today-grouping';
 export type Grouping = 'date' | 'dossier';
@@ -28,9 +30,10 @@ export interface PlannerNotice {
 export const plannerStore = create<{
   version: number;
   changed: () => void;
-  /** Overdue plus today's tasks, for the bar; null until first read. */
-  todayCount: number | null;
-  setTodayCount: (count: number) => void;
+  /** Overdue plus today's tasks of each section (LC130), for the bar; null until first read. */
+  todayCount: Record<TaskSection, number> | null;
+  /** From a whole answer of the «today» view: both sections at once, so the two badges never disagree with it. */
+  setTodayCount: (tasks: ReadonlyArray<Pick<Task, 'origin'>>) => void;
   /**
    * The server's Rome day, as the last read answered it. When it changes (a page left open overnight), every view
    * mounted reads again: the lists, the dates they propose and «Termini scaduti» and «In ritardo» follow the new day.
@@ -57,7 +60,7 @@ export const plannerStore = create<{
   version: 0,
   changed: () => set((s) => ({ version: s.version + 1 })),
   todayCount: null,
-  setTodayCount: (todayCount) => set({ todayCount }),
+  setTodayCount: (tasks) => set({ todayCount: countBySection(tasks) }),
   today: null,
   setToday: (today) => set((s) => (s.today === today ? s : { today })),
   quickAdd: null,

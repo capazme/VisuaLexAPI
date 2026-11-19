@@ -8,14 +8,18 @@ import { plannerStore } from './plannerStore';
 import { TaskDialog } from './TaskDialog';
 import { belongsTo } from './taskDraft';
 import type { TaskView } from '../../../types/tasks';
+import { sectionForPath } from '../../../features/sections/sections';
+import { sectionStore } from '../../../features/sections/useSection';
+import { TASK_BASE, type TaskSection } from './taskSection';
+
+const PAGE_VIEWS: Readonly<Record<string, TaskView>> = { scadenziario: 'today', prossimi: 'upcoming', ingresso: 'inbox' };
 
 /** The view the page shows, for «c»: what a new task starts with, and whether it will be seen there. */
-function pageView(pathname: string, dossierId: string | null): { view: TaskView; dossierId?: string } | null {
+function pageView(pathname: string, dossierId: string | null, section: TaskSection): { view: TaskView; dossierId?: string; section?: TaskSection } | null {
   if (dossierId) return { view: 'dossier', dossierId };
-  if (pathname === '/work/scadenziario') return { view: 'today' };
-  if (pathname === '/work/prossimi') return { view: 'upcoming' };
-  if (pathname === '/work/ingresso') return { view: 'inbox' };
-  return null;
+  const base = TASK_BASE[section];
+  const view = pathname.startsWith(`${base}/`) ? PAGE_VIEWS[pathname.slice(base.length + 1)] : undefined;
+  return view ? { view, section } : null;
 }
 
 /** The bar's count is read again every two minutes while the tab is on screen, and after every write. */
@@ -53,6 +57,9 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
   const serverToday = plannerStore((s) => s.today);
   const { pathname, search } = useLocation();
   const openDossierId = pathname === '/pratiche' ? new URLSearchParams(search).get('dossier') : null;
+  // Learn's pages, or a common page (a dossier, the search) reached from Learn: a task with no dossier is Learn's (LC130).
+  const lastSection = sectionStore((s) => s.section);
+  const section: TaskSection = (sectionForPath(pathname) ?? lastSection) === 'gymnasium' ? 'learn' : 'work';
 
   useEffect(() => {
     if (!enabled) return;
@@ -73,7 +80,7 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
       taskService.list('today').then(
         (answer) => {
           if (!live) return;
-          plannerStore.getState().setTodayCount(answer.tasks.length);
+          plannerStore.getState().setTodayCount(answer.tasks);
           // A new day here makes every view mounted read again (`useTaskView`).
           plannerStore.getState().setToday(answer.today);
         },
@@ -92,7 +99,7 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
   }, [enabled, version]);
 
   const today = serverToday ?? todayInRome();
-  const shown = pageView(pathname, openDossierId);
+  const shown = pageView(pathname, openDossierId, section);
   // On «Oggi» and «Prossimi giorni» a new task is for today, as their own field proposes.
   const forToday = shown?.view === 'today' || shown?.view === 'upcoming';
 
@@ -101,10 +108,11 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
       {quickAdd && (
         <TaskDialog
           defaults={{ ...(quickAdd.dossierId ? { dossierId: quickAdd.dossierId } : {}), ...(forToday ? { plannedDate: today } : {}) }}
+          section={section}
           onClose={() => plannerStore.getState().closeQuickAdd()}
           onCreated={(task) => {
             // As the views' own field says it: a task the page will not list is announced.
-            const unseen = shown !== null && !belongsTo(task, shown.view, today, shown.dossierId);
+            const unseen = shown !== null && !belongsTo(task, shown.view, today, shown.dossierId, shown.section);
             plannerStore.getState().notify(unseen ? 'Compito aggiunto: non è in questa vista' : 'Compito aggiunto', unseen ? 'info' : 'success');
           }}
         />

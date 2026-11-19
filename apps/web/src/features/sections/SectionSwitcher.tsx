@@ -47,7 +47,9 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
   const forumDot = forumCount > 0 && section !== 'forum';
   const news = forumDot ? ', nuove attività nel Forum' : '';
   // Opus's count (overdue plus today's tasks) rides its entry, as the Forum's does; no dot: it is a to-do, not news.
-  const opusCount = plannerStore((s) => s.todayCount) ?? 0;
+  // Learn's own tasks ride Learn's (LC130).
+  const opusCount = plannerStore((s) => s.todayCount?.work) ?? 0;
+  const learnCount = plannerStore((s) => s.todayCount?.learn) ?? 0;
 
   const [phase, setPhase] = useState<Phase>('closed');
   // Which entry takes the focus once the menu is drawn.
@@ -199,6 +201,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
           current={openedOn}
           forumCount={forumCount}
           opusCount={opusCount}
+          learnCount={learnCount}
           inDrawer={inDrawer}
           chosen={phase !== 'open'}
           onChoose={choose}
@@ -230,6 +233,7 @@ interface SectionMenuProps {
   current: SectionId;
   forumCount: number;
   opusCount: number;
+  learnCount: number;
   inDrawer: boolean;
   /** Chosen, or rolling up: nothing more can be chosen in it. */
   chosen: boolean;
@@ -241,7 +245,7 @@ interface SectionMenuProps {
  * The menu of the sections (WAI-ARIA menu, `menuitemradio` entries): arrows, Home and End move, Escape closes and
  * gives the focus back to the arrow, Tab closes. One check, on the entry checked, slides when it changes.
  */
-function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCount, inDrawer, chosen, onChoose, onClose }: SectionMenuProps) {
+function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCount, learnCount, inDrawer, chosen, onChoose, onClose }: SectionMenuProps) {
   const check = useRef<HTMLSpanElement>(null);
   const lines = useRef(new Map<SectionId, HTMLSpanElement>());
   const placed = useRef<number | null>(null);
@@ -298,8 +302,8 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCoun
     >
       {sections.map((s) => {
         const isChecked = s.id === checked;
-        const badge = s.id === 'forum' ? forumCount : s.id === 'opus' ? opusCount : 0;
-        const badgeLabel = s.id === 'opus' ? todayCountLabel(badge) : `${badge} notifiche`;
+        const badge = s.id === 'forum' ? forumCount : s.id === 'opus' ? opusCount : s.id === 'gymnasium' ? learnCount : 0;
+        const badgeLabel = s.id === 'opus' || s.id === 'gymnasium' ? todayCountLabel(badge) : `${badge} notifiche`;
         // Labs with its tools off (A7) stays, said «in arrivo» as the sidebar says the tools that are coming.
         const soon = s.id === 'academia' && !isMerltEnabled();
         return (

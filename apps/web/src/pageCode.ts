@@ -31,6 +31,8 @@ export function pageCodeFor(pathname: string): (() => Promise<unknown>) | null {
   if (under(pathname, '/crediti')) return PAGE_CODE.credits;
   if (under(pathname, '/collega-app')) return PAGE_CODE.connectAiApp;
   if (under(pathname, '/work')) return PAGE_CODE.opus;
+  // Learn's planner is Work's page (LC130).
+  if (under(pathname, '/learn/attivita')) return PAGE_CODE.opus;
   if (under(pathname, '/learn')) return PAGE_CODE.learn;
   return null;
 }

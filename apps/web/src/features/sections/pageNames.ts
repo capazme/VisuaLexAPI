@@ -13,10 +13,11 @@ export const ASSISTANT_PAGE = 'Assistente';
 export const GRAPH_PAGE = 'Grafo';
 
 const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
-  [/^\/work\/scadenziario(\/|$)/, 'Scadenziario'],
-  [/^\/work\/prossimi(\/|$)/, 'Prossimi giorni'],
-  [/^\/work\/ingresso(\/|$)/, "Lista d'ingresso"],
-  [/^\/work\/cestino(\/|$)/, 'Cestino dei compiti'],
+  // Work's planner and Learn's (LC130), the same views.
+  [/^\/(work|learn\/attivita)\/scadenziario(\/|$)/, 'Scadenziario'],
+  [/^\/(work|learn\/attivita)\/prossimi(\/|$)/, 'Prossimi giorni'],
+  [/^\/(work|learn\/attivita)\/ingresso(\/|$)/, "Lista d'ingresso"],
+  [/^\/(work|learn\/attivita)\/cestino(\/|$)/, 'Cestino dei compiti'],
   [/^\/work\/pseudonimizzatore(\/|$)/, 'Pseudonimizzatore'],
   [/^\/work\/grafo-pratiche(\/|$)/, 'Grafo delle pratiche'],
   [/^\/learn\/ripasso(\/|$)/, 'Oggi'],

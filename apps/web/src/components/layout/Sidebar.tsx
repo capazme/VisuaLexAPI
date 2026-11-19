@@ -349,8 +349,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const coursesOn = useCoursesSwitch() === 'on';
   const { section, active } = useSection();
   const { count: forumNotifications } = useForumNotifications(!!user);
-  // Overdue plus today's tasks (`PlannerHost` reads them): beside «Scadenziario» in Opus.
-  const todayCount = plannerStore((s) => s.todayCount) ?? 0;
+  // Overdue plus today's tasks (`PlannerHost` reads them): beside «Attività», Work's and Learn's each (LC130).
+  const todayCount = plannerStore((s) => s.todayCount?.work) ?? 0;
+  const studyTodayCount = plannerStore((s) => s.todayCount?.learn) ?? 0;
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
   const normaChanges = forumNotifications.normaChanges ?? 0;
@@ -572,6 +573,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
                   {coursesOn && <NavItem to="/learn/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}
                   <NavItem to="/learn/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
+                  {/* Learn's own to-do list, the «studio» tasks, with Work's icon (LC130). */}
+                  <NavItem to="/learn/attivita/scadenziario" activeOn={['/learn/attivita']} icon={CalendarCheck} label="Attività" onClick={closeMobile} badgeCount={studyTodayCount} badgeLabel={todayCountLabel(studyTodayCount)} layout={layout} />
                   <NavItem to="/pratiche" icon={Folder} label="Pratiche" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
                 </NavGroup>
                 {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}

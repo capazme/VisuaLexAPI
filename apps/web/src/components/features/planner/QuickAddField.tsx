@@ -14,6 +14,7 @@ import { PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
 import { draftWithLine, readQuickAddLine, suggestDossiers, type DossierName, type FoundPart } from './quickAddLine';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
+import { newTaskOrigin, useTaskSection } from './taskSection';
 
 interface Props {
   /** The view it sits on: a task that will not show there is announced. */
@@ -90,6 +91,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
   const suggestions: DossierName[] = listOpen ? suggestDossiers(line.dossierQuery!.query, dossiers) : [];
   const dossierTitle = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.title : undefined;
   const dossierKind = task.dossierId ? dossiers.find((d) => d.id === task.dossierId)?.kind : undefined;
+  // Work's or Learn's page (LC130): a task with no dossier is the section's; on a dossier's page, the dossier's kind.
+  const section = useTaskSection();
 
   // A dossier chosen from the list puts the caret after its name.
   useLayoutEffect(() => {
@@ -150,12 +153,12 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
     setBusy(true);
     setError(null);
     try {
-      const created = await taskService.create(inputFromDraft(task, { withDossier: true, origin: dossierKind === 'studio' ? 'studio' : 'lavoro' }));
+      const created = await taskService.create(inputFromDraft(task, { withDossier: true, origin: newTaskOrigin(dossierKind, section ?? 'work') }));
       setTitle('', 0);
       // Back in the field, for the next task: the disabled button had dropped the focus on the body (LC111).
       titleRef.current?.focus();
       plannerStore.getState().changed();
-      if (!belongsTo(created, view, today, defaults.dossierId || undefined)) plannerStore.getState().notify('Compito aggiunto: non è in questa vista', 'info');
+      if (!belongsTo(created, view, today, defaults.dossierId || undefined, section)) plannerStore.getState().notify('Compito aggiunto: non è in questa vista', 'info');
     } catch (failure) {
       setError(failureMessage(failure, 'Non riesco ad aggiungere il compito. Riprova.'));
     } finally {

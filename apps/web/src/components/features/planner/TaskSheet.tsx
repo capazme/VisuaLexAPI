@@ -195,6 +195,16 @@ function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimis
         q.sending = false;
         q.saved = updated;
         onSaved(updated);
+        // The server brings the subtasks into the new dossier, not into its origin: they follow here, or a task moved
+        // between Work and Learn would leave them in the other list (LC130).
+        const origin = input.origin;
+        const behind = origin ? subtasks.filter((child) => child.origin !== origin) : [];
+        if (origin && behind.length > 0) {
+          Promise.all(behind.map((child) => taskService.update(child.id, { origin }))).then(
+            () => plannerStore.getState().changed(),
+            (failure) => setError(failureMessage(failure, 'Non riesco a spostare i sottocompiti. Riprova.')),
+          );
+        }
         plannerStore.getState().changed();
         if (q.pending) flush();
         else {
