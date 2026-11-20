@@ -91,10 +91,12 @@ export function PublishDossierDialog({ open, className, ...form }: Props & { ope
  * becomes public, the privacy check, and its buttons. Also «Aggiorna la versione pubblicata», the same form over the
  * copy already in the Forum. Its holder keeps `busy`, so it can refuse to close while the server works.
  */
-export function PublishDossierForm({ dossier, otherDossiers, onClose, onPublished, onAlreadyPublished, headingId, busy, setBusy }: Props & {
+export function PublishDossierForm({ dossier, otherDossiers, onClose, onPublished, onAlreadyPublished, onFailed, headingId, busy, setBusy }: Props & {
   headingId: string;
   busy: boolean;
   setBusy: (busy: boolean) => void;
+  /** The server refused it: the error is in the form (the Forum's space shows it again if it was closed meanwhile). */
+  onFailed?: () => void;
 }) {
   const updating = dossier.published ?? null;
   const updatingId = updating?.sharedEnvironmentId ?? null;
@@ -222,6 +224,7 @@ export function PublishDossierForm({ dossier, otherDossiers, onClose, onPublishe
     } catch (err) {
       setError(getErrorMessage(err) || 'Pubblicazione non riuscita. Riprova.');
       setBusy(false);
+      onFailed?.();
       // Already in the Forum (another tab, a double click): read the dossier again, the dialog becomes an update.
       if ((err as { status?: number } | null)?.status === 409) onAlreadyPublished();
     }

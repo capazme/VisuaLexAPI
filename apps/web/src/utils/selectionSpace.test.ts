@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { opensUnder, revealBy, viewOf } from './selectionSpace';
+import { fitsInView, opensUnder, revealBy, viewOf } from './selectionSpace';
 
 // A phone's view at 390: 812 px tall, its top bar 64 px.
 const view = { top: 64, bottom: 812 };
@@ -33,6 +33,18 @@ describe('bringing the space into view, the words kept in it', () => {
   it('moves at most until the words reach the top bar, never past it', () => {
     expect(revealBy(1500, 300, view)).toBe(236);
     expect(revealBy(1500, 50, view)).toBe(0);
+  });
+});
+
+describe('the space measured once drawn (LC145)', () => {
+  it('fits when it is in view, or a scroll that keeps the words brings it in', () => {
+    expect(fitsInView(800, 300, view)).toBe(true);
+    expect(fitsInView(900, 400, view)).toBe(true);
+  });
+
+  it('does not fit when even the words at the top bar leave it past the foot (390×450, commands on several rows)', () => {
+    // Bars down to 109 and from 400; words at 120; the drawn space, 308 px from 148, ends at 456.
+    expect(fitsInView(456, 120, { top: 109, bottom: 400 })).toBe(false);
   });
 });
 

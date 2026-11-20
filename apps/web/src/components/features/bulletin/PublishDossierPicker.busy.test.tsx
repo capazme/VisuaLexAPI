@@ -6,15 +6,24 @@ import { appStore } from '../../../store/useAppStore';
 
 // The form stands in as one button that starts the publication and leaves it running (it disables itself, as the
 // real form's «Pubblica» does while the server works).
-vi.mock('../dossier/PublishDossierDialog', () => ({
-  PublishDossierForm: ({ busy, setBusy, headingId }: { busy: boolean; setBusy: (b: boolean) => void; headingId: string }) => (
-    <>
-      <h2 id={headingId}>Pubblica nel Forum</h2>
-      <button type="button" disabled={busy} onClick={() => setBusy(true)}>Pubblica</button>
-      <button type="button" onClick={() => setBusy(false)}>Fine</button>
-    </>
-  ),
-}));
+vi.mock('../dossier/PublishDossierDialog', async () => {
+  const { useState } = await import('react');
+  return {
+    PublishDossierForm: ({ busy, setBusy, headingId, onFailed }: { busy: boolean; setBusy: (b: boolean) => void; headingId: string; onFailed?: () => void }) => {
+      const [error, setError] = useState<string | null>(null);
+      return (
+        <>
+          <h2 id={headingId}>Pubblica nel Forum</h2>
+          <button type="button" disabled={busy} onClick={() => setBusy(true)}>Pubblica</button>
+          <button type="button" onClick={() => setBusy(false)}>Fine</button>
+          {/* The server refuses: the form keeps its error, as the real one does. */}
+          <button type="button" onClick={() => { setError('Pubblicazione non riuscita. Riprova.'); setBusy(false); onFailed?.(); }}>Rifiuta</button>
+          {error && <p role="alert">{error}</p>}
+        </>
+      );
+    },
+  };
+});
 
 import { PublishDossierPicker } from './PublishDossierPicker';
 
@@ -67,5 +76,41 @@ describe('PublishDossierPicker while it publishes', () => {
     expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Fine' }));
     expect(screen.queryByRole('region', { name: 'Pubblica nel Forum' })).toBeNull();
+  });
+
+  // LC145: the command says its space is there while it publishes; a refusal after another space opened shows again.
+  it('keeps the command expanded while it publishes, and opens again with the error when the server refuses', () => {
+    appStore.setState({ dossiers: [{ id: 'a', title: 'Dossier a', createdAt: '', items: [item], kind: 'studio' }] });
+    function Host() {
+      // As the Forum's page wires it.
+      const [open, setOpen] = useState(false);
+      const [publishing, setPublishing] = useState(false);
+      return (
+        <>
+          <button type="button" aria-expanded={open || publishing} onClick={() => setOpen(true)}>Apri</button>
+          <button type="button" onClick={() => setOpen(false)}>Un altro spazio</button>
+          <PublishDossierPicker open={open} onClose={() => setOpen(false)} onPublished={vi.fn()} onBusyChange={setPublishing} onReopen={() => setOpen(true)} />
+        </>
+      );
+    }
+    render(<Host />);
+    const command = screen.getByRole('button', { name: 'Apri' });
+    fireEvent.click(command);
+    fireEvent.click(screen.getByRole('button', { name: /Dossier a/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pubblica' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Un altro spazio' }));
+    expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
+    expect(command).toHaveAttribute('aria-expanded', 'true');
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Rifiuta' }));
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+    expect(screen.getByRole('region', { name: 'Pubblica nel Forum' })).toBeInTheDocument();
+    expect(scrollIntoView.mock.contexts[0]).toBe(screen.getByRole('region', { name: 'Pubblica nel Forum' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Pubblicazione non riuscita. Riprova.');
+    expect(command).toHaveAttribute('aria-expanded', 'true');
   });
 });

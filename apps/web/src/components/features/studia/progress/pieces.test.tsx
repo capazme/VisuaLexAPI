@@ -144,6 +144,11 @@ describe('DueForecast', () => {
     expect(screen.getByText('oggi')).toHaveClass('font-semibold');
   });
 
+  it('draws its columns still: no growth on every visit (LC145, the frequency rule)', () => {
+    const { container } = render(<DueForecast prossimi={prossimi} />);
+    expect(container.querySelector('.vlx-grow-y, .vlx-grow-x, [class*="animate-"]')).toBeNull();
+  });
+
   it('draws a day with nothing due as a hollow mark, not a gap', () => {
     const empty = prossimi.map((d, i) => ({ ...d, schede: i === 3 ? 0 : d.schede }));
     const { container } = render(<DueForecast prossimi={empty} />);
@@ -167,6 +172,16 @@ describe('the subject filter', () => {
     { materia: 'DIRITTO_PROCESSUALE_CIVILE', nuove: 0, apprendimento: 2, consolidate: 2, ripassi30: 0 },
     { materia: 'DIRITTO_PROCESSUALE_PENALE', nuove: 0, apprendimento: 1, consolidate: 0, ripassi30: 0 },
   ];
+
+  it('draws the bars of Progressi still: no growth on every visit (LC145, the frequency rule)', () => {
+    const { container } = render(
+      <>
+        <SubjectProgress materie={materie} selected={undefined} onSelect={vi.fn()} />
+        <CardStatesBar stati={{ nuove: 1, apprendimento: 2, consolidate: 1 }} />
+      </>,
+    );
+    expect(container.querySelector('.vlx-grow-x, .vlx-grow-y')).toBeNull();
+  });
 
   it('lists the five subjects, each a button that sets the filter and, pressed again, clears it', async () => {
     const onSelect = vi.fn();

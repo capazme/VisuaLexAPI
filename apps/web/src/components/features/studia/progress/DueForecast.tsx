@@ -79,8 +79,8 @@ export function DueForecast({ prossimi, hue }: DueForecastProps) {
             ))}
           </div>
           {/* LC37: no tinted column behind today (it read as a tall bar); «oggi» in ink under it says which day it is. The
-              bars grow from the base once. */}
-          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="vlx-grow-y block h-auto w-full overflow-visible" aria-hidden>
+              bars are drawn still: a growth on every visit broke the frequency rule (LC145). */}
+          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block h-auto w-full overflow-visible" aria-hidden>
             {lines.map((value) => (
               <line key={value} x1={0} x2={WIDTH} y1={y(value)} y2={y(value)} className="stroke-slate-200 dark:stroke-slate-700" strokeWidth={0.5} strokeDasharray="2 2" />
             ))}

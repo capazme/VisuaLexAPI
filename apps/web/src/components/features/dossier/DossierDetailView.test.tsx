@@ -569,9 +569,13 @@ describe('DossierDetailView — «Cronologia» (LC137)', () => {
   it('shows the dated facts by year, oldest first, in the page under the tabs, never in a dialog', () => {
     renderView(dated);
     fireEvent.click(screen.getByRole('tab', { name: 'Cronologia' }));
-    const y2024 = screen.getByRole('region', { name: '2024 (2)' });
-    const y2025 = screen.getByRole('region', { name: '2025 (1)' });
-    expect(screen.getByRole('region', { name: '2023 (1)' }).compareDocumentPosition(y2024) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // One list, the years its headings: no card or region per year (LC145).
+    expect(screen.queryByRole('region', { name: /^\d{4} / })).toBeNull();
+    const y2024 = screen.getByRole('list', { name: '2024 (2)' });
+    const y2025 = screen.getByRole('list', { name: '2025 (1)' });
+    expect(screen.getByRole('heading', { level: 2, name: '2024 (2)' })).toBeInTheDocument();
+    expect(y2024.closest('.bg-card')).toBe(y2025.closest('.bg-card'));
+    expect(screen.getByRole('list', { name: '2023 (1)' }).compareDocumentPosition(y2024) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(y2024.compareDocumentPosition(y2025) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(y2024).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       expect.stringContaining('firma del contratto'),
@@ -586,9 +590,9 @@ describe('DossierDetailView — «Cronologia» (LC137)', () => {
     expect(screen.getByRole('button', { name: '12 marzo 2025, Nota: Notifica della diffida — apri nella pratica' })).toHaveClass('min-h-11', 'w-[calc(100%+1rem)]');
     // The toggle says the order a press gives.
     fireEvent.click(screen.getByRole('button', { name: 'Dal più recente' }));
-    expect(screen.getAllByRole('region', { name: /^\d{4} / }).map((r) => r.getAttribute('aria-labelledby'))).toEqual(['chronology-2025', 'chronology-2024', 'chronology-2023']);
+    expect(screen.getAllByRole('list', { name: /^\d{4} / }).map((r) => r.getAttribute('aria-labelledby'))).toEqual(['chronology-2025', 'chronology-2024', 'chronology-2023']);
     fireEvent.click(screen.getByRole('button', { name: 'Dal più vecchio' }));
-    expect(screen.getAllByRole('region', { name: /^\d{4} / })[0]).toHaveAccessibleName('2023 (1)');
+    expect(screen.getAllByRole('list', { name: /^\d{4} / })[0]).toHaveAccessibleName('2023 (1)');
   });
 
   it('opens a note in «Fonti», clearing the filter, the focus on its row', () => {

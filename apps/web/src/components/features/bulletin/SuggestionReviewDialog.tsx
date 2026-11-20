@@ -5,6 +5,7 @@ import { SuggestionItemCard } from './SuggestionItemCard';
 import { itemName } from './suggestionItemName';
 import { ForumSpace } from './ForumSpace';
 import { AliasConflictDialog, type AliasChoice } from './AliasConflictDialog';
+import { useSpaceDraft } from './spaceDrafts';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
 import { Textarea } from '../../ui/Textarea';
@@ -64,7 +65,9 @@ export function SuggestionReviewDialog({ suggestion, onClose, ...rest }: Suggest
 function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict, onAliasChoose, onAliasCancel }:
   Omit<SuggestionReviewDialogProps, 'suggestion' | 'onClose'> & { suggestion: EnvironmentSuggestion; spaceId: string; setBusy: (busy: boolean) => void }) {
   const [declineTargetId, setDeclineTargetId] = useState<string | null>(null);
-  const [declineNote, setDeclineNote] = useState('');
+  // The note's item, kept once closed: the closing shows its text, and its draft waits for the next opening.
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [declineNote, setDeclineNote, clearDeclineNote] = useSpaceDraft(`decline:${noteFor ?? ''}`);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [aliasBusy, setAliasBusy] = useState(false);
   // «Prendi» refused: what happened, under its item.
@@ -95,6 +98,8 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
   };
 
   const handleTake = async (itemId: string) => {
+    // Its alias choice open, «Prendi» waits for it: no second request.
+    if (aliasConflict?.itemId === itemId) return;
     working(itemId);
     setTakeError(null);
     try {
@@ -108,12 +113,14 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
     }
   };
 
-  const closeDecline = () => { setDeclineTargetId(null); setDeclineNote(''); };
+  // Esc and «Annulla» keep the note typed (LC145, no silent loss); the server taking it clears it.
+  const closeDecline = () => setDeclineTargetId(null);
   const handleConfirmDecline = async () => {
     if (!declineTargetId) return;
     working(declineTargetId);
     try {
       await onDecline(declineTargetId, declineNote.trim() || undefined);
+      clearDeclineNote();
     } finally {
       working(null);
       closeDecline();
@@ -192,12 +199,14 @@ function Review({ suggestion, spaceId, setBusy, onTake, onDecline, aliasConflict
                               id={takeId(item.id)}
                               onClick={() => void handleTake(item.id)}
                               disabled={busyItemId === item.id}
+                              // Held while its alias choice is open, still reachable: the choice gives the focus back to it.
+                              aria-disabled={aliasConflict?.itemId === item.id || undefined}
                               aria-label={`Prendi ${name}`}
                               icon={<Check aria-hidden />}
-                              className="text-green-700 dark:text-green-300"
+                              className="text-green-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:text-green-300"
                             />
                             <IconButton
-                              onClick={() => { setDeclineTargetId(item.id); setDeclineNote(''); }}
+                              onClick={() => { setDeclineTargetId(item.id); setNoteFor(item.id); }}
                               disabled={busyItemId === item.id}
                               aria-label={`Rifiuta ${name}`}
                               aria-expanded={declineTargetId === item.id}

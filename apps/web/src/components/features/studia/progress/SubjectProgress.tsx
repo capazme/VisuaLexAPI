@@ -64,9 +64,9 @@ export function SubjectProgress({ materie, selected, onSelect }: SubjectProgress
                 </span>
               </span>
               {/* The words under it say the same: the bar is their picture. */}
-              {/* No card: no empty bar, the words say it (LC37). The bar grows in once, from the left. */}
+              {/* No card: no empty bar, the words say it (LC37). Drawn still: no growth on every visit (LC145). */}
               {total > 0 && (
-                <span aria-hidden className="vlx-grow-x flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <span aria-hidden className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                   {CARD_STATES.filter((state) => row[state.key] > 0).map((state) => (
                     <span key={state.key} className={cn('min-w-1 basis-0', state.swatch)} style={{ flexGrow: row[state.key] }} />
                   ))}

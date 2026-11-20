@@ -18,7 +18,7 @@ import { IslandSurface } from '../../ui/IslandSurface';
 import { IconButton } from '../../ui/IconButton';
 import { CARD_RADIUS } from '../../ui/controlStyles';
 import { REPEAT_CLOSE, REPEAT_OPEN } from '../../../lib/motion';
-import { opensUnder, revealBy, scrollViewBy, viewOf } from '../../../utils/selectionSpace';
+import { fitsInView, opensUnder, revealBy, scrollViewBy, viewOf } from '../../../utils/selectionSpace';
 
 interface SelectionPopupProps {
   /** Where selections are listened for (mouseup) and where the popup is positioned. */
@@ -468,11 +468,19 @@ export function SelectionPopup({
           onClose={closeInPage}
           title={() => 'Testo selezionato'}
           line={() => quote}
-          // Into view only as far as the selected words stay in it.
+          // Into view only as far as the selected words stay in it. Drawn taller than the estimate (a phone's commands
+          // on several rows) and past the bars at the foot even then, the actions go to the island, the page still.
           reveal={(space) => {
             const words = liveWordsBox() ?? popup.words;
             const view = viewOf(space);
-            scrollViewBy(space, revealBy(space.getBoundingClientRect().bottom, words.top, view));
+            const bottom = space.getBoundingClientRect().bottom;
+            if (!fitsInView(bottom, words.top, view)) {
+              // Gone at once: under reduced motion its closing fade would leave an empty box pushing the text down.
+              space.style.display = 'none';
+              setPopup((prev) => ({ ...prev, under: false }));
+              return;
+            }
+            scrollViewBy(space, revealBy(bottom, words.top, view));
           }}
         >
           {() => <div ref={popupRef}>{actions}</div>}

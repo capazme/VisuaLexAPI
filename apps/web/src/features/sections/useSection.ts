@@ -100,11 +100,8 @@ export function useSection() {
   const wanted = fromPath ?? stored;
   const section = sections.some((s) => s.id === wanted) ? wanted : 'opus';
 
-  /**
-   * `still`: chosen in the phone's drawer, whose closing is the change; `byPointer`: chosen with a pointer, so the new
-   * title takes the focus without its ring (`playSectionTransition`).
-   */
-  const chooseSection = (id: SectionId, { still = false, byPointer = false }: { still?: boolean; byPointer?: boolean } = {}) => {
+  /** `still`: chosen in the phone's drawer, whose closing is the change. */
+  const chooseSection = (id: SectionId, { still = false }: { still?: boolean } = {}) => {
     finishRunning?.();
     finishRunning = null;
     const go = () => {
@@ -118,7 +115,7 @@ export function useSection() {
     }
     // By hand: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router. The
     // router renders the new page in a transition: the old page's picture holds until its title is there.
-    finishRunning = playSectionTransition({ section: id, swap: go, still, byPointer });
+    finishRunning = playSectionTransition({ section: id, swap: go, still });
     startedHere.current = finishRunning;
   };
 
