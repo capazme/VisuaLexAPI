@@ -12,6 +12,18 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.64.0] - 2026-11-20
+
+Seven touch-ups collected on 19 November. Web only, no migration. MERL-T stays off.
+
+### Interface
+
+- The reader's island is measured, so it never covers the text it belongs to.
+- «Prendi» is off while a name conflict is open.
+- The Forum spaces keep what was typed when another space takes their place, and forget it when the session ends.
+- The chronology stands in a box; lists with a moving tab stop show the ring on the row reached with the keyboard.
+- Progressi no longer grows its bars on every visit (LC145).
+
 ## [1.63.0] - 2026-11-19
 
 In the reader, the annotations and the actions of a selection open under the paragraph, and citation previews
