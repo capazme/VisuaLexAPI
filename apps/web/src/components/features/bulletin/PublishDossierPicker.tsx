@@ -14,6 +14,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onPublished: (message: string) => void;
+  /** Publishing or not: the space stays visible while it publishes, closed or not (the command's `aria-expanded`). */
+  onBusyChange?: (busy: boolean) => void;
+  /** A publication refused after another space took its place: the space is asked to open again, with its error. */
+  onReopen?: () => void;
 }
 
 /**
@@ -22,16 +26,19 @@ interface Props {
  * page under the Forum's header (LC138, L-73), as the dossier's own «Pubblica nel Forum» (LC125): Esc closes it, but not
  * while the server works, and the focus goes back to the command.
  */
-export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
+export function PublishDossierPicker({ open, onClose, onPublished, onBusyChange, onReopen }: Props) {
   const dossiers = useAppStore((s) => s.dossiers);
   const refreshDossier = useAppStore((s) => s.refreshDossier);
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Opened again after a refusal while closed: the form stays, with its error.
+  const [keepChosen, setKeepChosen] = useState(false);
   // Opened again, it starts from the list; not while a publication it holds is still travelling.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open && !busy) setChosenId(null);
+    if (open && !busy && !keepChosen) setChosenId(null);
+    setKeepChosen(false);
   }
   const chosen = chosenId ? dossiers.find((d) => d.id === chosenId) ?? null : null;
   const candidates = dossiers.filter((d) => !d.published && d.items.length > 0);
@@ -41,6 +48,7 @@ export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
   // Publishing, the form's button waits (disabled): the focus stays on the space, not on the page's body.
   const setWorking = (working: boolean) => {
     setBusy(working);
+    onBusyChange?.(working);
     if (working) document.getElementById(spaceId)?.focus({ preventScroll: true });
   };
 
@@ -60,6 +68,13 @@ export function PublishDossierPicker({ open, onClose, onPublished }: Props) {
               onPublished(message);
             }}
             onAlreadyPublished={() => void refreshDossier(chosen.id)}
+            // Always asked: this closure may be from before another space opened. Open already, nothing changes.
+            onFailed={() => {
+              setKeepChosen(true);
+              onReopen?.();
+              // It never closed, so it opens nothing: brought into view, the error is seen where the page was scrolled.
+              document.getElementById(spaceId)?.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+            }}
             headingId={headingId}
             busy={busy}
             setBusy={setWorking}

@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
@@ -121,21 +121,20 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
     }
   };
 
-  const choose = (id: SectionId, event: ReactMouseEvent<HTMLButtonElement>) => {
+  const choose = (id: SectionId) => {
     setChosen(id);
     // The focus leaves the menu before the change starts, which gives it to the new page's title (T1).
     arrowRef.current?.focus();
-    // A key's click (Enter, Space) has `detail` 0.
-    chooseSection(id, { still: inDrawer, byPointer: event.detail > 0 });
+    chooseSection(id, { still: inDrawer });
     onChoose?.();
     // The phone's drawer closes over the change and takes the menu with it (T1): it goes at once, as it did.
     if (!motionHere() || inDrawer) finishClosing();
     else close(false);
   };
 
-  const goHome = (event: ReactMouseEvent<HTMLButtonElement>) => {
+  const goHome = () => {
     close(false);
-    chooseSection(section, { still: inDrawer, byPointer: event.detail > 0 });
+    chooseSection(section, { still: inDrawer });
     onChoose?.();
   };
 
@@ -237,7 +236,7 @@ interface SectionMenuProps {
   inDrawer: boolean;
   /** Chosen, or rolling up: nothing more can be chosen in it. */
   chosen: boolean;
-  onChoose: (id: SectionId, event: ReactMouseEvent<HTMLButtonElement>) => void;
+  onChoose: (id: SectionId) => void;
   onClose: (returnFocus: boolean) => void;
 }
 
@@ -314,7 +313,7 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCoun
             aria-checked={isChecked}
             aria-label={soon ? `${s.name}, in arrivo` : undefined}
             tabIndex={-1}
-            onClick={(event) => !chosen && onChoose(s.id, event)}
+            onClick={() => !chosen && onChoose(s.id)}
             className={cn(
               'relative flex w-full items-start gap-3 px-3 py-2 pr-10 text-left text-sm text-slate-700 dark:text-slate-200',
               inDrawer ? 'min-h-14 py-2.5' : 'min-h-[44px]',

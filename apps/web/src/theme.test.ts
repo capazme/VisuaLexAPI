@@ -802,30 +802,14 @@ describe('the section change (T1)', () => {
     expect(css).toMatch(/\.shadow-md\s*\{[^}]*box-shadow:[^;]*var\(--tw-ring-shadow\)[^;]*var\(--tw-shadow\)/);
   }, 30000);
 
-  it('draws no ring on a title focused after a choice made with a pointer, over the utilities\' ring', async () => {
-    const css = await compile(FOCUS_RING.split(' '));
-    expect(css).toMatch(/\[data-pointer-focus\]:focus\s*\{\s*outline:\s*none;\s*box-shadow:\s*none/);
-    // Outside every layer, so it wins over `focus-visible:ring-2` (in the utilities layer) whatever the order.
-    const rule = css.indexOf('[data-pointer-focus]:focus');
-    const layers = [...css.matchAll(/@layer [\w-]+\s*\{/g)];
-    for (const layer of layers) {
-      let depth = 0;
-      let at = layer.index! + layer[0].length - 1;
-      for (; at < css.length; at += 1) {
-        if (css[at] === '{') depth += 1;
-        else if (css[at] === '}' && (depth -= 1) === 0) break;
-      }
-      expect(rule < layer.index! || rule > at, layer[0]).toBe(true);
-    }
-  }, 30000);
-
   it('draws no ring on what the script focuses but no one operates, and keeps it on the controls (LC143)', async () => {
     const css = await compile(FOCUS_RING.split(' '));
     const at = css.indexOf('[tabindex="-1"]:not(');
     expect(at).toBeGreaterThan(-1);
     const rule = css.slice(at, css.indexOf('}', at));
     // Not on a control the script focuses (a menu's entries, a button): those keep the ring.
-    for (const control of ['button', 'a', '[role="menuitem"]', '[role="option"]', '[role="tab"]']) expect(rule).toContain(control);
+    // Roving-tabindex lists with these roles keep the keyboard ring too (LC145).
+    for (const control of ['button', 'a', '[role="menuitem"]', '[role="option"]', '[role="tab"]', '[role="button"]', '[role="link"]', '[role="row"]', '[role="combobox"]']) expect(rule).toContain(control);
     expect(rule).toMatch(/outline:\s*none/);
     expect(rule).toMatch(/--tw-ring-shadow:\s*0 0 #0000/);
     expect(rule).toMatch(/--tw-ring-offset-shadow:\s*0 0 #0000/);
