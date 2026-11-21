@@ -13,7 +13,6 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
-import { FIELD_TEXT } from '../../../constants/interactions';
 import { DossierModal } from '../../ui/DossierModal';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
@@ -316,20 +315,15 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           />
         </div>
         <div className="flex flex-wrap items-center gap-3 md:flex-nowrap md:gap-4">
-          <div className="relative min-w-[8rem] flex-1 md:max-w-[14rem] md:flex-none">
-            {/* The closed menu shows the short name; the system list keeps the full text. */}
+          <div className="min-w-[8rem] flex-1 md:max-w-[14rem] md:flex-none">
             <Select
               id="tour-dossier-sort"
               value={sortBy}
               onChange={(e) => { const key = e.target.value as SortKey; updatePrefs({ sort: key, dir: DEFAULT_DIR[key] }); }}
-              aria-label={`Ordina le pratiche: ${SORT_OPTIONS.find((o) => o.id === sortBy)?.label}`}
-              className="text-transparent"
+              aria-label="Ordina le pratiche"
             >
-              {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id} className="text-ink-900 dark:text-ink-50">{o.label}</option>)}
+              {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
             </Select>
-            <span aria-hidden="true" className={cn('pointer-events-none absolute inset-y-0 left-4 flex items-center whitespace-nowrap font-medium text-ink-900 dark:text-ink-50', FIELD_TEXT)}>
-              {SORT_OPTIONS.find((o) => o.id === sortBy)?.short}
-            </span>
           </div>
           {categories.length > 0 && (
             <div className="min-w-[8rem] flex-1 md:max-w-[16rem] md:flex-none">
