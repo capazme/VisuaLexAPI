@@ -330,7 +330,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
         wide ? "h-9 rounded-lg pl-3 gap-3" : "h-11",
         SIDEBAR_TOGGLE_TEXT,
         "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+        "focus-visible:outline-none ",
         wide ? "w-full overflow-hidden" : "w-11",
       )}
     >
@@ -492,7 +492,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           aria-label="LexCraft"
           onClick={closeMobile}
           className={cn(
-            "rounded-lg text-primary-600 dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+            "rounded-lg text-primary-600 dark:text-primary-400 focus-visible:outline-none ",
             layout === 'rail' ? "grid h-11 w-11 place-items-center" : "flex h-11 items-center px-2",
           )}
         >
@@ -682,7 +682,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               layout === 'drawer' ? "h-11" : "h-9",
               SIDEBAR_TOGGLE_TEXT,
               "hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+              "focus-visible:outline-none ",
             )}
           >
             <span className="grid h-5 w-5 shrink-0 place-items-center"><Settings size={18} strokeWidth={1.5} aria-hidden /></span>
@@ -703,7 +703,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                 layout === 'drawer' ? "h-11 w-11" : "h-9 w-9",
                 SIDEBAR_TOGGLE_TEXT,
                 "hover:bg-slate-200/70 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                "focus-visible:outline-none ",
               )}
             >
               <Bug size={18} strokeWidth={1.5} aria-hidden />

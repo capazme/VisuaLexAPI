@@ -18,7 +18,7 @@ export interface KeyPassagesMenuProps {
 
 const LEGEND = 'Evidenziati automaticamente: non sono le tue evidenziazioni.';
 const SHEET_ENTRY =
-  'flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 dark:hover:bg-slate-800';
+  'flex min-h-[44px] w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 dark:hover:bg-slate-800';
 
 /**
  * «Passaggi chiave (n)» in the decision's toolbar (spec 2026-10-13-decision-key-passages-design,

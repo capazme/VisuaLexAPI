@@ -70,13 +70,13 @@ export function MassimarioReportPanel({ report, vectors, onResume, resuming, onR
       )}
       {running && onRefresh && (
         <button type="button" onClick={onRefresh}
-          className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400">
+          className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none md:min-h-0 dark:text-primary-400">
           Aggiorna
         </button>
       )}
       {stopped && onResume && (
         <button type="button" onClick={onResume} disabled={resuming}
-          className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50 md:min-h-0 dark:text-primary-400">
+          className="min-h-[44px] text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none disabled:opacity-50 md:min-h-0 dark:text-primary-400">
           Riprendi i vettori
         </button>
       )}

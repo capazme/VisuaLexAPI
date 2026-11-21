@@ -27,7 +27,7 @@ export function Switch({ checked, onCheckedChange, className, ...props }: Switch
         aria-hidden
         data-switch-track=""
         className={cn(
-          'relative block h-6 w-11 rounded-full transition-colors duration-(--dur-press) ease-out group-focus-visible:ring-2 group-focus-visible:ring-toga-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background',
+          'relative block h-6 w-11 rounded-full transition-colors duration-(--dur-press) ease-out group-focus-visible:outline group-focus-visible:outline-[1.5px] group-focus-visible:outline-offset-1 group-focus-visible:outline-(--focus-line)',
           checked ? 'bg-primary-600 dark:bg-toga-400' : 'bg-slate-300 dark:bg-slate-600',
         )}
       >

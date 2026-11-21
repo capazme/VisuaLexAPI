@@ -106,7 +106,7 @@ export function PublishDossierPicker({ open, onClose, onPublished, onBusyChange,
                       setChosenId(d.id);
                     }}
                     disabled={d.forumBlocked}
-                    className={`flex w-full items-center justify-between gap-2 ${CONTROL_RADIUS} px-3 text-left hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE} md:py-2`}
+                    className={`flex w-full items-center justify-between gap-2 ${CONTROL_RADIUS} px-3 text-left hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-700 focus-visible:outline-none ${TOUCH_TARGET_RESPONSIVE} md:py-2`}
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium text-slate-900 dark:text-white">{d.title}</span>

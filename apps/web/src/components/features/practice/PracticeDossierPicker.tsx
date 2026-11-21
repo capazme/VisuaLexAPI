@@ -59,7 +59,7 @@ export function PracticeDossierPicker({ isOpen, onPick, onClose }: PracticeDossi
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Cerca una pratica…"
               aria-label="Cerca una pratica"
-              className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full rounded-md border border-slate-300 bg-white py-1.5 pl-8 pr-2.5 text-sm text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
           </div>
         </div>
@@ -79,7 +79,7 @@ export function PracticeDossierPicker({ isOpen, onPick, onClose }: PracticeDossi
                 setQuery('');
                 onPick(d.id);
               }}
-              className="flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-primary-50 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:hover:bg-primary-900/10"
+              className="flex min-h-[44px] w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-primary-50 md:min-h-0 focus-visible:outline-none dark:hover:bg-primary-900/10"
             >
               <Folder size={16} className="shrink-0 text-primary-500" aria-hidden />
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">{d.title}</span>

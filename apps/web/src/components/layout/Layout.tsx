@@ -354,7 +354,7 @@ export function Layout() {
         aria-pressed={settings.focusMode}
         aria-keyshortcuts={FULL_SCREEN_KEYS}
         title={settings.focusMode ? `Esci dal tutto schermo (${FULL_SCREEN_SHORTCUT})` : `Tutto schermo (${FULL_SCREEN_SHORTCUT})`}
-        className="grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        className="grid h-8 w-8 place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
       >
         {settings.focusMode ? <Minimize2 size={16} aria-hidden /> : <Maximize2 size={16} aria-hidden />}
       </button>

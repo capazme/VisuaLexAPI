@@ -119,7 +119,7 @@ export function AiWaysDiagram() {
         aria-pressed={paused}
         aria-label="Ferma l’animazione"
         onClick={() => setPaused((p) => !p)}
-        className="absolute bottom-1 right-1 hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:inline-flex md:motion-reduce:hidden dark:text-slate-300 dark:hover:text-white"
+        className="absolute bottom-1 right-1 hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 hover:text-slate-900 focus-visible:outline-none md:inline-flex md:motion-reduce:hidden dark:text-slate-300 dark:hover:text-white"
       >
         {paused ? <Play size={16} aria-hidden /> : <Pause size={16} aria-hidden />}
       </button>

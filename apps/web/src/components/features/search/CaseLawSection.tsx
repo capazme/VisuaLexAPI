@@ -125,7 +125,7 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
           aria-controls={open ? panelId : undefined}
           onClick={toggle}
           className={cn(
-            'flex w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+            'flex w-full items-center justify-between gap-3 text-left focus-visible:outline-none ',
             TOUCH_TARGET_RESPONSIVE,
           )}
         >
@@ -201,7 +201,7 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry }: C
                   if (backEntry) pushReadingBack(backEntry);
                   openTopicSearch({ tema }, `Tema: ${tema}`, tabId ? { besideId: tabId } : undefined);
                 }}
-                className="group -mx-1 flex min-h-[44px] items-start gap-2 rounded-md px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="group -mx-1 flex min-h-[44px] items-start gap-2 rounded-md px-1 py-1.5 text-left focus-visible:outline-none "
               >
                 <Search size={14} aria-hidden="true" className="mt-1 shrink-0 text-primary-700 dark:text-primary-300" />
                 <span className="min-w-0">

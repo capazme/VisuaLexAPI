@@ -320,7 +320,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
           aria-label={`Sposta ${heading}`}
           // Lettura semplice (LC28): one act, nothing to reorder.
           // 44 px to grab on a computer too (LC86); its reach goes into the panel's margin, the grip where it was.
-          className={cn(plain ? 'hidden' : 'hidden md:flex', 'min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-slate-300 hover:text-slate-500 md:-my-2 md:-ml-3 md:-mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600')}
+          className={cn(plain ? 'hidden' : 'hidden md:flex', 'min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-slate-300 hover:text-slate-500 md:-my-2 md:-ml-3 md:-mr-2 focus-visible:outline-none dark:text-slate-600')}
         >
           <GripVertical size={18} aria-hidden />
         </button>
@@ -344,7 +344,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
               }}
               // The act's title, in the reader's serif (R3): 22 px; 17 px in the index, a heading among its entries.
               className={cn(
-                'flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md font-serif font-medium leading-tight text-slate-900 md:min-h-0 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                'flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md font-serif font-medium leading-tight text-slate-900 md:min-h-0 dark:text-white focus-visible:outline-none ',
                 isIndex ? 'text-[17px]' : 'text-[22px]',
               )}
             >
@@ -516,7 +516,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference,
                             // 14 px in a dossier's «Lettura» (LC55); the Corpus keeps its 12.
                             hostDossier ? 'text-sm' : 'text-xs',
                             // Inset: the row scrolls sideways on a phone and would clip a ring drawn outside the chip.
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
+                            'focus-visible:outline-none ',
                             key === activeKey
                               ? 'bg-slate-200/70 text-slate-900 dark:bg-slate-800 dark:text-white'
                               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',

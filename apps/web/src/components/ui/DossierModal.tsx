@@ -61,20 +61,20 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
               if (e.key === 'Enter') void handleCreate();
             }}
             placeholder="Nome della pratica…"
-            className="flex-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="flex-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800 px-3 py-2 focus:outline-none "
             disabled={busy}
           />
           <button
             onClick={() => void handleCreate()}
             disabled={busy || !newDossierTitle.trim()}
-            className="bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Crea
           </button>
           <button
             onClick={close}
             disabled={busy}
-            className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 rounded-md focus:outline-none ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Annulla
           </button>

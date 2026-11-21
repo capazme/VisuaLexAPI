@@ -51,7 +51,7 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
             onClick={(e) => toggle(e.currentTarget, identity, decisionPath(identity))}
             aria-haspopup="dialog"
             aria-expanded={preview.isVisible}
-            className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 rounded-md text-left hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-primary-300"
+            className="flex min-h-[44px] min-w-0 flex-1 items-center gap-2 rounded-md text-left hover:text-primary-700 focus-visible:outline-none dark:hover:text-primary-300"
           >
             <Gavel size={16} aria-hidden className="text-slate-500 flex-shrink-0" />
             <span className="min-w-0">

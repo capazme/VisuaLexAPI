@@ -62,7 +62,7 @@ export function ReadingBackControl({ bottomOffset = 16 }: ReadingBackControlProp
               'flex items-center gap-2 px-4 py-2 rounded-full max-w-[min(90vw,26rem)]',
               'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900',
               'text-sm font-medium shadow-lg transition-transform active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+              'focus-visible:outline-none ',
             )}
           >
             <ArrowLeft size={16} className="shrink-0" />

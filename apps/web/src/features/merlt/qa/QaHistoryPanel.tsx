@@ -58,7 +58,7 @@ export function QaHistoryPanel({ onSelect }: QaHistoryPanelProps) {
                 <button
                   type="button"
                   onClick={() => onSelect(item)}
-                  className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none "
                 >
                   <span className="block truncate text-sm text-slate-800 dark:text-slate-200">{item.query}</span>
                   {item.created_at && (

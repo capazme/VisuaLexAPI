@@ -27,7 +27,7 @@ const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 const CORPUS_LINK = cn(buttonClassName('link', 'lg'), 'whitespace-nowrap font-serif text-lg font-normal max-md:font-sans max-md:text-[15px] max-md:font-medium');
 
 const ROW =
-  'group flex w-full min-h-[44px] items-center gap-4 border-t border-slate-200 py-3.5 max-md:py-2.5 text-left transition-colors hover:bg-slate-100/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-800 dark:hover:bg-slate-900/60';
+  'group flex w-full min-h-[44px] items-center gap-4 border-t border-slate-200 py-3.5 max-md:py-2.5 text-left transition-colors hover:bg-slate-100/60 focus-visible:outline-none dark:border-slate-800 dark:hover:bg-slate-900/60';
 
 export function Scrivania() {
   const navigate = useNavigate();
@@ -94,7 +94,7 @@ export function Scrivania() {
               className={cn(
                 TOUCH_TARGET_RESPONSIVE,
                 // The prototype's: a word in the interface's type, bold and quiet, with a tint under the pointer (LC21).
-                'shrink-0 whitespace-nowrap rounded-md px-2 text-[15px] font-semibold text-slate-700 transition-colors hover:bg-slate-200/70 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
+                'shrink-0 whitespace-nowrap rounded-md px-2 text-[15px] font-semibold text-slate-700 transition-colors hover:bg-slate-200/70 hover:text-slate-900 focus-visible:outline-none dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
                 // On a phone a quiet stone chip, the interface's size: no frame, no white.
                 'max-md:rounded-full max-md:bg-ink-200/70 max-md:px-3.5 max-md:text-sm max-md:font-medium dark:max-md:bg-ink-800',
               )}

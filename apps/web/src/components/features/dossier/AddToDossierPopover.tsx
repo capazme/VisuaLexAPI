@@ -163,7 +163,7 @@ function PopoverBody({ norma, sentenza, onClose, onAdded, onDuplicate, headingId
                                 className={cn(
                                     'w-full flex items-center gap-2.5 px-2.5 py-2 text-left transition-colors', CONTROL_RADIUS,
                                     TOUCH_TARGET_RESPONSIVE,
-                                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
+                                    'focus-visible:outline-none ',
                                     // No opacity on the row (LC61): «già presente» and the name keep their contrast (AA).
                                     alreadyPresent
                                         ? 'cursor-default'

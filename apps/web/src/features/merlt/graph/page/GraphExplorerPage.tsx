@@ -1256,7 +1256,7 @@ export function GraphExplorerPage(): React.ReactElement {
                     aria-pressed={hideJurisprudence}
                     title="Nascondi le sentenze per alleggerire il grafo"
                     className={cn(
-                      'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                      'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none ',
                       hideJurisprudence
                         ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300'
                         : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
@@ -1325,7 +1325,7 @@ export function GraphExplorerPage(): React.ReactElement {
                     onClick={() => setSourceFadeDismissed(true)}
                     aria-label="Rimuovi evidenza fonti"
                     title="Rimuovi l'evidenza delle fonti consultate"
-                    className="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 shadow-sm transition-colors hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300 dark:hover:bg-primary-950/60"
+                    className="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 shadow-sm transition-colors hover:bg-primary-100 focus-visible:outline-none dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300 dark:hover:bg-primary-950/60"
                   >
                     <X size={12} /> Evidenza fonti
                   </button>
@@ -1337,7 +1337,7 @@ export function GraphExplorerPage(): React.ReactElement {
                   type="button"
                   onClick={() => canvasRef.current?.fit()}
                   title="Adatta il grafo alla vista"
-                  className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   <Maximize2 size={14} /> Adatta alla vista
                 </button>
@@ -1359,7 +1359,7 @@ export function GraphExplorerPage(): React.ReactElement {
               tabIndex={0}
               onMouseDown={handleSplitterMouseDown}
               onKeyDown={handleSplitterKeyDown}
-              className="hidden w-1.5 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-primary-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 md:block"
+              className="hidden w-1.5 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-primary-300/40 focus-visible:outline-none md:block"
             />
           )}
 
@@ -1448,7 +1448,7 @@ export function GraphExplorerPage(): React.ReactElement {
 }
 
 /** A small filled action: «Riprova», the error's retry. */
-const RETRY_BUTTON = 'rounded bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+const RETRY_BUTTON = 'rounded bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none ';
 
 /** The page's tools beside its title (S7b): 44 px, their words with their icon. */
 const SLICE_BUTTON = `inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 ${FOCUS_RING}`;
@@ -1545,7 +1545,7 @@ function EmptyState({
                 type="button"
                 onClick={() => onSelectSource(s.node_id ?? s.urn)}
                 title={`Apri ${sourceLabel(s)} nel grafo`}
-                className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+                className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
               >
                 {sourceLabel(s)}
               </button>

@@ -47,7 +47,7 @@ export function GraphFilterPanel({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-800"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none dark:text-slate-200 dark:hover:bg-slate-800"
       >
         <span className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-primary-600" />
@@ -167,14 +167,14 @@ function Section({
           <button
             type="button"
             onClick={() => onSetAll(false)}
-            className="rounded px-1.5 py-0.5 text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800"
+            className="rounded px-1.5 py-0.5 text-primary-600 hover:bg-primary-50 focus-visible:outline-none dark:hover:bg-slate-800"
           >
             {allLabel}
           </button>
           <button
             type="button"
             onClick={() => onSetAll(true)}
-            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800"
+            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-100 focus-visible:outline-none dark:hover:bg-slate-800"
           >
             {noneLabel}
           </button>
@@ -200,7 +200,7 @@ function Section({
                     onToggle(type);
                   }
                 }}
-                className={`flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                className={`flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs focus-visible:outline-none ${
                   isHidden ? 'opacity-45 hover:opacity-70' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >

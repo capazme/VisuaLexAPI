@@ -22,7 +22,7 @@ export interface StudyPreferencesProps {
 const MIN_PER_DAY = 1;
 const MAX_PER_DAY = 200;
 /** A disclosure's row: its words and its chevron, the whole width (not a button's look). */
-const DISCLOSURE = 'flex min-h-[44px] w-full items-center gap-2 rounded-md text-left text-sm font-medium text-slate-700 md:min-h-0 md:py-1.5 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+const DISCLOSURE = 'flex min-h-[44px] w-full items-center gap-2 rounded-md text-left text-sm font-medium text-slate-700 md:min-h-0 md:py-1.5 dark:text-slate-200 focus-visible:outline-none ';
 
 /** A whole number in the allowed range, or null. */
 function parseGoal(text: string): number | null {

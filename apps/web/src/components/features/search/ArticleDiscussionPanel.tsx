@@ -698,7 +698,7 @@ export function ArticleDiscussionPanel({
               ref={writeLineRef}
               type="button"
               onClick={() => setComposerOpen(true)}
-              className="flex min-h-11 w-full items-center gap-2 rounded-md border border-slate-200 px-3 text-left text-sm text-slate-500 hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-9 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
+              className="flex min-h-11 w-full items-center gap-2 rounded-md border border-slate-200 px-3 text-left text-sm text-slate-500 hover:border-slate-300 hover:text-slate-800 focus-visible:outline-none md:min-h-9 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200"
             >
               <PenLine size={14} aria-hidden /> Scrivi una glossa…
             </button>

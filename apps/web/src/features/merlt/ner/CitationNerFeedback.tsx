@@ -98,7 +98,7 @@ export function CitationNerFeedback({ citation, onSubmit }: CitationNerFeedbackP
           type="button"
           aria-label="Conferma la citazione"
           onClick={() => submit('confirmation')}
-          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-emerald-950/40"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 focus-visible:outline-none dark:hover:bg-emerald-950/40"
         >
           <Check size={14} />
         </button>
@@ -106,7 +106,7 @@ export function CitationNerFeedback({ citation, onSubmit }: CitationNerFeedbackP
           type="button"
           aria-label="Segnala citazione errata"
           onClick={() => submit('false_positive')}
-          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-950/40"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none dark:hover:bg-red-950/40"
         >
           <Ban size={14} />
         </button>
@@ -114,7 +114,7 @@ export function CitationNerFeedback({ citation, onSubmit }: CitationNerFeedbackP
           type="button"
           aria-label="Correggi la citazione"
           onClick={() => setEditing(true)}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-300"
         >
           <Pencil size={13} /> Correggi
         </button>

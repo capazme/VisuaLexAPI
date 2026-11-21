@@ -337,7 +337,7 @@ function TitleField({ value, onCommit }: { value: string; onCommit: (title: stri
       }}
       className={cn(
         'block w-full resize-none overflow-hidden rounded-md bg-transparent px-1 py-1.5 font-serif text-2xl font-medium leading-snug text-slate-900 hover:bg-slate-50 dark:text-slate-50 dark:hover:bg-slate-800/50',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+        'focus-visible:outline-none ',
       )}
     />
   );

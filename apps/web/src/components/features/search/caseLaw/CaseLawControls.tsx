@@ -114,7 +114,7 @@ export function CaseLawControls({ filters, onChange, counts }: CaseLawControlsPr
                 aria-pressed={pressed}
                 onClick={() => pickYear(year)}
                 className={cn(
-                  'rounded-full border px-2.5 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                  'rounded-full border px-2.5 py-1 text-xs focus-visible:outline-none ',
                   TOUCH_TARGET_RESPONSIVE,
                   pressed
                     ? 'border-primary-600 bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:border-toga-400 text-white'

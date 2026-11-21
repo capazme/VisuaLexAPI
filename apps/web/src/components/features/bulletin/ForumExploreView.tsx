@@ -341,7 +341,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
             <button
               type="button"
               onClick={() => onImport(env)}
-              className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${TOUCH_TARGET_RESPONSIVE}`}
+              className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none ${TOUCH_TARGET_RESPONSIVE}`}
             >
               <span className="w-5 shrink-0 text-sm font-bold text-amber-700 dark:text-amber-400 text-center">{idx + 1}</span>
               <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-200">

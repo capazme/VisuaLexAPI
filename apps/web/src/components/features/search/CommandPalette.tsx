@@ -769,7 +769,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               // LC81: the pill's words, so nothing changes as it grows; the examples are on the line under the field.
               placeholder={ISLAND_PLACEHOLDER}
               // The pill's type (16 px at least on a phone: Safari on an iPhone zooms into a field under 16 px).
-              className={cn('h-full w-full min-w-0 bg-transparent outline-none placeholder:text-slate-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:placeholder:text-slate-400', ISLAND_TEXT, ISLAND_WORDS)}
+              className={cn('h-full w-full min-w-0 bg-transparent outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400', ISLAND_TEXT, ISLAND_WORDS)}
               onKeyDown={(e) => {
                 // The field's order (R2): a decision, then the server still naming the act (the search runs when it
                 // answers), then a norm — unless the arrows chose another row, which Enter then picks.

@@ -42,7 +42,7 @@ export interface CitationListProps {
 }
 
 const ROW = 'relative flex items-stretch border-t border-slate-100 dark:border-slate-800/80';
-const ROW_SELECT = cn('min-h-[44px] min-w-0 flex-1 py-2.5 pl-4 pr-2 text-left', TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0');
+const ROW_SELECT = cn('min-h-[44px] min-w-0 flex-1 py-2.5 pl-4 pr-2 text-left', TRANSITION, FOCUS_RING, '');
 /** A row's «⋯»: `IconButton`'s quiet square, centred on the row. */
 const ROW_MENU = cn(buttonClassName('quiet'), 'min-w-11 shrink-0 self-center px-0 md:min-w-9');
 const TAG = 'mt-1 block text-[12px] leading-snug text-slate-600 [overflow-wrap:anywhere] dark:text-slate-400';
@@ -231,7 +231,7 @@ export const CitationList = memo(function CitationList(props: CitationListProps)
               aria-expanded={showDismissed}
               aria-controls="doc-dismissed"
               onClick={() => setShowDismissed((v) => !v)}
-              className={cn('flex min-h-[44px] w-full items-center gap-1.5 px-4 text-left font-serif text-[1.0625rem] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50', TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0')}
+              className={cn('flex min-h-[44px] w-full items-center gap-1.5 px-4 text-left font-serif text-[1.0625rem] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/50', TRANSITION, FOCUS_RING, '')}
             >
               <span aria-hidden="true" className={cn('inline-block text-slate-400 transition-transform motion-reduce:transition-none', showDismissed && 'rotate-90')}>›</span>
               Non sono norme <span className="font-sans text-sm tabular-nums text-slate-600 dark:text-slate-400">({dismissed.length})</span>

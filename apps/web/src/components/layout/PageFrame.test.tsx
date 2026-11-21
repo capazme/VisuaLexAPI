@@ -148,7 +148,7 @@ describe('PageFrame (W2)', () => {
     const title = screen.getByRole('heading', { level: 1 });
     expect(title).toHaveAttribute('tabindex', '-1');
     expect(title.className).not.toMatch(/\bring-|focus-visible:|focus:/);
-    expect(screen.getByRole('button', { name: 'Nuova' }).className).toMatch(/focus-visible:ring-2/);
+    expect(screen.getByRole('button', { name: 'Nuova' }).className).not.toMatch(/\bring-/);
   });
 });
 

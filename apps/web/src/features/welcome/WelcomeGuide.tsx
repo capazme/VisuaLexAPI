@@ -86,7 +86,7 @@ export function WelcomeGuide() {
                   key={example}
                   type="button"
                   onClick={() => search(example)}
-                  className="min-h-[44px] rounded-full bg-ink-200/70 px-4 text-sm font-medium text-slate-800 transition-colors hover:bg-ink-300/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-ink-800 dark:text-slate-100 dark:hover:bg-ink-700"
+                  className="min-h-[44px] rounded-full bg-ink-200/70 px-4 text-sm font-medium text-slate-800 transition-colors hover:bg-ink-300/70 focus-visible:outline-none dark:bg-ink-800 dark:text-slate-100 dark:hover:bg-ink-700"
                 >
                   {example}
                 </button>
