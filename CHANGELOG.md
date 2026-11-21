@@ -12,6 +12,17 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.66.0] - 2026-11-21
+
+Pratiche as cards or as a list, with sorting. Web only, no migration. MERL-T stays off.
+
+### Work
+
+- «Schede / Lista»: the Pratiche page shows cards or a list with one row per pratica (name, category, entries,
+  last update, «⋯»); the choice is remembered (LC147).
+- «Ordina le pratiche»: last update (by default), name, creation date, number of entries; pinned pratiche always
+  first, those without a date last. «Last update» is the latest of the creation and the last entry added.
+
 ## [1.65.0] - 2026-11-21
 
 No more focus rings: fields show focus by a darker border, and the other controls draw a thin outline only for

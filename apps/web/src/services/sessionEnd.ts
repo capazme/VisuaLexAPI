@@ -73,6 +73,7 @@ export const BROWSER_STORAGE: readonly StorageEntry[] = [
   { area: 'session', key: 'visualex:find-window-place', kind: 'device', what: 'where the find window sits' },
   { area: 'session', key: 'visualex:find-window-scope', kind: 'device', what: 'what the find window searches' },
   { area: 'session', key: 'visualex:case-law-open:*', kind: 'device', what: 'whether case law is open, per tab' },
+  { area: 'local', key: 'lexcraft.pratiche.vista', kind: 'device', what: 'the Pratiche view (cards or list) and its order' },
   { area: 'local', key: 'merlt-grafo-column-width', kind: 'device', what: 'the graph column width' },
   { area: 'local', key: 'merlt-grafo-column-collapsed', kind: 'device', what: 'the graph column collapsed' },
   { area: 'local', key: 'merlt_qa_dev_mode', kind: 'device', what: 'the assistant developer view' },
