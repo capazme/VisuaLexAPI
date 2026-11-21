@@ -126,7 +126,7 @@ function BatchRow({
           onSelect(batch.id);
         }
       }}
-      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors focus-visible:outline-none "
     >
       <td className="px-6 py-4">
         <p className="font-medium text-gray-900 dark:text-white">{batch.scope_label}</p>

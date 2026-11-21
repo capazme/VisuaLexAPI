@@ -25,7 +25,7 @@ export const TILE = 'rounded-[8px] border border-slate-200 bg-card dark:border-s
  */
 export const BLOCK_HEADING = 'font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 
-export const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900';
+export const FOCUS_RING = 'focus-visible:outline-none ';
 
 const SUBJECT_TOKEN: Record<Materia, string> = {
   DIRITTO_CIVILE: '--category-civil',

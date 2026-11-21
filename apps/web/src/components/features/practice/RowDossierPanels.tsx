@@ -43,7 +43,7 @@ export function RowNoteComposer({ name, onSave, onDone }: { name: string; onSave
         rows={3}
         aria-label={`Nota su ${name}`}
         placeholder="Scrivi la nota…"
-        className="w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 focus-visible:outline-none "
       />
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" variant="quiet" onClick={onDone}>Annulla</Button>
@@ -81,7 +81,7 @@ export function RowMovePicker({ onMove, onDone, from }: { onMove: (targetId: str
               <button
                 type="button"
                 onClick={() => { onMove(d.id); onDone(); }}
-                className="flex min-h-[44px] w-full items-center gap-2 rounded-md px-2 text-left text-sm text-slate-800 hover:bg-slate-100 md:min-h-9 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                className="flex min-h-[44px] w-full items-center gap-2 rounded-md px-2 text-left text-sm text-slate-800 hover:bg-slate-100 md:min-h-9 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none "
               >
                 <Folder size={15} aria-hidden className="flex-shrink-0 text-slate-500 dark:text-slate-400" />
                 <span className="min-w-0 truncate">{d.title}</span>

@@ -49,7 +49,7 @@ function IndexEntry({ shown, onOpen, label, title, removeName, onRemove, dossier
         onClick={onOpen}
         title={title}
         className={cn(
-          'flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+          'flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1 text-left text-sm transition-colors focus-visible:outline-none ',
           shown
             ? 'bg-slate-200/70 text-slate-900 dark:bg-slate-800 dark:text-white'
             : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60',

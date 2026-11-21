@@ -112,7 +112,7 @@ export function PracticeNameInput({ initial, onDone, className }: {
       }}
       onBlur={() => finish(value)}
       className={cn(
-        'min-w-0 rounded-md border border-primary-300 bg-white px-2 py-1 text-slate-900 dark:border-primary-700 dark:bg-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+        'min-w-0 rounded-md border border-primary-300 bg-white px-2 py-1 text-slate-900 dark:border-primary-700 dark:bg-slate-900 dark:text-white focus-visible:outline-none ',
         className,
       )}
     />

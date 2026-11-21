@@ -286,7 +286,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="es. art 2043 cc, legge 241/1990 art 1…"
-                  className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:border-primary-500 outline-none"
                   autoFocus
                 />
                 {isSearching && (
@@ -380,7 +380,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                     value={versionDate}
                     onChange={(e) => setVersionDate(e.target.value)}
                     placeholder="es. 01/01/2020 o 2020"
-                    className="flex-1 px-3 py-2 text-sm border border-primary-200 dark:border-primary-800 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    className="flex-1 px-3 py-2 text-sm border border-primary-200 dark:border-primary-800 rounded-lg bg-white dark:bg-slate-700 focus:border-primary-500 outline-none"
                   />
                 </div>
               )}

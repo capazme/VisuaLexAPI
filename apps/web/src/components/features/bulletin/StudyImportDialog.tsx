@@ -28,7 +28,7 @@ export interface StudyImportDialogProps {
   setBusy?: (busy: boolean) => void;
 }
 
-const CHECKBOX = 'mt-0.5 h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+const CHECKBOX = 'mt-0.5 h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none ';
 
 /**
  * Content that becomes the user's dossiers di studio (spec 2026-10-13-environments-into-forum, D8–D11): a Forum

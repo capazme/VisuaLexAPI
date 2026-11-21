@@ -291,7 +291,7 @@ function PastTurnRow({ turn, children }: { turn: QaTurnModel; children: React.Re
       data-past-turn={turn.id}
       className="group rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
     >
-      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500">
+      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 focus-visible:outline-none ">
         <PastTurnSummary turn={turn} />
         <ChevronDown
           size={14}
@@ -434,7 +434,7 @@ export function DeliberationColumn({
             onClick={onToggleCollapse}
             aria-label="Comprimi il pannello del dibattito"
             title="Comprimi il pannello"
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center text-slate-500 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:text-slate-200"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center text-slate-500 transition-colors hover:text-slate-700 focus-visible:outline-none dark:hover:text-slate-200"
           >
             <PanelRightClose size={16} aria-hidden="true" />
           </button>
@@ -548,7 +548,7 @@ function CollapsedRail({
         onClick={onExpand}
         aria-label="Espandi il pannello del dibattito"
         title="Espandi il dibattito"
-        className="flex h-full w-full flex-col items-center gap-3 py-3 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        className="flex h-full w-full flex-col items-center gap-3 py-3 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
       >
         <span className="relative">
           <PanelRightOpen size={18} aria-hidden="true" />
@@ -587,7 +587,7 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        'flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
+        'flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none ',
         active
           ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
           : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
@@ -731,7 +731,7 @@ function DibattitoTab({
             onClick={() => setShowHistory((v) => !v)}
             aria-pressed={showHistory}
             className={cn(
-              'flex min-h-11 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              'flex min-h-11 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium transition-colors focus-visible:outline-none ',
               showHistory
                 ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
@@ -753,7 +753,7 @@ function DibattitoTab({
               type="button"
               onClick={scopeChip.onReturn}
               title={`Torna al centro del dibattito (${scopeChip.label})`}
-              className="shrink-0 font-medium underline transition-colors hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:hover:text-amber-200"
+              className="shrink-0 font-medium underline transition-colors hover:text-amber-900 focus-visible:outline-none dark:hover:text-amber-200"
             >
               Torna
             </button>
@@ -906,7 +906,7 @@ function DeliberationTurn({
           <button
             type="button"
             onClick={onCancel}
-            className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:text-slate-200"
+            className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 focus-visible:outline-none dark:text-slate-400 dark:hover:text-slate-200"
           >
             Annulla
           </button>
@@ -925,7 +925,7 @@ function DeliberationTurn({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:text-slate-200"
+                  className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 focus-visible:outline-none dark:text-slate-400 dark:hover:text-slate-200"
                 >
                   Annulla
                 </button>
@@ -977,7 +977,7 @@ function DeliberationTurn({
           <button
             type="button"
             onClick={onRetry}
-            className="text-sm font-medium text-amber-800 underline transition-colors hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-amber-300 dark:hover:text-amber-200"
+            className="text-sm font-medium text-amber-800 underline transition-colors hover:text-amber-900 focus-visible:outline-none dark:text-amber-300 dark:hover:text-amber-200"
           >
             Riprova
           </button>
@@ -1084,7 +1084,7 @@ function DeliberationTurn({
                   type="button"
                   onClick={() => downloadAnswerJson(a, turn.question)}
                   title="Esporta la risposta completa in JSON (trace, strumenti, errori) per la diagnostica"
-                  className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   <Download size={13} className="shrink-0" aria-hidden="true" />
                   Esporta JSON
@@ -1096,7 +1096,7 @@ function DeliberationTurn({
                 // list is taller than a viewport and buries the feedback controls
                 // below. The summary keeps the count visible; feedback stays reachable.
                 <details className="mt-3">
-                  <summary className="mb-1.5 cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-300">
+                  <summary className="mb-1.5 cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-500 focus-visible:outline-none dark:hover:text-slate-300">
                     Fonti consultate ({a.retrieved_sources.length})
                   </summary>
                   <ul className="space-y-1.5">
@@ -1209,7 +1209,7 @@ function DissentBanner({
       </div>
       {explanation && (
         <details className="mt-1.5">
-          <summary className="cursor-pointer select-none text-xs font-medium text-amber-700 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-amber-400 dark:hover:text-amber-200">
+          <summary className="cursor-pointer select-none text-xs font-medium text-amber-700 hover:text-amber-900 focus-visible:outline-none dark:text-amber-400 dark:hover:text-amber-200">
             Perché il collegio dissente
           </summary>
           <p className="mt-1 whitespace-pre-wrap text-xs text-amber-800 dark:text-amber-300">{explanation}</p>
@@ -1252,7 +1252,7 @@ function GraphTraversalControl({
         onClick={() => onFollowReasoning?.(walk)}
         disabled={!hasWalk}
         title={hasWalk ? undefined : 'Nessuna traversata sul grafo per questa risposta'}
-        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:border-slate-700 dark:disabled:bg-slate-800/40 dark:disabled:text-slate-500 dark:disabled:hover:bg-slate-800/40"
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:border-slate-700 dark:disabled:bg-slate-800/40 dark:disabled:text-slate-500 dark:disabled:hover:bg-slate-800/40"
       >
         <Route size={13} className="shrink-0" aria-hidden="true" />
         Segui il ragionamento sul grafo
@@ -1307,7 +1307,7 @@ function TraversalNodesList({
 
   return (
     <details className="mt-3" open>
-      <summary className="mb-1.5 cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-300">
+      <summary className="mb-1.5 cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-500 focus-visible:outline-none dark:hover:text-slate-300">
         Nodi percorsi nel grafo ({nodes.length})
       </summary>
       <ul className="flex flex-wrap gap-1.5">
@@ -1322,7 +1322,7 @@ function TraversalNodesList({
                 onMouseEnter={onHover ? () => onHover(node) : undefined}
                 onMouseLeave={onHover ? () => onHover(null) : undefined}
                 title={`Centra «${formatRetrievedUrn(node)}» sul grafo`}
-                className="inline-flex max-w-[220px] items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+                className="inline-flex max-w-[220px] items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
               >
                 <Icon size={12} className="shrink-0" aria-hidden="true" />
                 <span className="truncate">{formatRetrievedUrn(node)}</span>
@@ -1335,7 +1335,7 @@ function TraversalNodesList({
             <button
               type="button"
               onClick={() => setExpanded(true)}
-              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400"
+              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none dark:text-primary-400"
             >
               +{hidden} altri
             </button>
@@ -1378,7 +1378,7 @@ function ReasoningTraceDisclosure({
 
   return (
     <details className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700">
-      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-slate-200">
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 focus-visible:outline-none dark:text-slate-400 dark:hover:text-slate-200">
         Come ha ragionato
       </summary>
       <div className="space-y-3 border-t border-slate-200 p-3 text-xs dark:border-slate-700">
@@ -1687,7 +1687,7 @@ function TurnFeedback({
             aria-pressed={turn.rating === 5}
             onClick={() => onRate(turn.id, traceId, 5)}
             className={cn(
-              'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
+              'rounded-md p-1.5 focus-visible:outline-none ',
               turn.rating === 5
                 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40'
                 : 'text-slate-400 hover:text-emerald-600',
@@ -1701,7 +1701,7 @@ function TurnFeedback({
             aria-pressed={turn.rating === 1}
             onClick={() => onRate(turn.id, traceId, 1)}
             className={cn(
-              'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500',
+              'rounded-md p-1.5 focus-visible:outline-none ',
               turn.rating === 1
                 ? 'bg-red-50 text-red-600 dark:bg-red-950/40'
                 : 'text-slate-400 hover:text-red-600',
@@ -1733,7 +1733,7 @@ function TurnFeedback({
                           aria-pressed={grades[d.key] === g.value}
                           onClick={() => setGrades((prev) => ({ ...prev, [d.key]: g.value }))}
                           className={cn(
-                            'rounded px-2 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                            'rounded px-2 py-0.5 text-xs transition-colors focus-visible:outline-none ',
                             grades[d.key] === g.value
                               ? 'bg-primary-50 text-primary-700 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
@@ -1867,7 +1867,7 @@ function CanonThesisItem({
       className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
     >
       <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: color }} aria-hidden="true" />
-      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 py-2 pl-4 pr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500">
+      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 py-2 pl-4 pr-3 focus-visible:outline-none ">
         <span className="min-w-0">
           <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</span>
           <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-400">
@@ -1963,7 +1963,7 @@ function CanonSteer({
         type="button"
         onClick={handleClick}
         title={`Indica al collegio di dare più peso al canone ${label}`}
-        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
       >
         <Scale size={13} className="shrink-0" aria-hidden="true" />
         Pesa di più questo canone
@@ -2027,7 +2027,7 @@ function RelationSteer({
         type="button"
         onClick={onPrefer}
         title={`Indica al collegio di privilegiare la relazione ${humanizeEdgeType(relationType)} nell'esplorazione del grafo`}
-        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
       >
         <Route size={13} className="shrink-0" aria-hidden="true" />
         Privilegia questa relazione
@@ -2122,7 +2122,7 @@ function DeliberationSourceChip({
         type="button"
         onClick={() => onCenter(target)}
         title={`Centra il grafo su ${label}`}
-        className="flex w-full items-start justify-between gap-2 py-2 pl-4 pr-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:bg-slate-800"
+        className="flex w-full items-start justify-between gap-2 py-2 pl-4 pr-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none dark:hover:bg-slate-800"
       >
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium text-slate-800 dark:text-slate-200">{label}</span>
@@ -2141,7 +2141,7 @@ function DeliberationSourceChip({
             <button
               type="button"
               onClick={openNorma}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary-600 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-950/40"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary-600 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none dark:text-primary-400 dark:hover:bg-primary-950/40"
             >
               <BookOpen size={12} /> Apri la norma
             </button>
@@ -2150,7 +2150,7 @@ function DeliberationSourceChip({
             <button
               type="button"
               onClick={openSentenza}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary-600 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-950/40"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary-600 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none dark:text-primary-400 dark:hover:bg-primary-950/40"
             >
               <Scale size={12} /> Apri la sentenza
             </button>
@@ -2164,7 +2164,7 @@ function DeliberationSourceChip({
                   e.stopPropagation();
                   onRate(true);
                 }}
-                className="rounded-md p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:hover:bg-emerald-950/40"
+                className="rounded-md p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 focus-visible:outline-none dark:hover:bg-emerald-950/40"
               >
                 <ThumbsUp size={12} />
               </button>
@@ -2175,7 +2175,7 @@ function DeliberationSourceChip({
                   e.stopPropagation();
                   onRate(false);
                 }}
-                className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-950/40"
+                className="rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 focus-visible:outline-none dark:hover:bg-red-950/40"
               >
                 <ThumbsDown size={12} />
               </button>
@@ -2190,7 +2190,7 @@ function DeliberationSourceChip({
                 onConfirm();
               }}
               className={cn(
-                'ml-auto inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                'ml-auto inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none ',
                 confirmState === 'done'
                   ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900'
                   : 'border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950/40',
@@ -2352,7 +2352,7 @@ function ContrastConflictView({
           type="button"
           aria-label="Chiudi"
           onClick={onClose}
-          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-200"
+          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none dark:hover:text-slate-200"
         >
           <X className="h-4 w-4" />
         </button>

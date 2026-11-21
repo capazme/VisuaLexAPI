@@ -702,9 +702,10 @@ describe('CommandPalette — the field and its line', () => {
     asDesktop(true);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const box = screen.getByRole('combobox');
-    expect(box).toHaveClass('focus-visible:ring-0', 'focus-visible:ring-offset-0');
-    // LC81: one edge, the pill's rule: 2 px only from the keyboard (`data-keyboard`), never the tinted ring of old.
-    expect(box.parentElement).toHaveClass('border', 'data-[keyboard]:has-[input:focus]:ring-1');
+    expect(box.className).not.toMatch(/ring-/);
+    // LC146: one edge, no ring: the frame's border only moves to `--focus-line`.
+    expect(box.parentElement).toHaveClass('border', 'has-[input:focus]:border-(--focus-line)');
+    expect(box.parentElement!.className).not.toMatch(/ring-/);
     expect(box.parentElement!.className).not.toMatch(/focus-within/);
   });
 

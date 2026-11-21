@@ -33,12 +33,10 @@ export const SEARCH_ISLAND_ID = 'search-island';
 /** The island's one surface (LC69), Pietra's card: the pill and the panel it grows into wear the same ground and edge. */
 export const ISLAND_SURFACE = 'border border-border bg-card';
 /**
- * The pill's hover and focus (LC69, Luca: «è grossa la barra, va resa più elegante»). Hover: the one edge darkens. Focus
- * from the keyboard: the edge in the text's colour and a 1 px ring against it, read as one 2 px edge (the anti-slop
- * review: a tone alone is not seen); no offset, so never the second outline the field's ring and the base rule's
- * offset ring (`index.css`) drew. A tap's focus keeps the 1 px edge.
+ * The pill's hover and focus: hover darkens the edge; focus (any way, LC146) only moves the edge to `--focus-line`, one
+ * step darker. No ring, no halo, no second edge.
  */
-export const ISLAND_FOCUS = 'hover:border-foreground/30 focus:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground focus-visible:ring-offset-0';
+export const ISLAND_FOCUS = 'hover:border-foreground/30 focus:outline-none focus:border-(--focus-line) focus-within:border-(--focus-line)';
 /** A pill thinner than a finger: its target is 44 px tall, centred on its drawn edge (40 px: 2 above and below). */
 export const ISLAND_TARGET = "after:absolute after:inset-x-0 after:inset-y-[calc(50%-22px)] after:content-['']";
 /**
@@ -55,9 +53,9 @@ export const ISLAND_HINT = 'text-slate-500 dark:text-slate-400';
 export const ISLAND_PLACEHOLDER = 'Norma, sentenza o tema';
 /**
  * `ISLAND_FOCUS` for the panel's field, on its frame. An input matches `:focus-visible` after a tap too, so the frame
- * reads how the focus came (`data-keyboard`, set by the panel): 2 px from the keyboard, the 1 px edge from a pointer.
+ * only moves its edge (LC146), however the focus came.
  */
-export const ISLAND_FIELD_FOCUS = 'hover:border-foreground/30 data-[keyboard]:has-[input:focus]:border-foreground data-[keyboard]:has-[input:focus]:ring-1 data-[keyboard]:has-[input:focus]:ring-foreground';
+export const ISLAND_FIELD_FOCUS = 'hover:border-foreground/30 has-[input:focus]:border-(--focus-line)';
 
 let listener: Listener | null = null;
 let pending: { request: SearchFieldRequest; at: number } | null = null;

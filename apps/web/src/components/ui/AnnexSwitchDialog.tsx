@@ -38,7 +38,7 @@ export function AnnexSwitchDialog({
               'text-slate-600 dark:text-slate-300',
               'hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600',
               'active:scale-[0.98]',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background'
+              'focus:outline-none ring-offset-background'
             )}
           >
             No, resta qui
@@ -50,7 +50,7 @@ export function AnnexSwitchDialog({
               'bg-primary-500 hover:bg-primary-600 text-white dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950',
               'shadow-lg shadow-primary-500/25',
               'active:scale-[0.98]',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background'
+              'focus:outline-none ring-offset-background'
             )}
           >
             Sì, vai all'allegato

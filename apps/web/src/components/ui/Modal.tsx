@@ -171,7 +171,7 @@ export function Modal({
                 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300',
                 'hover:bg-slate-100 dark:hover:bg-slate-800',
                 'transition-colors duration-150',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-toga-500 focus-visible:ring-offset-2 ring-offset-background'
+                'focus:outline-none ring-offset-background'
               )}
             >
               <X size={20} />

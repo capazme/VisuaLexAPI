@@ -100,7 +100,7 @@ export function CardGroups({ groups, selectedId, folded, onToggleFold, grid = fa
                         className={cn(
                           'flex min-h-[44px] w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/60',
                           FOCUS_RING,
-                          'focus-visible:ring-inset focus-visible:ring-offset-0',
+                          '',
                         )}
                       >
                         <ChevronDown size={16} aria-hidden className={cn('shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', isFolded && '-rotate-90')} />

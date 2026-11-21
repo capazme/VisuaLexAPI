@@ -374,7 +374,7 @@ export function AdvancedExportModal({
       <button
         onClick={close}
         disabled={writingPdf}
-        className={cn(TOUCH_TARGET_RESPONSIVE, DISABLED, 'px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background')}
+        className={cn(TOUCH_TARGET_RESPONSIVE, DISABLED, 'px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none ring-offset-background')}
       >
         Annulla
       </button>
@@ -385,7 +385,7 @@ export function AdvancedExportModal({
         className={cn(
           TOUCH_TARGET_RESPONSIVE,
           DISABLED,
-          'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
+          'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none ring-offset-background',
           copied
             ? 'bg-green-600 text-white'
             : 'bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:bg-slate-700 dark:disabled:text-slate-400 dark:disabled:opacity-100 hover:bg-primary-700 text-white'

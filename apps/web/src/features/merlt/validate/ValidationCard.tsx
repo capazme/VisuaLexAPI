@@ -84,7 +84,7 @@ export function ValidationCard({ item, onVote, onSkip, onOpenNorm }: ValidationC
             <button
               type="button"
               onClick={() => onOpenNorm(normParams)}
-              className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+              className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 focus-visible:outline-none "
             >
               <BookOpen size={13} /> Apri la norma
             </button>
@@ -96,7 +96,7 @@ export function ValidationCard({ item, onVote, onSkip, onOpenNorm }: ValidationC
             type="button"
             aria-label={`Approva ${item.title}`}
             onClick={() => onVote(item.id, 'approve')}
-            className="rounded-lg border border-emerald-200 p-2 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:hover:bg-emerald-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            className="rounded-lg border border-emerald-200 p-2 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:hover:bg-emerald-950/40 focus-visible:outline-none "
           >
             <ThumbsUp size={16} />
           </button>
@@ -104,7 +104,7 @@ export function ValidationCard({ item, onVote, onSkip, onOpenNorm }: ValidationC
             type="button"
             aria-label={`Rifiuta ${item.title}`}
             onClick={() => reject()}
-            className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40 focus-visible:outline-none "
           >
             <X size={16} />
           </button>
@@ -114,7 +114,7 @@ export function ValidationCard({ item, onVote, onSkip, onOpenNorm }: ValidationC
             aria-expanded={reasonsOpen}
             onClick={() => setReasonsOpen((o) => !o)}
             className={cn(
-              'rounded-lg border p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400',
+              'rounded-lg border p-2 transition-colors focus-visible:outline-none ',
               reasonsOpen
                 ? 'border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200'
                 : 'border-slate-200 text-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800',
@@ -126,7 +126,7 @@ export function ValidationCard({ item, onVote, onSkip, onOpenNorm }: ValidationC
             type="button"
             aria-label={`Salta ${item.title}`}
             onClick={() => onSkip(item.id)}
-            className="rounded-lg border border-slate-200 p-2 text-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="rounded-lg border border-slate-200 p-2 text-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 focus-visible:outline-none "
           >
             <SkipForward size={16} />
           </button>
@@ -142,7 +142,7 @@ export function ValidationCard({ item, onVote, onSkip, onOpenNorm }: ValidationC
               key={r.value}
               type="button"
               onClick={() => reject(r.value)}
-              className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-red-950/40 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-600 hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-red-950/40 dark:hover:text-red-400 focus-visible:outline-none "
             >
               <Check size={12} /> {r.label}
             </button>

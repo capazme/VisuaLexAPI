@@ -61,7 +61,7 @@ export function DeadlineCard({ dossierId }: { dossierId: string }) {
         </Select>
         <Input label={option.dateLabel} type="date" value={start} onChange={(e) => setStart(e.target.value)} />
       </div>
-      <label className={cn('flex min-h-[44px] cursor-pointer items-start gap-3 rounded-lg py-2 text-sm text-slate-800 dark:text-slate-200', FOCUS_RING, 'focus-within:ring-2')}>
+      <label className={cn('flex min-h-[44px] cursor-pointer items-start gap-3 rounded-lg py-2 text-sm text-slate-800 dark:text-slate-200', FOCUS_RING, '')}>
         <input type="checkbox" checked={excluded} onChange={(e) => setExcluded(e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-primary-900" />
         <span>Materia esclusa dalla sospensione feriale (lavoro e previdenza, cause urgenti ex art. 92 ord. giud.)</span>
       </label>

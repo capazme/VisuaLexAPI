@@ -394,7 +394,7 @@ export function HistoryView() {
                                                         "relative block w-full text-left bg-white dark:bg-slate-800 p-3 pr-12 rounded-[8px] border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "active:scale-[0.98] active:border-primary-400",
-                                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                                        "focus-visible:outline-none "
                                                     )}
                                                 >
                                                     <span className="flex items-start justify-between gap-2">

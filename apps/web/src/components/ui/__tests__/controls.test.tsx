@@ -10,6 +10,7 @@ import { Select } from '../Select';
 import { Textarea } from '../Textarea';
 import { Switch } from '../Switch';
 import { Card } from '../Card';
+import { FIELD_CONTROL } from '../controlStyles';
 import { CARD_RADIUS, CONTROL_BORDER, CONTROL_HEIGHT, CONTROL_RADIUS, type ControlSize } from '../controlStyles';
 
 const SRC = resolve(process.cwd(), 'src');
@@ -159,5 +160,17 @@ describe('Textarea, Switch and Card', () => {
     expect(card).toHaveClass(...CONTROL_BORDER.split(' '));
     expect(classes(card).filter((c) => /^shadow/.test(c))).toEqual([]);
     expect(readFileSync(join(SRC, 'components', 'ui', 'Card.tsx'), 'utf8')).not.toMatch(/variant/);
+  });
+});
+
+describe('a field\'s focus (LC146)', () => {
+  it('moves the border to the quiet line and draws no ring, halo or outline', () => {
+    expect(FIELD_CONTROL).toContain('focus:border-(--focus-line)');
+    expect(FIELD_CONTROL).not.toMatch(/ring|shadow|focus:border-toga/);
+    render(<><Input label="Cerca" /><Select label="Tipo"><option>a</option></Select><Textarea label="Nota" /></>);
+    for (const field of [screen.getByLabelText('Cerca'), screen.getByLabelText('Tipo'), screen.getByLabelText('Nota')]) {
+      expect(field).toHaveClass('focus:border-(--focus-line)');
+      expect(field.className).not.toMatch(/ring-|focus-visible:/);
+    }
   });
 });

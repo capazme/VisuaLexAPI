@@ -253,7 +253,7 @@ export function TreeViewPanel({
   // On a phone, rows and fields a finger can hit.
   const drawer = !isDesktop;
   const rowHeight = drawer ? 'min-h-[44px] py-2' : 'min-h-8 py-1';
-  const ROW_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500';
+  const ROW_FOCUS = 'focus-visible:outline-none ';
 
   // One Tab stop in the list (the open article's row, else the first); the arrows walk it.
   const activeRow = rows.findIndex(({ node }) => node.type === 'article' && isActive(node.numero));

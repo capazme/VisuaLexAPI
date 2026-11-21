@@ -605,8 +605,8 @@ describe('DossierDetailView — «Cronologia» (LC137)', () => {
     expect(note).toBeVisible();
     expect(screen.getByLabelText('Filtra le fonti della pratica')).toHaveValue('');
     expect(document.activeElement).toBe(note);
-    // The rows' shared focus ring, not the browser's outline.
-    expect(note).toHaveClass('focus-visible:ring-2', 'focus-visible:outline-none');
+    // No ring on the row (LC146): the shared outline rule draws the keyboard's focus.
+    expect(note.className).not.toMatch(/ring-/);
   });
 
   it('opens the article\'s row for a note about it, the focus on the row\'s toggle', () => {

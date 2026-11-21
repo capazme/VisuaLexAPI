@@ -134,7 +134,7 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
               disabled={stepIndex === 0}
               aria-label="Passo precedente"
               title="Passo precedente"
-              className="rounded-md border border-slate-200 p-1.5 text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-md border border-slate-200 p-1.5 text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 focus-visible:outline-none dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <ChevronLeft size={16} />
             </button>
@@ -151,7 +151,7 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
                     : 'Riproduci'
               }
               className={cn(
-                'rounded-md border p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-40',
+                'rounded-md border p-1.5 transition-colors focus-visible:outline-none disabled:opacity-40',
                 playing && !atLastStep
                   ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300'
                   : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
@@ -165,7 +165,7 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
               disabled={stepIndex >= total - 1}
               aria-label="Passo successivo"
               title="Passo successivo"
-              className="rounded-md border border-slate-200 p-1.5 text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-md border border-slate-200 p-1.5 text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 focus-visible:outline-none dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <ChevronRight size={16} />
             </button>
@@ -175,7 +175,7 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
               onClick={onClose}
               aria-label="Chiudi il replay del ragionamento"
               title="Chiudi il replay"
-              className="rounded-md border border-slate-200 p-1.5 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-md border border-slate-200 p-1.5 text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <X size={16} />
             </button>

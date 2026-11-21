@@ -92,7 +92,7 @@ export function MobileDeliberationSheet({
               type="button"
               aria-label="Chiudi"
               onClick={() => setOpen(false)}
-              className="absolute right-1 top-0 inline-grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-slate-200"
+              className="absolute right-1 top-0 inline-grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition-colors hover:text-slate-700 focus-visible:outline-none dark:text-slate-400 dark:hover:text-slate-200"
             >
               <X size={16} aria-hidden />
             </button>
@@ -105,7 +105,7 @@ export function MobileDeliberationSheet({
       <button
         type="button"
         onClick={handleOpen}
-        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-primary-700 focus-visible:outline-none "
       >
         <MessageSquare size={16} aria-hidden="true" />
         Dibattito

@@ -841,7 +841,7 @@ export function DocumentReviewPage() {
                   tabIndex={0}
                   role="group"
                   aria-labelledby="doc-text"
-                  className={cn(PANEL_BODY, 'px-5 py-6 md:px-8', FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0')}
+                  className={cn(PANEL_BODY, 'px-5 py-6 md:px-8', FOCUS_RING, '')}
                 >
                   <DocumentText text={loaded.text} marks={marks} selected={selected} onSelect={selectFromText} />
                 </div>

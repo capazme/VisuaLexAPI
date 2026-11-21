@@ -19,7 +19,7 @@ export function CollapseToggle({ isOpen, onToggle }: CollapseToggleProps): React
       aria-label={isOpen ? 'Comprimi grafo' : 'Espandi grafo'}
       className={cn(
         'flex items-center justify-center transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+        'focus-visible:outline-none ',
         // 44 px to tap on a phone (M1). Closed, the tab stays 40 px wide over the reader's text, and an invisible
         // `::after` reaches 4 px further left, as the signs in the text do.
         isOpen

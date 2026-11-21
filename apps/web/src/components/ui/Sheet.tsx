@@ -98,7 +98,7 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
               onClick={onClose}
               aria-label="Chiudi"
               // ink-500 on white (4.7:1), ink-400 on ink-900: over 3:1, since it is often the one way out.
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             >
               <X size={20} aria-hidden="true" />
             </button>

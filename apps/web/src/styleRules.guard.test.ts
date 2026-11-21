@@ -178,6 +178,12 @@ describe('the app\'s rules of style (LC118)', () => {
     expect(files).toEqual(expect.arrayContaining(['components/layout/Sidebar.tsx', 'components/features/dossier/DossierListView.tsx', 'pages/AdminPage.tsx']));
   });
 
+  it('draws no focus ring or halo anywhere (LC146): the shared rules in index.css draw the focus', () => {
+    const ring = /(?:focus|focus-visible|focus-within|group-focus[\w-]*|peer-focus[\w-]*|has-\[[^\]]*focus[^\]]*\]):(?:ring|shadow)\b/;
+    const found = files.filter((f) => readFileSync(join(src, f), 'utf8').split('\n').some((l) => ring.test(l.replace(/^\s*(\/\/|\*|\/\*).*/, ''))));
+    expect(found).toEqual([]);
+  });
+
   it('keeps every control, radius and duration to the rules, but the exceptions, line for line', () => {
     const found: Record<string, Counts> = {};
     for (const f of files.filter((f) => !Object.keys(FOLDERS).some((dir) => f.startsWith(dir)))) {

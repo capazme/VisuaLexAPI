@@ -51,7 +51,7 @@ export function QaDeliberationPanel({ answer, onDetailed, canContribute }: QaDel
 
   return (
     <details className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700">
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-300">
+      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 focus-visible:outline-none dark:text-slate-300">
         Come ci sono arrivato
       </summary>
       <div className="space-y-4 border-t border-slate-200 p-3 dark:border-slate-700">
@@ -84,7 +84,7 @@ export function QaDeliberationPanel({ answer, onDetailed, canContribute }: QaDel
                           aria-pressed={grades[d.key] === g.value}
                           onClick={() => setGrades((prev) => ({ ...prev, [d.key]: g.value }))}
                           className={cn(
-                            'rounded px-2 py-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                            'rounded px-2 py-0.5 text-xs transition-colors focus-visible:outline-none ',
                             grades[d.key] === g.value
                               ? 'bg-primary-50 text-primary-700 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                               : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',

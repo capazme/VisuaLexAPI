@@ -35,7 +35,7 @@ export function VersionStatusChip({ chip, onClick }: VersionStatusChipProps) {
             className={cn(
                 // The tabs' ground under the pointer (LC72), on the words alone: no padding, so not a pill (R3).
                 'vlx-hover-tile inline-flex min-h-[44px] items-center gap-1 rounded-md text-left text-sm md:min-h-0 md:gap-1.5',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                'focus-visible:outline-none ',
                 TONE[chip.tone],
             )}
         >

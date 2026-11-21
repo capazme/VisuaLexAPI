@@ -114,7 +114,7 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
         tabIndex={title === 'line' ? undefined : -1}
         data-decision-heading
         className={cn(
-          'rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+          'rounded focus:outline-none ',
           title === 'line' ? 'text-sm text-slate-600 dark:text-slate-400' : 'text-xl font-semibold text-slate-900 dark:text-white',
         )}
       >
@@ -160,7 +160,7 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
             href={sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-md px-3 text-sm text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-primary-400"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-md px-3 text-sm text-primary-600 hover:underline focus-visible:outline-none md:min-h-0 dark:text-primary-400"
           >
             <ExternalLink size={16} aria-hidden /> Apri sulla fonte
           </a>

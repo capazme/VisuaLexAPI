@@ -86,7 +86,7 @@ function ProvisionalReviewCard({
                 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
                 'dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50',
                 'transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                'focus-visible:outline-none ',
               )}
             >
               {busy ? <Loader2 size={13} className="animate-spin" /> : <ThumbsUp size={13} />}
@@ -101,7 +101,7 @@ function ProvisionalReviewCard({
                 'bg-rose-50 text-rose-700 hover:bg-rose-100',
                 'dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50',
                 'transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2',
+                'focus-visible:outline-none ',
               )}
             >
               <Trash2 size={13} />

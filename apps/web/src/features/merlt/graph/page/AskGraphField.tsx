@@ -74,7 +74,7 @@ export function AskGraphField({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 dark:border-slate-700 dark:bg-slate-900">
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
       {hasContext && (
         <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 px-2 py-1.5 dark:border-slate-800">
           <span className="mr-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
@@ -94,7 +94,7 @@ export function AskGraphField({
                   onClick={() => onRemoveContext(item.id)}
                   aria-label={`Rimuovi ${item.label} dal contesto`}
                   title="Rimuovi dal contesto della domanda"
-                  className="shrink-0 rounded-full p-0.5 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-primary-900/50"
+                  className="shrink-0 rounded-full p-0.5 hover:bg-primary-100 focus-visible:outline-none dark:hover:bg-primary-900/50"
                 >
                   <X size={10} />
                 </button>
@@ -133,7 +133,7 @@ export function AskGraphField({
               aria-checked={mode === m}
               onClick={() => setMode(m)}
               className={cn(
-                'min-h-[44px] min-w-[44px] px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
+                'min-h-[44px] min-w-[44px] px-2.5 font-medium transition-colors focus-visible:outline-none ',
                 mode === m
                   ? 'bg-primary-50 text-primary-700 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950'
                   : 'text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
@@ -149,7 +149,7 @@ export function AskGraphField({
           disabled={!value.trim() || busy}
           aria-label="Chiedi al grafo"
           title={busy ? 'Attendi la deliberazione in corso…' : undefined}
-          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-r-[7px] bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 px-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:disabled:bg-slate-700 dark:focus-visible:ring-offset-slate-900"
+          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-r-[7px] bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 dark:disabled:text-slate-400 px-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none dark:disabled:bg-slate-700 "
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Chiedi
         </button>

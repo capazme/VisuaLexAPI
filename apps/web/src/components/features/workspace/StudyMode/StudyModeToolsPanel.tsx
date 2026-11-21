@@ -338,7 +338,7 @@ export function StudyModeToolsPanel({
                   }}
                   placeholder={noteAnchor ? "Scrivi una nota sullo span selezionato…" : "Scrivi una nota…"}
                   className={cn(
-                    "flex-1 text-sm rounded-lg border px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-shadow",
+                    "flex-1 text-sm rounded-lg border px-3 py-2 resize-none focus:outline-none transition-shadow",
                     styles.input,
                     styles.text
                   )}

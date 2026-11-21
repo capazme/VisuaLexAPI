@@ -39,7 +39,7 @@ export function SectionTabs({ forumCount, onChoose, inDrawer = false }: { forumC
             }}
             className={cn(
               'relative h-[30px] flex-auto whitespace-nowrap rounded px-1 text-center text-[13px]',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              'focus-visible:outline-none ',
               // 44 px on a touch screen, which the drawer is; the desktop bar keeps the prototype's 30.
               inDrawer && 'h-11',
               active

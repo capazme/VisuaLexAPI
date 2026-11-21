@@ -76,7 +76,7 @@ export function EdgeDetailsDrawer({
           type="button"
           aria-label="Chiudi"
           onClick={onClose}
-          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-200"
+          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none dark:hover:text-slate-200"
         >
           <X className="h-4 w-4" />
         </button>
@@ -163,7 +163,7 @@ function EndpointButton({
       type="button"
       onClick={() => onRecenter(node)}
       title={`Centra su ${node.label}`}
-      className="flex min-w-0 flex-1 items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-slate-700 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-900/60"
+      className="flex min-w-0 flex-1 items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-slate-700 hover:bg-white focus-visible:outline-none dark:text-slate-200 dark:hover:bg-slate-900/60"
     >
       <Crosshair className="h-3 w-3 shrink-0 text-slate-400" />
       <span className="truncate">{node.label}</span>
