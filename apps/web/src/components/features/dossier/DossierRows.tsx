@@ -22,11 +22,6 @@ interface Props {
 
 // One row each: name, category, items, last touched, «⋯». Fixed 52 px on a computer, two 44 px lines on a phone.
 const COLUMNS = 'md:grid-cols-[minmax(0,1fr)_11rem_6rem_10rem_2.75rem]';
-const SORTABLE: { key: SortKey; label: string; align?: string }[] = [
-  { key: 'name', label: 'Nome' },
-  { key: 'items', label: 'Elementi' },
-  { key: 'updated', label: 'Aggiornata' },
-];
 
 const dateOf = (d: Dossier) => {
   const t = lastTouched(d);
