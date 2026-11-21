@@ -12,6 +12,15 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.68.0] - 2026-11-21
+
+The Pratiche sort menu reads in full on a phone. Web only, no migration. MERL-T stays off.
+
+### Work
+
+- The closed sort menu shows a short name (Recenti, Nome, Creazione, Elementi); the open list and the screen
+  reader keep the full text (LC149).
+
 ## [1.67.0] - 2026-11-21
 
 Two touch-ups to the Pratiche list. Web only, no migration. MERL-T stays off.
