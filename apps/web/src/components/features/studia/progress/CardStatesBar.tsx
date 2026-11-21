@@ -47,7 +47,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
               onFocus={() => setChosen(state.key)}
               onClick={() => setChosen(state.key)}
               style={{ flexGrow: stati[state.key] }}
-              className={cn('relative h-11 min-w-3 basis-0 rounded-md motion-safe:transition-[flex-grow] motion-safe:duration-(--dur-scene)', FOCUS_RING, 'focus-visible:ring-offset-0', chosen === state.key && 'opacity-80')}
+              className={cn('relative h-11 min-w-3 basis-0 rounded-md motion-safe:transition-[flex-grow] motion-safe:duration-(--dur-scene)', FOCUS_RING, '', chosen === state.key && 'opacity-80')}
             >
               <span aria-hidden className={cn(BAR, state.swatch, index === 0 && 'rounded-l-md', index === segments.length - 1 && 'rounded-r-md')} />
             </button>

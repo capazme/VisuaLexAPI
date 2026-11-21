@@ -68,7 +68,7 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
         'group relative flex min-h-48 w-full flex-col items-center justify-center overflow-hidden rounded-[8px] bg-white px-6 py-8 text-center dark:bg-slate-900',
         // Inset: the wrapper that closes upwards clips whatever is drawn outside the box.
         FOCUS_RING,
-        'focus-visible:ring-inset focus-visible:ring-offset-0',
+        '',
       )}
     >
       {/* The ground tinted while a file is near, by its opacity; half of it under a mouse at rest. */}

@@ -113,7 +113,7 @@ export function IstruzioniPerClaude({ dossierId, headingClass }: { dossierId: st
             maxLength={MAX_ISTRUZIONI}
             rows={6}
             placeholder="Per esempio: cosa fare, quali fonti citare, con quali atti coordinarsi."
-            className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-base leading-relaxed text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-100"
+            className="w-full rounded-lg border border-slate-300 bg-card px-3 py-2 text-base leading-relaxed text-slate-900 focus-visible:outline-none dark:border-slate-700 dark:text-slate-100"
           />
           {saveError && <p role="alert" className="text-[15px] text-red-700 dark:text-red-400">{saveError}</p>}
         </>

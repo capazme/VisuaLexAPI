@@ -122,7 +122,7 @@ export function PracticeRowShell({
               onChange={() => tools.toggle(dossier.itemIds)}
               aria-label={`Seleziona ${removeName}`}
               // The theme's colours, as the app's other checkboxes: never a white box in the dark.
-              className="h-4 w-4 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:accent-primary-300 dark:[color-scheme:dark]"
+              className="h-4 w-4 accent-primary-600 focus-visible:outline-none dark:accent-primary-300 dark:[color-scheme:dark]"
             />
           </label>
         )}
@@ -147,7 +147,7 @@ export function PracticeRowShell({
               (folded ? beside.onOpen : onToggle)();
             }
           }}
-          className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 md:min-h-0 focus-visible:outline-none "
         >
           <ChevronDown
             size={16}

@@ -100,7 +100,7 @@ function ReportForm({ environmentId, onClose, onReported, setBusy }: ReportModal
               value={option.value}
               checked={reason === option.value}
               onChange={() => setReason(option.value)}
-              className="mt-0.5 w-4 h-4 text-primary-600 focus:ring-primary-500"
+              className="mt-0.5 w-4 h-4 text-primary-600 "
             />
             <span>
               <span className="block font-medium text-slate-900 dark:text-white">{option.label}</span>

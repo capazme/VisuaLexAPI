@@ -65,7 +65,7 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
         {...getReferenceProps()}
         type="button"
         aria-label="Dettagli della fonte consultata"
-        className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-300"
       >
         <Info size={14} />
       </button>
@@ -187,7 +187,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
           <button
             type="button"
             onClick={openNorma}
-            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400"
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline focus-visible:outline-none dark:text-primary-400"
           >
             <BookOpen size={12} /> Apri la norma
           </button>
@@ -196,7 +196,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
           <button
             type="button"
             onClick={openSentenza}
-            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400"
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline focus-visible:outline-none dark:text-primary-400"
           >
             <Scale size={12} /> Apri la sentenza
           </button>
@@ -209,7 +209,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
             to={`/labs/grafo?urn=${encodeURIComponent(displayUrn)}`}
             aria-label="Apri nel grafo esplorativo"
             title="Apri nel grafo esplorativo"
-            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none dark:hover:bg-slate-800 dark:hover:text-slate-300"
           >
             <Network size={14} />
           </Link>
@@ -221,7 +221,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
               type="button"
               aria-label={`Segna ${label} come pertinente`}
               onClick={() => onRate(source.urn, true)}
-              className="rounded-md p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="rounded-md p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40 focus-visible:outline-none "
             >
               <ThumbsUp size={14} />
             </button>
@@ -229,7 +229,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
               type="button"
               aria-label={`Segna ${label} come non pertinente`}
               onClick={() => onRate(source.urn, false)}
-              className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 focus-visible:outline-none "
             >
               <ThumbsDown size={14} />
             </button>
@@ -241,7 +241,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
             disabled={confirmState === 'pending' || confirmState === 'done'}
             onClick={() => onConfirm(source)}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none ',
               confirmState === 'done'
                 ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900'
                 : 'border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950/40',

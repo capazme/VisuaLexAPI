@@ -120,7 +120,7 @@ export function ConsentChoiceModal({
             data-testid="merlt-notice-body"
             className={cn(
               'max-h-[40vh] space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4 leading-relaxed',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              'focus-visible:outline-none ',
               'dark:border-slate-700 dark:bg-slate-800/50',
             )}
           >
@@ -152,7 +152,7 @@ export function ConsentChoiceModal({
                   value={meta.level}
                   checked={isSelected}
                   onChange={() => setSelected(meta.level)}
-                  className="mt-1 h-4 w-4 shrink-0 accent-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="mt-1 h-4 w-4 shrink-0 accent-primary-600 "
                 />
                 <span>
                   <span className="block font-semibold text-slate-900 dark:text-white">{meta.title}</span>
@@ -169,7 +169,7 @@ export function ConsentChoiceModal({
             type="checkbox"
             checked={ticked}
             onChange={(e) => setTickedFor(e.target.checked ? notice.id : null)}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary-600 "
           />
           <label htmlFor={checkboxId} className="cursor-pointer">
             {notice.conferma}

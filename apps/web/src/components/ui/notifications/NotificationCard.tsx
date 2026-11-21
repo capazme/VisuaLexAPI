@@ -249,7 +249,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
                 aria-keyshortcuts={shortcut?.keys}
                 className={cn(
                   CONTROL_RADIUS, 'min-h-[44px] shrink-0 px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                  'focus-visible:outline-none ',
                 )}
               >
                 Annulla
@@ -265,7 +265,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
                 disabled={closing}
                 className={cn(
                   CONTROL_RADIUS, 'min-h-[44px] shrink-0 px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                  'focus-visible:outline-none ',
                 )}
               >
                 {entry.action.label}
@@ -278,7 +278,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
               aria-label="Chiudi notifica"
               className={cn(
                 CONTROL_RADIUS, 'grid h-11 w-11 shrink-0 place-items-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                'focus-visible:outline-none ',
               )}
             >
               <X size={16} />

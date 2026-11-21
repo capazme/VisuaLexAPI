@@ -571,7 +571,7 @@ export function SelectionPopup({
                     {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                     <button
                       onClick={() => handleAction('card')}
-                      className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                      className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none "
                       title="Crea scheda"
                       aria-label="Crea scheda"
                     >
@@ -609,7 +609,7 @@ export function SelectionPopup({
                 {/* bare-button: an icon of the selection's dark bar, dark in both themes. */}
                 <button
                   onClick={() => handleAction('report')}
-                  className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none "
                   title="Segnala come citazione"
                   aria-label="Segnala come citazione"
                 >

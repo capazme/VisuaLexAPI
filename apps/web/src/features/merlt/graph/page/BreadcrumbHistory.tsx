@@ -30,7 +30,7 @@ export function BreadcrumbHistory({ entries, onNavigate }: BreadcrumbHistoryProp
               <button
                 type="button"
                 onClick={() => onNavigate(entry.urn)}
-                className="max-w-[140px] truncate text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="max-w-[140px] truncate text-primary-600 hover:underline focus-visible:outline-none "
               >
                 {entry.label}
               </button>

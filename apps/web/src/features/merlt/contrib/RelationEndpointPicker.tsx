@@ -65,7 +65,7 @@ export function RelationEndpointPicker({
           type="button"
           onClick={() => onChange(null)}
           aria-label={`Cambia ${labels.lower}`}
-          className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded p-1 text-emerald-600 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:min-w-0 dark:hover:bg-emerald-900/40"
+          className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded p-1 text-emerald-600 hover:bg-emerald-100 focus-visible:outline-none md:min-h-0 md:min-w-0 dark:hover:bg-emerald-900/40"
         >
           <X size={14} />
         </button>
@@ -138,7 +138,7 @@ export function RelationEndpointPicker({
                 <button
                   type="button"
                   onClick={() => onChange({ id: p.pendingId, label: p.label, kind: 'pending' })}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-left text-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:border-slate-700 dark:hover:bg-slate-800"
+                  className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-left text-sm hover:bg-slate-50 focus-visible:outline-none md:min-h-0 dark:border-slate-700 dark:hover:bg-slate-800"
                 >
                   <span className="truncate text-slate-800 dark:text-slate-100">{p.label}</span>
                   {p.tipo && <span className="shrink-0 text-xs text-slate-400">{p.tipo}</span>}

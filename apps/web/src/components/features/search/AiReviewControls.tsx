@@ -115,7 +115,7 @@ export function AiReviewControls({
                         aria-hidden
                         className={cn(
                             'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border-2 bg-white transition-colors motion-reduce:transition-none dark:bg-slate-900',
-                            'peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-1 dark:peer-focus-visible:ring-offset-slate-900',
+                            'peer-focus-visible:outline peer-focus-visible:outline-[1.5px] peer-focus-visible:outline-offset-1 peer-focus-visible:outline-(--focus-line)',
                             validated ? 'border-emerald-600 dark:border-emerald-400' : 'border-slate-500 dark:border-slate-400',
                         )}
                     >

@@ -107,7 +107,7 @@ function YearSection({ urn, archivio, q, report, anno, count, initial, besideId,
     <section className="border-t border-slate-100 dark:border-slate-800">
       {/* bare-button: the year's heading, a whole row that opens its space. */}
       <button type="button" aria-expanded={open} aria-controls={spaceId} onClick={toggle}
-        className="flex min-h-[44px] w-full items-center justify-between py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0">
+        className="flex min-h-[44px] w-full items-center justify-between py-2 text-left focus-visible:outline-none md:min-h-0">
         <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Rassegna dell'anno {anno}</span>
         <span className="text-xs text-slate-500 dark:text-slate-400">
           {isNarrowing(filters) && items.length > 0 ? `${shown.length} di ${items.length} caricati` : passi(count)}
@@ -263,7 +263,7 @@ export function RassegnePanel({ articleUrn, besideId, backEntry }: RassegnePanel
       <h4>
         {/* bare-button: the accordion's heading, a whole row. */}
         <button type="button" aria-expanded={open} aria-controls={spaceId} onClick={toggle}
-          className="flex min-h-11 w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-8">
+          className="flex min-h-11 w-full items-center justify-between gap-3 text-left focus-visible:outline-none md:min-h-8">
           <span className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">Nelle rassegne della Cassazione</span>
           <span className="flex items-center gap-2 text-xs font-normal text-slate-500 dark:text-slate-400">
             <span>{`${passi(presence.data.total)}, ${years(presence.data.anni)}`}</span>

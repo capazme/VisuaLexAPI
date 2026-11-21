@@ -569,8 +569,39 @@ describe('the interaction constants', () => {
     const css = await compile([ACTIVE, HOVER_LIFT, ...FOCUS_RING.split(' ')]);
     expect(css).toMatch(/\.active\\:scale-\\\[0\\\.97\\\][^{]*\{\s*&:active\s*\{\s*scale:\s*0\.97/);
     expect(css).toMatch(/pointer\\:fine\\\)\\\]\\:hover\\:-translate-y-px\s*\{\s*@media \(hover:hover\) and \(pointer:fine\)/);
-    expect(css).toContain('.focus-visible\\:ring-toga-500');
-    expect(css).toContain('.focus-visible\\:ring-offset-background');
+    // LC146: the shared focus token draws no ring any more (the rules at the end of index.css draw the focus).
+    expect(FOCUS_RING).not.toMatch(/ring/);
+  }, 30000);
+
+  it('draws no ring or halo on a field, a quiet border instead; a thin outline on the keyboard for the rest (LC146)', async () => {
+    const css = await compile(['focus-visible:ring-2', 'focus:ring-2', 'ring-offset-2']);
+    const at = css.lastIndexOf(':root', css.indexOf('--focus-line: var(--color-ink-500)'));
+    expect(at).toBeGreaterThan(-1);
+    const tail = css.slice(at);
+    const rule = (head: string) => tail.slice(tail.indexOf(head), tail.indexOf('}', tail.indexOf(head)));
+    expect(rule(':root')).toMatch(/--focus-line:\s*var\(--color-ink-500\)/);
+    expect(rule('.dark')).toMatch(/--focus-line:\s*var\(--color-ink-400\)/);
+    // Every focused element has its ring variables cleared: no `ring-*` utility shows.
+    expect(rule(':focus,')).toMatch(/--tw-ring-shadow:\s*0 0 #0000[^}]*--tw-ring-offset-shadow:\s*0 0 #0000/);
+    // Not a field: 1.5 px, offset 1 px, only for :focus-visible.
+    expect(rule(':focus-visible:not(input')).toMatch(/outline:\s*1\.5px solid var\(--focus-line\)[^}]*outline-offset:\s*1px/);
+    // A field: no outline, no shadow, the border one step darker, for :focus and :focus-visible alike.
+    const field = rule(':is(input, textarea, select):is(:focus, :focus-visible)');
+    expect(field).toMatch(/outline:\s*none/);
+    expect(field).toMatch(/box-shadow:\s*none/);
+    expect(field).toMatch(/border-color:\s*var\(--focus-line\)/);
+    // Outside every layer, so it wins over the utilities.
+    for (const layer of css.matchAll(/@layer [\w-]+\s*\{/g)) {
+      let depth = 0;
+      let end = layer.index! + layer[0].length - 1;
+      for (; end < css.length; end += 1) {
+        if (css[end] === '{') depth += 1;
+        else if (css[end] === '}' && (depth -= 1) === 0) break;
+      }
+      expect(at < layer.index! || at > end, layer[0]).toBe(true);
+    }
+    // The old base rule that drew a 2 px ring on every control is gone.
+    expect(css).not.toMatch(/button:focus-visible,\s*a:focus-visible/);
   }, 30000);
 });
 

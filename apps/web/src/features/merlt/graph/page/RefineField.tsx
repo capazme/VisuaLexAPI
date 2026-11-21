@@ -44,7 +44,7 @@ export function RefineField({ busy = false, onRefine }: RefineFieldProps): React
         aria-expanded={open}
         aria-controls={open ? inputId : undefined}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md px-1 text-xs font-medium text-primary-600 transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:text-primary-300',
+          'inline-flex items-center gap-1.5 rounded-md px-1 text-xs font-medium text-primary-600 transition-colors hover:text-primary-700 focus-visible:outline-none dark:text-primary-400 dark:hover:text-primary-300',
           TOUCH_TARGET_RESPONSIVE,
         )}
       >
@@ -70,7 +70,7 @@ export function RefineField({ busy = false, onRefine }: RefineFieldProps): React
             }}
             placeholder="Domanda di approfondimento…"
             aria-label="Domanda di approfondimento"
-            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-500 dark:placeholder:text-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
           />
           <Button
             type="button"

@@ -135,7 +135,7 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
           className={cn(
             LAYOUT,
             'snap-x overflow-x-auto rounded-[8px] @min-[61.5rem]:overflow-x-visible',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+            'focus-visible:outline-none ',
           )}
         >
           {packs.map((pack) => {

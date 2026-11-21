@@ -271,7 +271,7 @@ function GoTo({ onClick }: { onClick: () => void }) {
         <button
             type="button"
             onClick={onClick}
-            className="inline-flex min-h-[44px] items-center gap-1 rounded px-1 text-xs font-medium text-slate-500 transition-colors hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 [@media(pointer:fine)]:min-h-8 dark:text-slate-400 dark:hover:text-primary-400"
+            className="inline-flex min-h-[44px] items-center gap-1 rounded px-1 text-xs font-medium text-slate-500 transition-colors hover:text-primary-600 focus-visible:outline-none [@media(pointer:fine)]:min-h-8 dark:text-slate-400 dark:hover:text-primary-400"
         >
             <LocateFixed size={12} aria-hidden /> Vai al passo
         </button>
@@ -293,7 +293,7 @@ function HighlightCard({ highlight, onGoTo, onRemove }: { highlight: Highlight; 
                 <button
                     type="button"
                     onClick={onGoTo}
-                    className="inline-flex min-h-[44px] items-center gap-1 rounded px-1 text-xs font-medium text-slate-500 transition-colors hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 [@media(pointer:fine)]:min-h-8 dark:text-slate-400 dark:hover:text-primary-400"
+                    className="inline-flex min-h-[44px] items-center gap-1 rounded px-1 text-xs font-medium text-slate-500 transition-colors hover:text-primary-600 focus-visible:outline-none [@media(pointer:fine)]:min-h-8 dark:text-slate-400 dark:hover:text-primary-400"
                 >
                     <LocateFixed size={12} aria-hidden /> Vai al passo
                 </button>
@@ -301,7 +301,7 @@ function HighlightCard({ highlight, onGoTo, onRemove }: { highlight: Highlight; 
                     type="button"
                     onClick={onRemove}
                     aria-label={`Rimuovi l'evidenziazione ${quoteForLabel(highlight.text)}`}
-                    className="ml-auto inline-flex min-h-[44px] items-center gap-1 rounded px-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 [@media(pointer:fine)]:min-h-8 dark:text-slate-400 dark:hover:bg-red-900/20"
+                    className="ml-auto inline-flex min-h-[44px] items-center gap-1 rounded px-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none [@media(pointer:fine)]:min-h-8 dark:text-slate-400 dark:hover:bg-red-900/20"
                 >
                     <Trash2 size={12} aria-hidden /> Rimuovi
                 </button>

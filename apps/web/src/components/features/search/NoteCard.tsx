@@ -48,7 +48,7 @@ export function NoteCard({ note, isEditing, editingText, onStartEdit, onChangeEd
                     <button
                         type="button"
                         onClick={onStartEdit}
-                        className="w-full text-left whitespace-pre-wrap text-slate-800 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 rounded-md"
+                        className="w-full text-left whitespace-pre-wrap text-slate-800 dark:text-slate-200 focus:outline-none rounded-md"
                         title="Clicca per modificare"
                     >
                         {note.text}

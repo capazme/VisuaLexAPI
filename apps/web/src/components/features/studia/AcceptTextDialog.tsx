@@ -72,7 +72,7 @@ export function AcceptTextDialog({ text, onAccept, onCancel, busy = false }: Acc
           type="checkbox"
           checked={ticked}
           onChange={(e) => setTickedFor(e.target.checked ? text.id : null)}
-          className="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300 text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-300 text-primary-600 focus-visible:outline-none "
         />
         <label htmlFor={checkboxId} className="text-sm font-medium text-slate-800 dark:text-slate-100">
           {text.conferma}

@@ -84,7 +84,7 @@ export function NoteEditBox({
             }}
             rows={Math.max(2, value.split('\n').length)}
             // 16 px on a phone (`FIELD_TEXT`): iOS zooms the page into a smaller field as it takes the focus.
-            className={cn('w-full resize-none rounded-md border border-amber-500/50 bg-white dark:bg-slate-900 px-2 py-1 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/40', FIELD_TEXT)}
+            className={cn('w-full resize-none rounded-md border border-amber-500/50 bg-white dark:bg-slate-900 px-2 py-1 text-slate-900 dark:text-slate-100 focus:outline-none ', FIELD_TEXT)}
         />
     );
     if (!explicit) return box;

@@ -421,13 +421,7 @@
   input::placeholder, textarea::placeholder { color: var(--color-ink-500); }
   .dark input::placeholder, .dark textarea::placeholder { color: var(--color-ink-400); }
 
-  button:focus-visible,
-  a:focus-visible,
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
-  }
+  /* Focus is drawn by the LC146 rules at the end of this file, not here. */
 
   /* Font-size preference: scales the root font-size so every Tailwind
      rem-based utility (text-*, spacing, button heights) scales together.
@@ -1444,7 +1438,7 @@
 }
 
 .focus-ring {
-  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background;
+  @apply focus:outline-none;
 }
 
 /* Touch target minimum — apply to interactive elements that are too small */
@@ -1784,4 +1778,32 @@
 .vlx-pulse { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .vlx-pulse { display: inline; stroke-dasharray: 10 90; stroke-dashoffset: 10; animation: vlx-pulse-run 3600ms linear 3; }
+}
+
+/* LC146: no rings, no halos. One place, unlayered so it wins over every `ring-*` utility (their two variables cleared,
+   a card's own shadow stays).
+   - A text field (input, textarea, select, or a wrapper that holds one) shows focus by its border alone, one step
+     darker (ink-500, 4.5:1 on the paper; ink-400 in the dark), whether focused by mouse, Tab or script. No outline, no shadow, no size change.
+   - Any other control keeps a thin quiet outline only for the keyboard (:focus-visible); the mouse and a script
+     focus draw nothing. `[tabindex="-1"]` non-controls keep the rule above (higher specificity). */
+:root { --focus-line: var(--color-ink-500); }
+.dark { --focus-line: var(--color-ink-400); }
+:focus,
+:focus-visible {
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+:focus-visible:not(input, textarea, select) {
+  outline: 1.5px solid var(--focus-line);
+  outline-offset: 1px;
+}
+:focus:not(:focus-visible, input, textarea, select) { outline: none; }
+:is(input, textarea, select):is(:focus, :focus-visible):not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [aria-invalid="true"]),
+:has(> input:focus:not([type="checkbox"], [type="radio"], [type="range"]), > textarea:focus, > select:focus):is(.border, [class*="border-"]) {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--focus-line);
+}
+:is(input, textarea, select):is(:focus, :focus-visible):not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]) {
+  outline: none;
 }

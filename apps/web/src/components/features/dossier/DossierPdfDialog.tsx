@@ -27,7 +27,7 @@ interface Props {
   className?: string;
 }
 
-const RADIO = 'h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+const RADIO = 'h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none ';
 const OPTION = `flex items-start gap-2 rounded text-sm text-slate-700 dark:text-slate-300 ${TOUCH_TARGET_RESPONSIVE}`;
 
 /**
@@ -105,7 +105,7 @@ export function DossierPdfDialog({ isOpen, onClose, decisions, progress, onExpor
                   <label className={`${OPTION} items-center`}>
                     <input
                       type="checkbox"
-                      className="h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                      className="h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none "
                       checked={!left.has(item.id)}
                       disabled={busy}
                       onChange={(e) => toggle(item.id, e.target.checked)}

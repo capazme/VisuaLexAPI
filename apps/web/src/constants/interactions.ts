@@ -4,7 +4,7 @@
  */
 
 /** Standard focus ring for all interactive elements: 2 px toga-500 on a 2 px paper offset, never animated */
-export const FOCUS_RING = 'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-toga-500 focus-visible:ring-offset-background focus:outline-none';
+export const FOCUS_RING = 'focus:outline-none';
 
 /** Standard disabled state */
 export const DISABLED = 'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none';

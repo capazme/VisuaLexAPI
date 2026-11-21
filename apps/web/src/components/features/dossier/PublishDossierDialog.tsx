@@ -341,7 +341,7 @@ export function PublishDossierForm({ dossier, otherDossiers, onClose, onPublishe
             {dossier.kind !== 'studio' && <p className="font-medium">È una pratica di lavoro: controlla con attenzione titolo e note.</p>}
             {WARNING.map((line) => <p key={line}>{line}</p>)}
             <label className={`mt-2 flex items-start gap-2 font-medium ${TOUCH_TARGET_RESPONSIVE}`}>
-              <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" />
+              <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600 focus-visible:outline-none " />
               Ho controllato: non contiene dati personali
             </label>
           </div>
@@ -388,7 +388,7 @@ function RowGroup({ heading, hint, rows, ticked, onToggle, onAll }: {
                 type="checkbox"
                 checked={ticked.has(row.id)}
                 onChange={(e) => onToggle(row, e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="mt-0.5 h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none "
               />
               <span className="min-w-0 space-y-0.5">
                 <span className="block text-xs text-slate-500 dark:text-slate-400">{row.label}</span>

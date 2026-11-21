@@ -106,7 +106,7 @@ export function ForumSuggestionsView({
                     key={suggestion.id}
                     type="button"
                     onClick={() => onOpenReview(suggestion)}
-                    className="w-full text-left bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    className="w-full text-left bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 p-4 transition-colors focus-visible:outline-none "
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -154,7 +154,7 @@ export function ForumSuggestionsView({
                     type="button"
                     onClick={() => canEdit && onOpenEdit(suggestion)}
                     disabled={!canEdit}
-                    className="w-full text-left bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 p-4 transition-colors disabled:cursor-default enabled:hover:border-primary-400 dark:enabled:hover:border-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    className="w-full text-left bg-white dark:bg-slate-800 rounded-[8px] border border-slate-200 dark:border-slate-700 p-4 transition-colors disabled:cursor-default enabled:hover:border-primary-400 dark:enabled:hover:border-primary-600 focus-visible:outline-none "
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">

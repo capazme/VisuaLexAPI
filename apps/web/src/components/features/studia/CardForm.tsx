@@ -448,7 +448,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
                         className={cn(
                           'inline-flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200',
                           'min-h-[44px] min-w-[44px] md:min-h-7 md:min-w-7',
-                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                          'focus:outline-none ',
                         )}
                       >
                         <X size={14} aria-hidden="true" />

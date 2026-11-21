@@ -13,7 +13,7 @@ import { rollUpMenu, slideCheck, unrollMenu, type RollingUp } from './sectionMen
 /** Closed; open; rolling back up (after a choice too: nothing more can be chosen). */
 type Phase = 'closed' | 'open' | 'closing';
 
-const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+const FOCUS = 'focus-visible:outline-none ';
 const HOVER = 'hover:bg-slate-100 dark:hover:bg-slate-800';
 
 /**

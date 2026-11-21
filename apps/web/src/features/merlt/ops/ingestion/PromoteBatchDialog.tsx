@@ -113,7 +113,7 @@ export function PromoteBatchDialog({ batch, onClose, onPromoted }: PromoteBatchD
                 type="checkbox"
                 checked={force}
                 onChange={(e) => setForce(e.target.checked)}
-                className="w-4 h-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+                className="w-4 h-4 rounded border-red-300 text-red-600 "
               />
               Forza promozione (ignora conflitti URN)
             </label>
@@ -129,7 +129,7 @@ export function PromoteBatchDialog({ batch, onClose, onPromoted }: PromoteBatchD
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm outline-none"
           />
         </div>
 

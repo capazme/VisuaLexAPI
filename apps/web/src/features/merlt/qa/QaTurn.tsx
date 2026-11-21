@@ -139,7 +139,7 @@ export function QaTurn({
             <button
               type="button"
               onClick={onCancel}
-              className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none "
             >
               Annulla
             </button>
@@ -157,7 +157,7 @@ export function QaTurn({
             <button
               type="button"
               onClick={onRetry}
-              className="text-sm font-medium text-amber-800 underline transition-colors hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-amber-300 dark:hover:text-amber-200"
+              className="text-sm font-medium text-amber-800 underline transition-colors hover:text-amber-900 focus-visible:outline-none dark:text-amber-300 dark:hover:text-amber-200"
             >
               Riprova
             </button>
@@ -184,7 +184,7 @@ export function QaTurn({
                         <button
                           type="button"
                           onClick={() => onPrefer(alt.expert)}
-                          className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-primary-300 hover:text-primary-600 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                          className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-primary-300 hover:text-primary-600 dark:border-slate-700 focus-visible:outline-none "
                         >
                           Mi convince
                         </button>
@@ -227,7 +227,7 @@ export function QaTurn({
                 type="button"
                 onClick={() => downloadAnswerJson(a, turn.question)}
                 title="Esporta la risposta completa in JSON (trace, strumenti, errori) per la diagnostica"
-                className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
               >
                 <Download size={13} className="shrink-0" aria-hidden="true" />
                 Esporta JSON
@@ -290,7 +290,7 @@ export function QaTurn({
                   aria-pressed={turn.rating === 5}
                   onClick={() => onRate(5)}
                   className={cn(
-                    'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
+                    'rounded-md p-1.5 focus-visible:outline-none ',
                     turn.rating === 5 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'text-slate-400 hover:text-emerald-600',
                   )}
                 >
@@ -302,7 +302,7 @@ export function QaTurn({
                   aria-pressed={turn.rating === 1}
                   onClick={() => onRate(1)}
                   className={cn(
-                    'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500',
+                    'rounded-md p-1.5 focus-visible:outline-none ',
                     turn.rating === 1 ? 'bg-red-50 text-red-600 dark:bg-red-950/40' : 'text-slate-400 hover:text-red-600',
                   )}
                 >
@@ -344,7 +344,7 @@ export function QaTurn({
                     }
                   }}
                   placeholder="Domanda di approfondimento…"
-                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
                 <button
                   type="button"

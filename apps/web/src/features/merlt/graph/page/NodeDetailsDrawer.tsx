@@ -126,7 +126,7 @@ export function NodeDetailsDrawer({
           type="button"
           aria-label="Chiudi"
           onClick={onClose}
-          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-200"
+          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none dark:hover:text-slate-200"
         >
           <X className="h-4 w-4" />
         </button>
@@ -190,7 +190,7 @@ export function NodeDetailsDrawer({
         <button
           type="button"
           onClick={() => onRecenter(node)}
-          className="flex flex-1 items-center justify-center gap-2 rounded bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+          className="flex flex-1 items-center justify-center gap-2 rounded bg-primary-600 dark:bg-toga-400 dark:hover:bg-toga-300 dark:text-ink-950 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none "
         >
           <Crosshair className="h-4 w-4" />
           Centra qui
@@ -209,7 +209,7 @@ export function NodeDetailsDrawer({
               type="button"
               onClick={() => onAddToContext(node)}
               title="Aggiungi questo nodo al contesto della domanda"
-              className="flex flex-1 items-center justify-center gap-1.5 rounded border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none dark:border-slate-700 dark:text-slate-200 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
             >
               <Plus className="h-4 w-4" />
               Usa come contesto
@@ -256,7 +256,7 @@ function RelationGroup({
                 type="button"
                 disabled={!other}
                 onClick={() => other && onRecenter(other)}
-                className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-default disabled:opacity-50 disabled:text-slate-400 disabled:hover:bg-transparent dark:hover:bg-slate-800"
+                className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 focus-visible:outline-none disabled:cursor-default disabled:opacity-50 disabled:text-slate-400 disabled:hover:bg-transparent dark:hover:bg-slate-800"
               >
                 <span className="truncate text-slate-700 dark:text-slate-200">{other?.label ?? otherId}</span>
                 <span className="shrink-0 text-xs text-slate-600 dark:text-slate-400">{e.type}</span>

@@ -61,7 +61,7 @@ function EarlierVersion({ version }: { version: StudiaTextVersion }) {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex min-h-[44px] w-full items-center gap-2 rounded text-left text-sm text-gray-700 hover:text-gray-900 md:min-h-0 dark:text-gray-300 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="flex min-h-[44px] w-full items-center gap-2 rounded text-left text-sm text-gray-700 hover:text-gray-900 md:min-h-0 dark:text-gray-300 dark:hover:text-white focus-visible:outline-none "
       >
         <Chevron size={16} aria-hidden className="shrink-0" />
         <span className="font-medium">Versione {version.versione}</span>

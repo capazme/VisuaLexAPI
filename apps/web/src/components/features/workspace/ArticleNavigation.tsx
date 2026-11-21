@@ -159,7 +159,7 @@ export function ArticleNavigation({
         onClick={handlePrev}
         disabled={isFirst || isLoading}
         className={cn(
-          "vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
+          "vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none ",
           isFirst || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
@@ -185,7 +185,7 @@ export function ArticleNavigation({
           aria-label="Numero dell'articolo"
           enterKeyHint="go"
           // 16 px on a phone: under it Safari on iPhone zooms the page when the field is touched (LC70).
-          className="h-11 w-20 rounded-md border border-slate-300 bg-white px-2 text-center text-base font-medium tabular-nums text-slate-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 md:h-7 md:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          className="h-11 w-20 rounded-md border border-slate-300 bg-white px-2 text-center text-base font-medium tabular-nums text-slate-900 focus:border-primary-500 focus:outline-none md:h-7 md:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           placeholder="Art."
         />
       ) : (
@@ -194,7 +194,7 @@ export function ArticleNavigation({
           type="button"
           onClick={startEditing}
           aria-label={activeArticleId ? `Art. ${activeArticleId}, scrivi un altro numero` : 'Scrivi il numero di un articolo'}
-          className="vlx-hover-tile flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 text-sm font-medium tabular-nums text-slate-900 md:min-h-0 md:py-0.5 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+          className="vlx-hover-tile flex min-h-[44px] items-center whitespace-nowrap rounded-md px-2 text-sm font-medium tabular-nums text-slate-900 md:min-h-0 md:py-0.5 dark:text-white focus-visible:outline-none "
         >
           Art. {activeArticleId ?? '…'}
         </button>
@@ -205,7 +205,7 @@ export function ArticleNavigation({
         onClick={handleNext}
         disabled={isLast || isLoading}
         className={cn(
-          "vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
+          "vlx-hover-tile flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none ",
           isLast || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
