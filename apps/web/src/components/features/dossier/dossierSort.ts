@@ -4,11 +4,11 @@ export type SortKey = 'updated' | 'name' | 'created' | 'items';
 export type SortDir = 'asc' | 'desc';
 export type ListMode = 'schede' | 'lista';
 
-export const SORT_OPTIONS: { id: SortKey; label: string }[] = [
-  { id: 'updated', label: 'Ultimo aggiornamento' },
-  { id: 'name', label: 'Nome (A–Z)' },
-  { id: 'created', label: 'Data di creazione' },
-  { id: 'items', label: 'Numero di elementi' },
+export const SORT_OPTIONS: { id: SortKey; label: string; short: string }[] = [
+  { id: 'updated', label: 'Ultimo aggiornamento', short: 'Recenti' },
+  { id: 'name', label: 'Nome (A–Z)', short: 'Nome' },
+  { id: 'created', label: 'Data di creazione', short: 'Creazione' },
+  { id: 'items', label: 'Numero di elementi', short: 'Elementi' },
 ];
 
 /** The way each order reads first: newest and largest on top, names from A. */
