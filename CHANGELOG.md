@@ -12,6 +12,16 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.69.0] - 2026-11-21
+
+The Pratiche sort menu as a plain menu with short options, readable in light and dark. Web only, no migration.
+MERL-T stays off.
+
+### Work
+
+- The sort menu is a plain menu again, with short options that fit on a phone: «Più recenti», «Nome A–Z»,
+  «Creazione», «Elementi»; the text no longer overlaps in the dark theme (LC150).
+
 ## [1.68.0] - 2026-11-21
 
 The Pratiche sort menu reads in full on a phone. Web only, no migration. MERL-T stays off.
