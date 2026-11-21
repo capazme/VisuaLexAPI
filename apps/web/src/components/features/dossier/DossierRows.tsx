@@ -21,7 +21,9 @@ interface Props {
 }
 
 // One row each: name, category, items, last touched, «⋯». Fixed 52 px on a computer, two 44 px lines on a phone.
+// The category column is left out when no pratica has one, so no empty column is left.
 const COLUMNS = 'md:grid-cols-[minmax(0,1fr)_11rem_6rem_10rem_2.75rem]';
+const COLUMNS_NO_CATEGORY = 'md:grid-cols-[minmax(0,1fr)_6rem_10rem_2.75rem]';
 
 const dateOf = (d: Dossier) => {
   const t = lastTouched(d);
@@ -29,6 +31,8 @@ const dateOf = (d: Dossier) => {
 };
 
 export function DossierRows({ dossiers, isDesktop, sort, dir, onSort, onSelect, onEdit, onTrashChanged }: Props) {
+  const showCategory = dossiers.some((d) => d.tags?.[0]);
+  const columns = showCategory ? COLUMNS : COLUMNS_NO_CATEGORY;
   const header = (key: SortKey, label: string) => {
     const active = sort === key;
     return (
@@ -50,9 +54,9 @@ export function DossierRows({ dossiers, isDesktop, sort, dir, onSort, onSelect, 
   return (
     <div role="table" aria-label="Pratiche" className="overflow-hidden rounded-[8px] border border-slate-200 dark:border-slate-800">
       {isDesktop && (
-        <div role="row" className={cn('grid items-center gap-4 border-b border-slate-200 bg-slate-50 px-4 dark:border-slate-800 dark:bg-slate-900', COLUMNS)}>
+        <div role="row" className={cn('grid items-center gap-4 border-b border-slate-200 bg-slate-50 px-4 dark:border-slate-800 dark:bg-slate-900', columns)}>
           {header('name', 'Nome')}
-          <div role="columnheader" className="text-xs font-medium text-slate-600 dark:text-slate-400">Categoria</div>
+          {showCategory && <div role="columnheader" className="text-xs font-medium text-slate-600 dark:text-slate-400">Categoria</div>}
           {header('items', 'Elementi')}
           {header('updated', 'Aggiornata')}
           <div role="columnheader"><span className="sr-only">Azioni</span></div>
@@ -84,12 +88,12 @@ export function DossierRows({ dossiers, isDesktop, sort, dir, onSort, onSelect, 
               onKeyDown={(e) => {
                 if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onSelect(d.id); }
               }}
-              className={cn('grid cursor-pointer items-center gap-x-4 bg-white px-4 hover:bg-slate-50 dark:bg-slate-950 dark:hover:bg-slate-900', isDesktop ? cn('h-[52px]', COLUMNS) : 'grid-cols-[minmax(0,1fr)_2.75rem] py-1')}
+              className={cn('grid cursor-pointer items-center gap-x-4 bg-white px-4 hover:bg-slate-50 dark:bg-slate-950 dark:hover:bg-slate-900', isDesktop ? cn('h-[52px]', columns) : 'grid-cols-[minmax(0,1fr)_2.75rem] py-1')}
             >
               {isDesktop ? (
                 <>
                   <div role="cell" title={d.title} className="truncate text-sm font-medium text-slate-900 dark:text-slate-50">{d.title}</div>
-                  <div role="cell" title={category} className="truncate text-sm text-slate-600 dark:text-slate-400">{category}</div>
+                  {showCategory && <div role="cell" title={category} className="truncate text-sm text-slate-600 dark:text-slate-400">{category || '–'}</div>}
                   <div role="cell" className="text-sm tabular-nums text-slate-600 dark:text-slate-400">{d.items.length}</div>
                   <div role="cell" className="truncate text-sm text-slate-600 dark:text-slate-400">{dateOf(d)}</div>
                   <div role="cell" className="-mr-2 flex justify-end" onClick={(e) => e.stopPropagation()}>{actions}</div>

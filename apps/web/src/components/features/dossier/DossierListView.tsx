@@ -315,7 +315,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           />
         </div>
         <div className="flex flex-wrap items-center gap-3 md:flex-nowrap md:gap-4">
-          <div className="min-w-[10rem] flex-1 md:max-w-[14rem] md:flex-none">
+          <div className="min-w-[12.5rem] flex-1 md:max-w-[14rem] md:flex-none">
             <Select
               id="tour-dossier-sort"
               value={sortBy}

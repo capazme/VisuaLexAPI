@@ -375,6 +375,31 @@ describe('DossierListView — view and order (LC147)', () => {
     expect(rows()).toEqual(['Charlie', 'Bravo', 'Alfa']);
   });
 
+  it('gives the sort menu room for its longest label on a phone', () => {
+    appStore.setState({ dossiers: data() });
+    renderIt();
+    expect(screen.getByRole('combobox', { name: 'Ordina le pratiche' }).closest('div.flex-1')).toHaveClass('min-w-[12.5rem]');
+  });
+
+  it('leaves out the category column when no pratica has a category', () => {
+    viewport.desktop = true;
+    appStore.setState({ dossiers: data() });
+    renderIt();
+    fireEvent.click(screen.getByRole('radio', { name: 'Lista' }));
+    expect(screen.queryByRole('columnheader', { name: 'Categoria' })).toBeNull();
+    expect(screen.getAllByRole('row')[0]).toHaveClass('md:grid-cols-[minmax(0,1fr)_6rem_10rem_2.75rem]');
+    expect(screen.queryByText('–')).toBeNull();
+  });
+
+  it('shows a dash in the empty category cells when only some have one', () => {
+    viewport.desktop = true;
+    appStore.setState({ dossiers: data().map((d) => (d.id === 'a' ? { ...d, tags: ['civile'] } : d)) });
+    renderIt();
+    fireEvent.click(screen.getByRole('radio', { name: 'Lista' }));
+    expect(screen.getByRole('columnheader', { name: 'Categoria' })).toBeInTheDocument();
+    expect(screen.getAllByText('–')).toHaveLength(2);
+  });
+
   it('opens a row with Enter and has its menu', () => {
     const onSelect = vi.fn();
     appStore.setState({ dossiers: data() });
