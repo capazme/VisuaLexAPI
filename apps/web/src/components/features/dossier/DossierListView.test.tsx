@@ -27,6 +27,7 @@ const dossier = (data: NormaVisitata[]): Dossier => ({
 
 beforeEach(() => {
   viewport.desktop = false;
+  localStorage.removeItem('lexcraft.pratiche.vista');
   appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [], isLoadingData: false });
   sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
 });
@@ -261,14 +262,14 @@ describe('DossierListView — the category menu (D1)', () => {
     const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
     expect(menu).toHaveClass('appearance-none', 'rounded-md', 'min-h-11');
     expect(menu.closest('.flex-1')).toHaveClass('min-w-[8rem]');
-    expect(menu.closest('.flex-wrap')).toContainElement(screen.getByRole('radiogroup', { name: 'Ordina le pratiche' }));
+    expect(menu.closest('.flex-wrap')).toContainElement(screen.getByRole('combobox', { name: 'Ordina le pratiche' }));
   });
 
   it('has no menu when no dossier has a category, and the order menu stays', () => {
     appStore.setState({ dossiers: [dossier([CIVIL])] });
     renderList();
     expect(screen.queryByRole('combobox', { name: 'Filtra per categoria' })).toBeNull();
-    expect(screen.getByRole('radiogroup', { name: 'Ordina le pratiche' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Ordina le pratiche' })).toBeInTheDocument();
   });
 
   it('shows «Tutte le categorie» again when the chosen category leaves the list', () => {
@@ -296,48 +297,92 @@ describe('DossierListView — the category menu (D1)', () => {
   });
 });
 
-// On a phone the title keeps its row (M1): «⋯» with «Importa» and «Cestino», and «+» for a new dossier, beside it.
-// LC106 (Luca, 18-11): the order is a choice in a row, «Data · Nome · Elementi», not a menu saying «Ordina».
-describe('DossierListView — the order, a choice in a row', () => {
-  const at = (id: string, title: string, createdAt: string, items: number): Dossier => ({
+// LC147: two views and sensible orders, remembered together.
+describe('DossierListView — view and order (LC147)', () => {
+  const at = (id: string, title: string, createdAt: string, items: number, addedAt = createdAt): Dossier => ({
     ...dossier(Array.from({ length: items }, () => CIVIL)), id, title, createdAt,
+    items: Array.from({ length: items }, (_, i) => ({ id: `${id}${i}`, type: 'norma' as const, data: CIVIL, addedAt })),
   });
-  const order = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+  const renderIt = () => render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+  const cards = () => screen.getAllByRole('button', { name: /^Apri la pratica / }).map((e) => e.getAttribute('aria-label')!.replace('Apri la pratica ', ''));
+  const rows = () => screen.getAllByRole('row').filter((r) => r.getAttribute('aria-label')).map((r) => r.getAttribute('aria-label')!.replace('Apri la pratica ', ''));
+  const pick = (v: string) => fireEvent.change(screen.getByRole('combobox', { name: 'Ordina le pratiche' }), { target: { value: v } });
+  const data = () => [
+    at('a', 'Bravo', '2026-03-01T00:00:00Z', 1),
+    at('b', 'Charlie', '2026-01-01T00:00:00Z', 3, '2026-05-01T00:00:00Z'),
+    at('c', 'Alfa', '2026-02-01T00:00:00Z', 2),
+  ];
+  beforeEach(() => { localStorage.removeItem('lexcraft.pratiche.vista'); });
 
-  it('is a radio group of three, the chosen one alone in the Tab order, with no «Ordina» in sight', () => {
-    appStore.setState({ dossiers: [at('a', 'Alfa', '2026-01-01T00:00:00Z', 1)] });
-    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    const group = screen.getByRole('radiogroup', { name: 'Ordina le pratiche' });
-    expect(group).toHaveAttribute('id', 'tour-dossier-sort');
-    const radios = within(group).getAllByRole('radio');
-    expect(radios.map((r) => r.textContent)).toEqual(['Data', 'Nome', 'Elementi']);
-    expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
-    expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1]);
-    expect(screen.queryByText(/Ordina/)).toBeNull();
-    expect(screen.queryByRole('combobox', { name: 'Ordina le pratiche' })).toBeNull();
+  it('lists the orders in a menu, the last touched first, cards by default', () => {
+    appStore.setState({ dossiers: data() });
+    renderIt();
+    const menu = screen.getByRole('combobox', { name: 'Ordina le pratiche' }) as HTMLSelectElement;
+    expect(Array.from(menu.options).map((o) => o.textContent)).toEqual(['Ultimo aggiornamento', 'Nome (A–Z)', 'Data di creazione', 'Numero di elementi']);
+    expect(screen.getByRole('radio', { name: 'Schede' })).toHaveAttribute('aria-checked', 'true');
+    expect(cards()).toEqual(['Charlie', 'Bravo', 'Alfa']);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('reorders the list: by date, by name, by items, with the arrows as with a click', () => {
-    appStore.setState({
-      dossiers: [
-        at('a', 'Bravo', '2026-03-01T00:00:00Z', 1),
-        at('b', 'Charlie', '2026-01-01T00:00:00Z', 3),
-        at('c', 'Alfa', '2026-02-01T00:00:00Z', 2),
-      ],
-    });
-    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(order()).toEqual(['Bravo', 'Alfa', 'Charlie']);
-    fireEvent.click(screen.getByRole('radio', { name: 'Nome' }));
-    expect(order()).toEqual(['Alfa', 'Bravo', 'Charlie']);
-    const name = screen.getByRole('radio', { name: 'Nome' });
-    name.focus();
-    fireEvent.keyDown(name, { key: 'ArrowRight' });
-    expect(screen.getByRole('radio', { name: 'Elementi' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: 'Elementi' })).toHaveFocus();
-    expect(order()).toEqual(['Charlie', 'Alfa', 'Bravo']);
-    fireEvent.keyDown(screen.getByRole('radio', { name: 'Elementi' }), { key: 'ArrowRight' });
-    expect(screen.getByRole('radio', { name: 'Data' })).toHaveAttribute('aria-checked', 'true');
-    expect(order()).toEqual(['Bravo', 'Alfa', 'Charlie']);
+  it('orders by each criterion', () => {
+    appStore.setState({ dossiers: data() });
+    renderIt();
+    pick('name'); expect(cards()).toEqual(['Alfa', 'Bravo', 'Charlie']);
+    pick('created'); expect(cards()).toEqual(['Bravo', 'Alfa', 'Charlie']);
+    pick('items'); expect(cards()).toEqual(['Charlie', 'Alfa', 'Bravo']);
+  });
+
+  it('puts a pratica with no usable date last, either way', () => {
+    appStore.setState({ dossiers: [{ ...at('x', 'Senza data', '', 0), createdAt: '' }, ...data()] });
+    renderIt();
+    pick('created'); expect(cards().at(-1)).toBe('Senza data');
+  });
+
+  it('keeps pinned ones first', () => {
+    appStore.setState({ dossiers: data().map((d) => (d.id === 'c' ? { ...d, isPinned: true } : d)) });
+    renderIt();
+    expect(cards()[0]).toBe('Alfa');
+  });
+
+  it('switches to the list with the same pratiche, and remembers view and order', () => {
+    viewport.desktop = true;
+    appStore.setState({ dossiers: data() });
+    const first = renderIt();
+    const inCards = cards().sort();
+    fireEvent.click(screen.getByRole('radio', { name: 'Lista' }));
+    expect(rows().sort()).toEqual(inCards);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    pick('name');
+    first.unmount();
+    renderIt();
+    expect(screen.getByRole('radio', { name: 'Lista' })).toHaveAttribute('aria-checked', 'true');
+    expect(rows()).toEqual(['Alfa', 'Bravo', 'Charlie']);
+  });
+
+  it('sorts from the column headers, toggling direction, with aria-sort', () => {
+    viewport.desktop = true;
+    appStore.setState({ dossiers: data() });
+    renderIt();
+    fireEvent.click(screen.getByRole('radio', { name: 'Lista' }));
+    const header = (n: string) => screen.getByRole('columnheader', { name: n });
+    expect(header('Aggiornata')).toHaveAttribute('aria-sort', 'descending');
+    expect(header('Nome')).toHaveAttribute('aria-sort', 'none');
+    fireEvent.click(within(header('Nome')).getByRole('button'));
+    expect(header('Nome')).toHaveAttribute('aria-sort', 'ascending');
+    expect(rows()).toEqual(['Alfa', 'Bravo', 'Charlie']);
+    fireEvent.click(within(header('Nome')).getByRole('button'));
+    expect(header('Nome')).toHaveAttribute('aria-sort', 'descending');
+    expect(rows()).toEqual(['Charlie', 'Bravo', 'Alfa']);
+  });
+
+  it('opens a row with Enter and has its menu', () => {
+    const onSelect = vi.fn();
+    appStore.setState({ dossiers: data() });
+    render(<MemoryRouter><DossierListView onSelect={onSelect} showToast={() => {}} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('radio', { name: 'Lista' }));
+    fireEvent.keyDown(screen.getAllByRole('row')[0], { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith('b');
+    expect(screen.getByRole('button', { name: 'Azioni su Charlie' })).toBeInTheDocument();
   });
 });
 
