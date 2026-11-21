@@ -262,14 +262,14 @@ describe('DossierListView — the category menu (D1)', () => {
     const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
     expect(menu).toHaveClass('appearance-none', 'rounded-md', 'min-h-11');
     expect(menu.closest('.flex-1')).toHaveClass('min-w-[8rem]');
-    expect(menu.closest('.flex-wrap')).toContainElement(screen.getByRole('combobox', { name: 'Ordina le pratiche' }));
+    expect(menu.closest('.flex-wrap')).toContainElement(screen.getByRole('combobox', { name: /^Ordina le pratiche: / }));
   });
 
   it('has no menu when no dossier has a category, and the order menu stays', () => {
     appStore.setState({ dossiers: [dossier([CIVIL])] });
     renderList();
     expect(screen.queryByRole('combobox', { name: 'Filtra per categoria' })).toBeNull();
-    expect(screen.getByRole('combobox', { name: 'Ordina le pratiche' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Ordina le pratiche: / })).toBeInTheDocument();
   });
 
   it('shows «Tutte le categorie» again when the chosen category leaves the list', () => {
@@ -306,7 +306,7 @@ describe('DossierListView — view and order (LC147)', () => {
   const renderIt = () => render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
   const cards = () => screen.getAllByRole('button', { name: /^Apri la pratica / }).map((e) => e.getAttribute('aria-label')!.replace('Apri la pratica ', ''));
   const rows = () => screen.getAllByRole('row').filter((r) => r.getAttribute('aria-label')).map((r) => r.getAttribute('aria-label')!.replace('Apri la pratica ', ''));
-  const pick = (v: string) => fireEvent.change(screen.getByRole('combobox', { name: 'Ordina le pratiche' }), { target: { value: v } });
+  const pick = (v: string) => fireEvent.change(screen.getByRole('combobox', { name: /^Ordina le pratiche: / }), { target: { value: v } });
   const data = () => [
     at('a', 'Bravo', '2026-03-01T00:00:00Z', 1),
     at('b', 'Charlie', '2026-01-01T00:00:00Z', 3, '2026-05-01T00:00:00Z'),
@@ -317,7 +317,7 @@ describe('DossierListView — view and order (LC147)', () => {
   it('lists the orders in a menu, the last touched first, cards by default', () => {
     appStore.setState({ dossiers: data() });
     renderIt();
-    const menu = screen.getByRole('combobox', { name: 'Ordina le pratiche' }) as HTMLSelectElement;
+    const menu = screen.getByRole('combobox', { name: /^Ordina le pratiche: / }) as HTMLSelectElement;
     expect(Array.from(menu.options).map((o) => o.textContent)).toEqual(['Ultimo aggiornamento', 'Nome (A–Z)', 'Data di creazione', 'Numero di elementi']);
     expect(screen.getByRole('radio', { name: 'Schede' })).toHaveAttribute('aria-checked', 'true');
     expect(cards()).toEqual(['Charlie', 'Bravo', 'Alfa']);
@@ -375,10 +375,16 @@ describe('DossierListView — view and order (LC147)', () => {
     expect(rows()).toEqual(['Charlie', 'Bravo', 'Alfa']);
   });
 
-  it('gives the sort menu room for its longest label on a phone', () => {
+  it('shows a short, unclipped label on the sort trigger and keeps the full name for assistive tech and the list', () => {
     appStore.setState({ dossiers: data() });
     renderIt();
-    expect(screen.getByRole('combobox', { name: 'Ordina le pratiche' }).closest('div.flex-1')).toHaveClass('min-w-[12.5rem]');
+    const menu = screen.getByRole('combobox', { name: 'Ordina le pratiche: Ultimo aggiornamento' });
+    const short = menu.closest('div.flex-1')!.querySelector('span[aria-hidden="true"].whitespace-nowrap')!;
+    expect(short).toHaveTextContent('Recenti');
+    expect(short).not.toHaveClass('truncate');
+    pick('created');
+    expect(screen.getByRole('combobox', { name: 'Ordina le pratiche: Data di creazione' })).toBeInTheDocument();
+    expect(short).toHaveTextContent('Creazione');
   });
 
   it('leaves out the category column when no pratica has a category', () => {
