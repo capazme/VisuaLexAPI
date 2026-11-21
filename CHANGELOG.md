@@ -12,6 +12,16 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.65.0] - 2026-11-21
+
+No more focus rings: fields show focus by a darker border, and the other controls draw a thin outline only for
+the keyboard. Web only, no migration. MERL-T stays off.
+
+### Interface
+
+- Fields show focus by their border alone, one step darker, with no ring or halo; buttons, links, tabs and rows
+  draw nothing with the mouse and a 1.5 px grey outline with the keyboard (LC146).
+
 ## [1.64.0] - 2026-11-20
 
 Seven touch-ups collected on 19 November. Web only, no migration. MERL-T stays off.
