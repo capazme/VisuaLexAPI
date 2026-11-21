@@ -35,6 +35,8 @@ import { SegmentedTabs } from '../../ui/SegmentedTabs';
 import { Card } from '../../ui/Card';
 import { buttonClassName } from '../../ui/buttonStyles';
 import { FOCUS_RING } from '../studia/progress/tokens';
+import { DossierRows } from './DossierRows';
+import { SORT_OPTIONS, DEFAULT_DIR, sortDossiers, readListPrefs, writeListPrefs, type ListMode, type ListPrefs, type SortKey, type SortDir } from './dossierSort';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -57,12 +59,9 @@ interface Props {
   onTrashChanged?: () => void;
 }
 
-type SortBy = 'date' | 'name' | 'items';
-
-const SORT_CHOICES: { id: SortBy; label: string }[] = [
-  { id: 'date', label: 'Data' },
-  { id: 'name', label: 'Nome' },
-  { id: 'items', label: 'Elementi' },
+const VIEW_CHOICES: { id: ListMode; label: string }[] = [
+  { id: 'schede', label: 'Schede' },
+  { id: 'lista', label: 'Lista' },
 ];
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
@@ -79,7 +78,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   // An option's text has no breakpoint: on a phone the half-width menu says «Tutte», which
   // «Tutte le categorie» did not fit beside the arrow at 390 px.
   const isDesktop = useIsDesktop();
-  const [sortBy, setSortBy] = useState<SortBy>('date');
+  // The view and the order are remembered per browser (try/catch inside): the default is the cards, latest touched first.
+  const [prefs, setPrefs] = useState<ListPrefs>(readListPrefs);
+  const updatePrefs = (next: Partial<ListPrefs>) => setPrefs((p) => { const n = { ...p, ...next }; writeListPrefs(n); return n; });
+  const { mode, sort: sortBy, dir: sortDir } = prefs;
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [importing, setImporting] = useState<ImportRequest | null>(null);
@@ -143,22 +145,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       result = result.filter((d) => (d.kind ?? 'lavoro') === sectionKind);
     }
 
-    result.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      switch (sortBy) {
-        case 'name':
-          return a.title.localeCompare(b.title);
-        case 'items':
-          return b.items.length - a.items.length;
-        case 'date':
-        default:
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-    });
+    result = sortDossiers(result, sortBy, sortDir);
 
     return result;
-  }, [dossiers, searchQuery, selectedCategory, sectionKind, sortBy]);
+  }, [dossiers, searchQuery, selectedCategory, sectionKind, sortBy, sortDir]);
 
   const handleUpdateDossier = (title: string, description: string, tags: string[], kind: DossierKind) => {
     if (editingDossier) {
@@ -324,19 +314,17 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             aria-keyshortcuts="/"
           />
         </div>
-        {/* The order as a choice in a row, its three words alone (Luca, 18-11: «Ordina» with its choices in a row), then
-            the category: one row on a phone while they fit, else the menu wraps under it, whole. */}
         <div className="flex flex-wrap items-center gap-3 md:flex-nowrap md:gap-4">
-          <SegmentedTabs
-            id="tour-dossier-sort"
-            label="Ordina le pratiche"
-            tabs={SORT_CHOICES}
-            value={sortBy}
-            onChange={setSortBy}
-            // Small: as tall as the category menu beside it, 44 px on a phone and 36 from md, with its corners.
-            size="sm"
-            className="shrink-0"
-          />
+          <div className="min-w-[10rem] flex-1 md:max-w-[14rem] md:flex-none">
+            <Select
+              id="tour-dossier-sort"
+              value={sortBy}
+              onChange={(e) => { const key = e.target.value as SortKey; updatePrefs({ sort: key, dir: DEFAULT_DIR[key] }); }}
+              aria-label="Ordina le pratiche"
+            >
+              {SORT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </Select>
+          </div>
           {categories.length > 0 && (
             <div className="min-w-[8rem] flex-1 md:max-w-[16rem] md:flex-none">
               <Select
@@ -352,6 +340,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               </Select>
             </div>
           )}
+          <SegmentedTabs label="Vista delle pratiche" tabs={VIEW_CHOICES} value={mode} onChange={(m) => updatePrefs({ mode: m })} size="sm" className="shrink-0" />
         </div>
       </div>
 
@@ -363,6 +352,18 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
         loading={isLoadingData && filteredDossiers.length === 0 && !searchQuery && !selectedCategory}
         placeholder={<><p role="status" className="sr-only">Apro le pratiche…</p><DossierListSkeleton /></>}
       >
+      {mode === 'lista' && filteredDossiers.length > 0 ? (
+        <DossierRows
+          dossiers={filteredDossiers}
+          isDesktop={isDesktop}
+          sort={sortBy}
+          dir={sortDir}
+          onSort={(key: SortKey, dir: SortDir) => updatePrefs({ sort: key, dir })}
+          onSelect={onSelect}
+          onEdit={setEditingDossier}
+          onTrashChanged={onTrashChanged}
+        />
+      ) : (
       <div className={cn('grid gap-4 md:gap-6', CARD_GRID_COLUMNS)}>
         {filteredDossiers.length === 0 ? (
           searchQuery || selectedCategory ? (
@@ -378,9 +379,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 {sectionKind ? `Nessuna ${kindLabel(sectionKind).toLowerCase()}` : 'Nessuna pratica creata'}
               </h2>
               <p className="mt-3 text-slate-700 dark:text-slate-300">
-                Una pratica raccoglie le norme, le sentenze e le note di un caso o di un tema di studio.
+                Qui compariranno le tue pratiche.
               </p>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">Crea la prima, o parti da una pratica di studio pronta.</p>
               <div className="mt-8 flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
                 <Button type="button" onClick={() => setIsModalOpen(true)} className="sm:whitespace-nowrap" icon={<FolderPlus size={16} aria-hidden />}>
                   Crea la tua prima pratica
@@ -505,6 +505,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           })
         )}
       </div>
+      )}
       </Arrive>
 
       <DossierModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
