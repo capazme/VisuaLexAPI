@@ -12,6 +12,15 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.67.0] - 2026-11-21
+
+Two touch-ups to the Pratiche list. Web only, no migration. MERL-T stays off.
+
+### Work
+
+- On a phone the sort menu shows «Ultimo aggiornamento» in full; the Categoria column is left out when no pratica
+  has a category, with a dash when only some do (LC148).
+
 ## [1.66.0] - 2026-11-21
 
 Pratiche as cards or as a list, with sorting. Web only, no migration. MERL-T stays off.
