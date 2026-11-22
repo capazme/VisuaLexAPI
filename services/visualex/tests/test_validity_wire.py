@@ -75,17 +75,25 @@ def no_network():
     The handlers read a page again when the cache does not hold it (`_page_left_the_cache`). A test
     scraper that left `request_document` real went to the portal there: on CI that request hung past
     the article stream's 60-second budget, and the article came back as the budget's error line, with
-    no `article_text` (the KeyError of 18 and 19 November, on whichever Python ran it). Any such
-    request now fails the test at once, naming what was asked, instead of waiting on the network.
+    no `article_text` (the KeyError of 18 and 19 November, on whichever Python ran it).
+
+    Watched: the scrapers' `request_document`, Normattiva's `read_part_page`, and the throttled HTTP
+    client itself (`http_client.request`, which the AKN export and a part's page call directly). A
+    test that stubs them on its instance, or replaces the module's client, is not watched. Any call
+    that reaches the real ones answers nothing at once, and the test fails at teardown naming it,
+    instead of waiting on the network.
     """
+    from visualex_api.services.http_client import ThrottledHttpClient
     from visualex_api.tools.sys_op import BaseScraper
 
     asked = AsyncMock(return_value=None)
     parts = AsyncMock(return_value=None)
+    http = AsyncMock(return_value=None)
     with patch.object(BaseScraper, "request_document", asked), \
-            patch.object(NormattivaScraper, "read_part_page", parts):
+            patch.object(NormattivaScraper, "read_part_page", parts), \
+            patch.object(ThrottledHttpClient, "request", http):
         yield
-    reached = asked.await_args_list + parts.await_args_list
+    reached = asked.await_args_list + parts.await_args_list + http.await_args_list
     assert not reached, f"a test reached the network: {reached}"
 
 

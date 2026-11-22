@@ -17,7 +17,6 @@ import pytest
 
 from visualex_api.services.normattiva_scraper import (
     AknArticleText,
-    NormattivaScraper,
     text_source_of,
 )
 from visualex_api.tools.norma import Norma, NormaVisitata
