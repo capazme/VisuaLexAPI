@@ -30,9 +30,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 # file -> (why it still crosses, the pull request that removes it)
-ALLOWLIST: dict[str, tuple[str, str]] = {
-    "tools/e2e/docx-roundtrip/run.mjs": ("imports the web app's sources", "PR-C"),
-}
+# Empty since the split's seams are repo-local; a crossing added later is listed here, or fixed.
+ALLOWLIST: dict[str, tuple[str, str]] = {}
 
 APPS = ("apps/web", "apps/mcp")
 ROOT_ONLY = {"version.txt", "CHANGELOG.md", "SECURITY.md", "start.sh", ".gitmodules"}

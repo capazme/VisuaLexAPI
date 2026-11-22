@@ -361,7 +361,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   descriptor; the central record with only its offset rewritten), deflates the changed parts with
   `CompressionStream`, keeps a part's encoding (UTF-16, a BOM) and the end record's comment, and refuses entries that share their bytes. The tests
   (`docxWriter.test.ts`) prove §10.2's round trip on `__tests__/docx/links/` and its variants and on a package
-  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `tools/e2e/docx-roundtrip/run.mjs` opens
+  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `scripts/docx-roundtrip/run.mjs` opens
   the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR.
   The citations are found and read as the search reads them
   (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts

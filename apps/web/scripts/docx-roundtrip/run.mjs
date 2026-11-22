@@ -3,7 +3,7 @@
  * Opens the DOCX writer's copies in LibreOffice (spec 2026-10-31-document-hyperlinks-design.md §10.2, L4).
  * Run by hand and in the browser pass, not in CI (CI has no LibreOffice):
  *
- *   node tools/e2e/docx-roundtrip/run.mjs [folder]
+ *   node scripts/docx-roundtrip/run.mjs [folder]      (from apps/web)
  *
  * It runs the writer's Vitest suite with `DOCX_ROUNDTRIP_OUT=<folder>` (a new temporary folder when none is given),
  * which writes each fixture's input, its copy and the addresses linked; then converts every input and copy with
@@ -18,14 +18,15 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repo = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
+// The web app's own folder (this file is apps/web/scripts/docx-roundtrip/): the app lives here, whatever repository holds it.
+const web = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const folder = resolve(process.argv[2] ?? mkdtempSync(join(tmpdir(), 'docx-roundtrip-')));
 mkdirSync(folder, { recursive: true });
 const soffice = process.env.SOFFICE ?? 'soffice';
 
-execFileSync('npm', ['--prefix', join(repo, 'apps/web'), 'exec', '--', 'vitest', 'run',
+execFileSync('npm', ['--prefix', web, 'exec', '--', 'vitest', 'run',
   'src/components/features/documents/__tests__/docxWriter.test.ts'], {
-  cwd: join(repo, 'apps/web'),
+  cwd: web,
   env: { ...process.env, DOCX_ROUNDTRIP_OUT: folder },
   stdio: 'inherit',
 });
