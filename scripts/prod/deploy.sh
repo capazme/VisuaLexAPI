@@ -85,7 +85,17 @@ if [ "$stop" = 1 ]; then
   exit 0
 fi
 
-# 1. The machine and the checkout.
+# 1. The submodules, then the machine and the checkout. Every submodule is initialised on every
+# deploy (the web app and the MCP server are built from them), before anything is built; one left
+# on another commit, or in conflict, is refused first, so that initialising never moves it.
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  sh scripts/prod/preflight.sh submodules --allow-missing || exit 1
+  say "initialising the submodules..."
+  if ! git submodule update --init --recursive; then
+    err "the submodules could not be initialised (git's message is above; the usual cause is the network): nothing was built. Run 'git submodule update --init --recursive' when it is up, then this again"
+    exit 1
+  fi
+fi
 # shellcheck disable=SC2086
 deploying="$(sh scripts/prod/preflight.sh host $allow)" || exit 1
 say "$deploying"
@@ -99,10 +109,9 @@ if [ -n "$REMOTE_SCRAPERS" ]; then
   say "the scrapers run elsewhere ($REMOTE_SCRAPERS): compose.scrapers.yml is left out"
 fi
 
-if [ "$(env_get infra/.env MERLT_ENABLED)" != false ] && [ ! -f vendor/mcp-legal-it/Dockerfile ]; then
-  say "initialising the vendor/mcp-legal-it submodule..."
-  git submodule update --init --recursive vendor/mcp-legal-it
-fi
+# What is about to be built, by submodule: the log says which web and which MCP it was.
+say "built from:"
+say_submodules "$root"
 
 # 3. A backup first. Migrations do not walk backwards, so this is the way back for the data.
 # Whether a stack exists is read from Docker's own list of volumes; when Docker cannot answer,
@@ -160,6 +169,7 @@ bind="$(env_get infra/.env INGRESS_BIND)"; bind="${bind:-127.0.0.1}"
 port="$(env_get infra/.env INGRESS_PORT)"; port="${port:-8080}"
 say ""
 say "$deploying: the stack is up and healthy"
+say_submodules "$root"
 dc ps --format 'table {{.Service}}\t{{.Status}}' || true
 say ""
 say "  address   http://$bind:$port"
