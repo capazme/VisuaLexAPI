@@ -9,6 +9,7 @@ core's source files.
 | `pins.json` | the password rule, the API's page ceiling, the codes table, the annexed acts and their sigle and headings, the decision kinds' families, the article ordinal suffixes | `apps/server/src/utils/password.ts`, `services/visualex/visualex_api/tools/{config,map,article_suffixes}.py`, `services/visualex/visualex_api/services/decisions/model.py` |
 | `frozen_projections.json` | the SHA-256 and length of each decision reader's projection, byte for byte | `services/visualex/tests/fixtures/decisions/frozen_projections.json` |
 | `anchors.json` | rule 23 across repositories: real article texts and synthetic decision texts, each with its projection and the passages the server would store on it | the texts: frozen inputs; the rest: the server's `apps/server/tests/assistant/anchorsContract.ts` |
+| `legal-paths.json` | the paths the browser sends to the Python API: what the web's Vite config proxies in development and the ingress routes to the scrapers in production | written by hand, with the Python route; the web's `legalPaths.contract.test.ts` holds Vite to it, the core's `infra/ingress/paths.test.mjs` the Caddyfile |
 
 Both files are generated: `node scripts/contract/build.mjs` writes them, `--check` writes nothing and
 exits 1 naming the stale one. Never edit them by hand, and never re-record the frozen projections to
