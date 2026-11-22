@@ -10,7 +10,7 @@ import pytest
 from visualex_api.services.normattiva_validity import upcoming_change, versions_between
 from tests.test_text_in_force import BASE, TODAY_PAGE, fixed_today, scraper_serving  # noqa: F401 - fixture
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
-    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller, requested,
+    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, no_network, controller, requested,
 )
 from tests.validity_pages import synthetic
 

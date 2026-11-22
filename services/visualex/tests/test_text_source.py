@@ -26,10 +26,10 @@ from tests.test_validity_wire import (  # noqa: F401 - fixtures
     ARTICLE_ENDPOINTS,
     TEXT,
     URN,
-    FakeCache,
     ask,
-    brocardi,
+    brocardi, no_network,
     controller,
+    normattiva_serving,
     requested,
 )
 
@@ -43,9 +43,9 @@ def _nv():
 
 
 def _serving(text):
-    scraper = NormattivaScraper.__new__(NormattivaScraper)
+    """No page cached, the network never touched (`normattiva_serving`), and this text."""
+    scraper = normattiva_serving(None)
     scraper.get_document = AsyncMock(return_value=(text, URN))
-    scraper.cache = FakeCache({})
     return scraper
 
 

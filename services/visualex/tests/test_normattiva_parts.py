@@ -15,7 +15,7 @@ import pytest
 from visualex_api.services.normattiva_parts import extract_parts, partial_notice, parts_fields
 from visualex_api.services.normattiva_scraper import AknArticleText
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
-    ARTICLE_ENDPOINTS, FakeCache, TEXT, URN, ask, brocardi, controller, normattiva_serving, requested,
+    ARTICLE_ENDPOINTS, FakeCache, TEXT, URN, ask, brocardi, no_network, controller, normattiva_serving, requested,
 )
 from tests.validity_pages import page
 
