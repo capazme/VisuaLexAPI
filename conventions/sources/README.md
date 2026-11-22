@@ -5,6 +5,9 @@ writes it for each use (its labels). It is the specification the owner reads and
 the fixture every suite asserts: the web app, the server, the MCP server, the
 Python API and MERL-T. Design: `docs/superpowers/specs/2026-10-04-source-convention-design.md`.
 
+The values the web copies from the core (password rule, page ceiling, codes table, suffixes, the
+decision readers' frozen projections) are pinned in the sibling folder `conventions/contract/`: see its `README.md`.
+
 ## Shape
 
 ```jsonc

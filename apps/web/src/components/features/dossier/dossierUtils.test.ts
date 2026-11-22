@@ -252,16 +252,18 @@ describe('searchParamsFromGroup', () => {
     expect(searchParamsFromGroup(group())[0]).not.toHaveProperty('annex');
   });
 
-  it('pages at the API\'s own ceiling, read from its config (one number, not two)', () => {
+  it('pages at the API\'s own ceiling, read from the contract that pins it (one number, not two)', () => {
     let dir = __dirname;
-    while (!existsSync(join(dir, 'services', 'visualex'))) {
-      if (dirname(dir) === dir) throw new Error('services/visualex not found above ' + __dirname);
+    while (!existsSync(join(dir, 'conventions', 'contract', 'pins.json'))) {
+      if (dirname(dir) === dir) throw new Error('conventions/contract/pins.json not found above ' + __dirname);
       dir = dirname(dir);
     }
-    const config = readFileSync(join(dir, 'services', 'visualex', 'visualex_api', 'tools', 'config.py'), 'utf8');
-    const match = config.match(/^MAX_ARTICLES_PER_REQUEST = .*\bor (\d+)\)\)$/m);
-    expect(match).not.toBeNull();
-    expect(MAX_ARTICLES_PER_SEARCH).toBe(Number(match![1]));
+    // The ceiling lives in the API's config; scripts/contract/build.mjs copies it into the contract.
+    const pins = JSON.parse(readFileSync(join(dir, 'conventions', 'contract', 'pins.json'), 'utf8')) as {
+      max_articles_per_request: number;
+    };
+    expect(pins.max_articles_per_request).toBeGreaterThan(0);
+    expect(MAX_ARTICLES_PER_SEARCH).toBe(pins.max_articles_per_request);
   });
 
   it('pages a group above the API ceiling, every page with the same act and version', () => {
