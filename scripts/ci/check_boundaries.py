@@ -60,6 +60,8 @@ COMMENT_START = ("//", "/*", "*", "#", "<!--")
 QUOTED = re.compile(r"""(["'`])((?:\\.|(?!\1)[^\\])*)\1""")
 # A template literal's interpolations: what follows each is still a path (`${ROOT}/services/…`).
 PLACEHOLDER = re.compile(r"\$\{[^}]*\}")
+# A Python f-string's or format string's fields: f"{ROOT}/apps/web/x".
+PY_PLACEHOLDER = re.compile(r"\{[^}]*\}")
 # A relative path inside a longer literal: "file:../server", "node ../../scripts/x.mjs".
 INNER_UP = re.compile(r"(?<![\w.])(?:\.\./)+[^\s\"'`]*")
 # A literal that is only parent steps, passed as an argument of its own: join(__dirname, '..', '..').
@@ -124,7 +126,9 @@ def crossings(path: str, text: str, prefixes: set[str], root_files: set[str] = f
 
     Not seen, on purpose: Python strings in triple quotes and lines that start like a comment
     (`//`, `/*`, `*`, `#`) are read as prose; a path built from variables alone (no literal says
-    where it goes) cannot be read from the text.
+    where it goes) cannot be read from the text. Known misses, accepted: a root file after an
+    interpolation (`${root}/CHANGELOG.md`), `cd ..` without a slash, and `${ROOT}/../x` (resolved
+    against the file's folder). A URL with four `../` in it would be flagged: none exists.
     """
     app = own_app(path)
     folder = posixpath.dirname(path)
@@ -143,12 +147,13 @@ def crossings(path: str, text: str, prefixes: set[str], root_files: set[str] = f
             continue
         for match in QUOTED.finditer(line if not python else line.replace("`", " ")):
             whole = match.group(2)
-            pieces = PLACEHOLDER.split(whole)
+            pieces = (PY_PLACEHOLDER if python else PLACEHOLDER).split(whole)
             literal = pieces[0]
             # (a) relative literals, resolved against the file's folder
             if literal == ".." or literal.startswith("../"):
                 target = posixpath.normpath(posixpath.join(folder, literal))
-                if target.startswith("..") or forbidden(target, app):
+                # Outside the repository counts for the apps only: a core test may hold a hostile path.
+                if (app and target.startswith("..")) or (not target.startswith("..") and forbidden(target, app)):
                     found.append((number, f"relative path {literal!r} reaches {target}"))
                 continue
             # (a') a relative path inside a longer literal
