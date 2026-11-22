@@ -5,8 +5,10 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { boundedTags, boundedText, parseBody } from '../utils/bodyLimits';
 import { atMostUnits } from '../utils/utf16Length';
-import { AppError } from '../middleware/errorHandler';
-import { assertDossierRoom } from '../utils/dossierCaps';
+import { ZodError } from 'zod';
+import { AppError, validationDetail } from '../middleware/errorHandler';
+import { chargeWrites } from '../middleware/rateLimiter';
+import { assertDossierRoom, formatThousands, itemRoom, MAX_ITEMS_PER_DOSSIER } from '../utils/dossierCaps';
 import { resolveReferences } from '../norms/resolveReference';
 import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '../norms/resolveDecisions';
 import { citeStoredAct } from '../norms/citation';
@@ -111,6 +113,14 @@ function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false
 /** One entry's answer, with its view of the assistant's notes. */
 export async function serializeItemFor(req: Request, item: ItemRow) {
   return serializeItem(item, await assistantViewFor(req, [item]), hidesNoteText(req), hidesNormText(req));
+}
+
+/** Several entries' answers, with one view of the assistant's notes for all of them. */
+async function serializeItemsFor(req: Request, items: ItemRow[]) {
+  const view = await assistantViewFor(req, items);
+  const hideNotes = hidesNoteText(req);
+  const hideNormText = hidesNormText(req);
+  return items.map((item) => serializeItem(item, view, hideNotes, hideNormText));
 }
 
 /** Dossiers' answers, with one view of the assistant's notes for all their entries. */
@@ -360,16 +370,30 @@ function recitalItem(content: unknown): { content: Prisma.InputJsonObject; title
 }
 
 /**
+ * One entry as an add checks it, before anything is written: the schema (a field over its limit refused in its
+ * Italian words), a decision's content (its identity, design 2026-10-01 §6) and a recital's (spec 2026-11-17 §6.2)
+ * checked, the title set from them. Throws what the single route answers. Shared by the single add and the bulk.
+ */
+function prepareItem(body: unknown) {
+  const data = parseBody(createDossierItemSchema, body);
+  const decision = data.itemType === 'sentenza' ? parseDecisionItemContent(data.content) : null;
+  const recital = data.itemType === 'norm' && isRecitalContent(data.content) ? recitalItem(data.content) : null;
+  return {
+    itemType: data.itemType as DossierItemType,
+    title: decision ? decision.etichetta : recital ? recital.title : data.title,
+    // As the single add always wrote it: no content is a plain null.
+    content: (decision ?? recital?.content ?? (data.content || null)) as Prisma.InputJsonValue,
+    position: data.position,
+    status: data.status,
+  };
+}
+
+/**
  * Add item to dossier
  */
 export const addDossierItem = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const data = parseBody(createDossierItemSchema, req.body);
-
-  // A decision's content is its identity: checked before anything is written (design 2026-10-01 §6).
-  const decision = data.itemType === 'sentenza' ? parseDecisionItemContent(data.content) : null;
-  // So is a recital's (spec 2026-11-17 §6.2).
-  const recital = data.itemType === 'norm' && isRecitalContent(data.content) ? recitalItem(data.content) : null;
+  const prepared = prepareItem(req.body);
 
   // Check ownership
   const dossier = await prisma.dossier.findFirst({
@@ -389,17 +413,97 @@ export const addDossierItem = async (req: Request, res: Response) => {
     return tx.dossierItem.create({
       data: {
         dossierId: id,
-        itemType: data.itemType as DossierItemType,
-        title: decision ? decision.etichetta : recital ? recital.title : data.title,
-        content: decision ?? recital?.content ?? (data.content || null),
-        position: data.position ?? (maxPos._max.position ?? -1) + 1,
-        ...(data.status !== undefined && { status: data.status }),
+        itemType: prepared.itemType,
+        title: prepared.title,
+        content: prepared.content,
+        position: prepared.position ?? (maxPos._max.position ?? -1) + 1,
+        ...(prepared.status !== undefined && { status: prepared.status }),
         ...provenanceFromRequest(req),
       },
     });
   });
 
   res.status(201).json(await serializeItemFor(req, item));
+};
+
+/** Entries per bulk request: a dossier's whole cap. */
+export const MAX_BULK_ITEMS = MAX_ITEMS_PER_DOSSIER;
+/** Entries a bulk request carries for the one write point every request costs; each 50 more cost one more. */
+export const BULK_ITEMS_PER_WRITE = 50;
+
+const bulkItemsSchema = z.object({
+  items: z.array(z.unknown()).min(1, 'Nessuna voce da aggiungere.')
+    .max(MAX_BULK_ITEMS, `Al massimo ${formatThousands(MAX_BULK_ITEMS)} voci per richiesta.`),
+});
+
+/** Why one entry of a bulk write was refused: the single route's code and its words. */
+function entryRefusal(err: unknown): { error: string; detail: string } {
+  if (err instanceof AppError) return { error: err.code ?? 'invalid', detail: err.message };
+  if (err instanceof ZodError) return { error: 'invalid', detail: validationDetail(err) };
+  throw err;
+}
+
+/**
+ * A dossier's entries in one request (G-595, the owner's words: «il server riceve tutte le voci in una richiesta,
+ * applica i limiti della G-576 in una volta e risponde con quante sono entrate»). One transaction: every entry is
+ * checked as a single add checks it; the caps once, for the batch, the account's row locked first; the entries that
+ * hold go in, in order, up to the room left, after the dossier's last entry. The answer says how many entered and,
+ * for each one that did not (by its index in the request), why: the single route's code and Italian sentence, or
+ * the cap's.
+ *
+ * At most `MAX_BULK_ITEMS` entries and 8 MB per request (app.ts): beyond that a client sends several requests, in
+ * order. On the write limiter it costs one write, as any request, plus one for each `BULK_ITEMS_PER_WRITE` entries
+ * past the first 50: a full batch of 2,000 costs 40 of the 200 writes a minute, so at most five a minute, 10,000
+ * entries, the account's own ceiling. Session only: not in the delegated table.
+ */
+export const addDossierItemsBulk = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user!.id;
+  const { items } = parseBody(bulkItemsSchema, req.body);
+  const extra = Math.ceil(Math.max(0, items.length - BULK_ITEMS_PER_WRITE) / BULK_ITEMS_PER_WRITE);
+  if (!(await chargeWrites(req, res, extra))) return;
+
+  const dossier = await prisma.dossier.findFirst({ where: { id, userId }, select: { id: true } });
+  if (!dossier) throw new AppError(404, 'Dossier not found');
+
+  const valid: { index: number; entry: ReturnType<typeof prepareItem> }[] = [];
+  const refused: { index: number; error: string; detail: string }[] = [];
+  items.forEach((body, index) => {
+    try {
+      valid.push({ index, entry: prepareItem(body) });
+    } catch (err) {
+      refused.push({ index, ...entryRefusal(err) });
+    }
+  });
+
+  const created = await prisma.$transaction(async (tx) => {
+    const { room, refusal } = await itemRoom(tx, userId, id);
+    for (const over of valid.slice(room)) refused.push({ index: over.index, ...refusal });
+    const fits = valid.slice(0, room);
+    if (fits.length === 0) return [];
+    const last = await tx.dossierItem.aggregate({ where: { dossierId: id }, _max: { position: true } });
+    let next = (last._max.position ?? -1) + 1;
+    const provenance = provenanceFromRequest(req);
+    return tx.dossierItem.createManyAndReturn({
+      data: fits.map(({ entry }) => ({
+        dossierId: id,
+        itemType: entry.itemType,
+        title: entry.title,
+        content: entry.content,
+        position: entry.position ?? next++,
+        ...(entry.status !== undefined && { status: entry.status }),
+        ...provenance,
+      })),
+    });
+  }, { maxWait: 10_000, timeout: 60_000 });
+
+  refused.sort((a, b) => a.index - b.index);
+  res.status(created.length > 0 ? 201 : 200).json({
+    entered: created.length,
+    total: items.length,
+    items: await serializeItemsFor(req, created.sort((a, b) => a.position - b.position)),
+    refused,
+  });
 };
 
 /**

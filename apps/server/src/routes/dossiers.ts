@@ -18,6 +18,8 @@ router.delete('/dossiers/:id', dossierController.deleteDossier);
 
 // Dossier items
 router.post('/dossiers/:id/items', dossierController.addDossierItem);
+// A dossier's entries in one request (G-595): up to 2,000 entries and 8 MB (app.ts), the caps once for the batch.
+router.post('/dossiers/:id/items/bulk', dossierController.addDossierItemsBulk);
 // Norms from references in free text, checked for existence (MCP spike).
 router.post('/dossiers/:id/norms', dossierController.addDossierNorms);
 // Court decisions from references in words, confirmed at their source (design 2026-10-12 §2.2).
