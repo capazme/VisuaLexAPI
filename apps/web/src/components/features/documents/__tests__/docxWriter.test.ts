@@ -2,7 +2,7 @@
  * The DOCX writer (spec 2026-10-31-document-hyperlinks-design.md §6.2–§6.5, §10.2, L4), on the invented fixture
  * `docx/links/` and variants of it: the round trip proved part by part, the untouched cases reported, the look.
  *
- * With `DOCX_ROUNDTRIP_OUT=<folder>` the copies are also written there, for `tools/e2e/docx-roundtrip/` to open in
+ * With `DOCX_ROUNDTRIP_OUT=<folder>` the copies are also written there, for `scripts/docx-roundtrip/` to open in
  * LibreOffice (not in CI, which has none).
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

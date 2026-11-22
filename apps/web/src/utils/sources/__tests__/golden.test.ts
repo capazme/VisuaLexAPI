@@ -5,12 +5,13 @@ import { ANNEX_HEADINGS, ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE } from '../actTy
 import { actHeading, citeAct, citeNorm, normFromUrn, shortAct, shortNorm, type LabelledNorm } from '../normLabels';
 
 // The web app's labels of norms against the convention's golden file
-// (conventions/sources/golden.json; spec docs/superpowers/specs/2026-10-04-source-convention-design.md).
+// (conventions/sources/golden.json; spec docs/superpowers/specs/2026-10-04-source-convention-design.md),
+// and its copies of the API's tables against the contract (conventions/contract/pins.json).
 
 function root(from: string): string {
   for (let dir = from; ; dir = dirname(dir)) {
-    if (existsSync(join(dir, 'conventions', 'sources', 'golden.json'))) return dir;
-    if (dirname(dir) === dir) throw new Error('conventions/sources/golden.json not found above ' + from);
+    if (existsSync(join(dir, 'conventions', 'sources', 'golden.json')) && existsSync(join(dir, 'conventions', 'contract', 'pins.json'))) return dir;
+    if (dirname(dir) === dir) throw new Error('conventions/sources/golden.json and conventions/contract/pins.json not found above ' + from);
   }
 }
 
@@ -82,45 +83,40 @@ describe('an aliased code stored without its decree', () => {
   });
 });
 
-describe('the codes table is the API\'s', () => {
-  it('has the same rows', () => {
-    const python = readFileSync(join(ROOT, 'services', 'visualex', 'visualex_api', 'tools', 'map.py'), 'utf8');
-    const block = python.slice(python.indexOf('NORMATTIVA_URN_CODICI = {'), python.indexOf('\n}', python.indexOf('NORMATTIVA_URN_CODICI = {')));
-    const rows = Object.fromEntries([...block.matchAll(/^\s*"(.+)":\s*"(.+)",?\s*$/gm)].map((m) => [m[1], m[2]]));
-    expect(Object.keys(rows).length).toBeGreaterThan(30);
-    expect(CODES_TABLE).toEqual(rows);
-  });
-});
+describe('the tables the web copies from the API are the contract\'s', () => {
+  // services/visualex/visualex_api/tools/map.py, copied into conventions/contract/pins.json by scripts/contract/build.mjs.
+  const pins = JSON.parse(readFileSync(join(ROOT, 'conventions', 'contract', 'pins.json'), 'utf8')) as {
+    normattiva_urn_codici: Record<string, string>;
+    annexed_acts: Record<string, string>;
+    annex_sigle: Record<string, string>;
+    annex_headings: Record<string, string>;
+  };
 
-describe('the table of acts whose text is an annex is the API\'s', () => {
-  it('has the same rows', () => {
-    const python = readFileSync(join(ROOT, 'services', 'visualex', 'visualex_api', 'tools', 'map.py'), 'utf8');
-    const start = python.indexOf('ANNEXED_ACTS = {');
-    const block = python.slice(start, python.indexOf('\n}', start));
-    const rows = Object.fromEntries([...block.matchAll(/^\s*"(.+)":\s*"(.+)",?\s*$/gm)].map((m) => [m[1], m[2]]));
-    expect(Object.keys(rows).length).toBeGreaterThan(0);
-    expect(ANNEXED_ACTS).toEqual(rows);
+  describe('the codes table', () => {
+    it('has the same rows', () => {
+      expect(Object.keys(pins.normattiva_urn_codici).length).toBeGreaterThan(30);
+      expect(CODES_TABLE).toEqual(pins.normattiva_urn_codici);
+    });
   });
-});
 
-describe('the ANNEX_SIGLE table is the API\'s', () => {
-  it('has the same rows', () => {
-    const python = readFileSync(join(ROOT, 'services', 'visualex', 'visualex_api', 'tools', 'map.py'), 'utf8');
-    const start = python.indexOf('ANNEX_SIGLE = {');
-    const block = python.slice(start, python.indexOf('\n}', start));
-    const rows = Object.fromEntries([...block.matchAll(/^\s*"(.+)":\s*"(.+)",?\s*$/gm)].map((m) => [m[1], m[2]]));
-    expect(Object.keys(rows).length).toBeGreaterThan(0);
-    expect(ANNEX_SIGLE).toEqual(rows);
+  describe('the table of acts whose text is an annex', () => {
+    it('has the same rows', () => {
+      expect(Object.keys(pins.annexed_acts).length).toBeGreaterThan(0);
+      expect(ANNEXED_ACTS).toEqual(pins.annexed_acts);
+    });
   });
-});
 
-describe('the ANNEX_HEADINGS table is the API\'s', () => {
-  it('has the same rows', () => {
-    const python = readFileSync(join(ROOT, 'services', 'visualex', 'visualex_api', 'tools', 'map.py'), 'utf8');
-    const start = python.indexOf('ANNEX_HEADINGS = {');
-    const block = python.slice(start, python.indexOf('\n}', start));
-    const rows = Object.fromEntries([...block.matchAll(/^\s*"(.+)":\s*"(.+)",?\s*$/gm)].map((m) => [m[1], m[2]]));
-    expect(Object.keys(rows).length).toBeGreaterThan(0);
-    expect(ANNEX_HEADINGS).toEqual(rows);
+  describe('the ANNEX_SIGLE table', () => {
+    it('has the same rows', () => {
+      expect(Object.keys(pins.annex_sigle).length).toBeGreaterThan(0);
+      expect(ANNEX_SIGLE).toEqual(pins.annex_sigle);
+    });
+  });
+
+  describe('the ANNEX_HEADINGS table', () => {
+    it('has the same rows', () => {
+      expect(Object.keys(pins.annex_headings).length).toBeGreaterThan(0);
+      expect(ANNEX_HEADINGS).toEqual(pins.annex_headings);
+    });
   });
 });

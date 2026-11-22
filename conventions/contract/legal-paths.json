@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "note": "The paths the browser sends to the Python API: what the web's Vite config proxies to it in development (PYTHON_API) and what the ingress routes to the scrapers in production (infra/ingress/Caddyfile in the core, @legal and @open). Each is a prefix, as a Vite proxy key. The web checks its Vite config against this list and the core checks the Caddyfile: a path is added here, with the Python route, before either side routes it.",
+  "paths": [
+    "/fetch_norma_data",
+    "/fetch_article_text",
+    "/stream_article_text",
+    "/fetch_brocardi_info",
+    "/fetch_all_data",
+    "/fetch_tree",
+    "/fetch_recitals",
+    "/fetch_rubriche",
+    "/fetch_alias_catalog",
+    "/fetch_decision",
+    "/fetch_decision_pdf",
+    "/search_decisions",
+    "/search_eu_case_law",
+    "/fetch_rassegne",
+    "/search_rassegne",
+    "/parse_query",
+    "/fetch_norm_links",
+    "/extract_citations",
+    "/export_pdf",
+    "/version",
+    "/health"
+  ]
+}

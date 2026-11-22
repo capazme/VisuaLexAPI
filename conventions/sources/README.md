@@ -5,6 +5,9 @@ writes it for each use (its labels). It is the specification the owner reads and
 the fixture every suite asserts: the web app, the server, the MCP server, the
 Python API and MERL-T. Design: `docs/superpowers/specs/2026-10-04-source-convention-design.md`.
 
+The values the web copies from the core (password rule, page ceiling, codes table, suffixes, the
+decision readers' frozen projections) are pinned in the sibling folder `conventions/contract/`: see its `README.md`.
+
 ## Shape
 
 ```jsonc
@@ -165,6 +168,16 @@ its identity, or refused: the shapes, the leading zeros, the whitespace, the fir
 court and the current-year bound (`{currentYear}`, `{nextYear}` stand for the reader's clock). Every
 number is fictional. The web's `identityFromKey` and the server's `readDecisionKey` both assert it
 (`apps/web/src/utils/__tests__/decisionLinks.key.test.ts`, `apps/server/tests/decisionKey.test.ts`).
+
+## `norm-keys.json`
+
+The keys of a norm the server's assistant ports from the web (spec D7b §8.5): the dossier item key
+and the article id (`normaKeys.ts`), the body the web sends to `/fetch_article_text`
+(`articleFetchCache.ts`) and whether a text is read-only (`describeVersion` in `versionDisplay.ts`).
+A key that drifts is a proposal the server makes and the web never shows. The web's
+`apps/web/src/utils/__tests__/normKeysContract.test.ts` and the server's
+`apps/server/tests/assistant/entryText.test.ts` both assert it. The cases were written on
+22 November 2026 from the code of both sides, then equal; a new case goes with both sides green.
 
 ## `numbered-act-types.json`
 

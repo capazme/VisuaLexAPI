@@ -33,25 +33,20 @@ function seatsFile(): { seats: Array<{ slug: string; sede: string; regione: stri
 }
 
 
-// The reader's families (services/visualex/.../decisions/model.py, FAMIGLIE): a kind it reads with a
-// family must carry the same one here, or the citation loses its «ord.» or «decr.».
-function readerFamilies(root: string): Record<string, string> {
-  const python = readFileSync(join(root, 'services', 'visualex', 'visualex_api', 'services', 'decisions', 'model.py'), 'utf8');
-  const start = python.indexOf('FAMIGLIE');
-  const block = python.slice(start, python.indexOf('\n}', start));
-  return Object.fromEntries([...block.matchAll(/"(\w+)":\s*\(([^)]*)\)/g)]
-    .flatMap((m) => [...m[2].matchAll(/"(\w+)"/g)].map((k) => [k[1], m[1]])));
-}
-function repoRoot(): string {
+// The reader's families (services/visualex/.../decisions/model.py, FAMIGLIE), copied into
+// conventions/contract/pins.json by scripts/contract/build.mjs: a kind it reads with a family must
+// carry the same one here, or the citation loses its «ord.» or «decr.».
+function readerFamilies(): Record<string, string> {
   for (let dir = __dirname; ; dir = dirname(dir)) {
-    if (existsSync(join(dir, 'conventions', 'sources', 'tar-seats.json'))) return dir;
-    if (dirname(dir) === dir) throw new Error('repository root not found');
+    const file = join(dir, 'conventions', 'contract', 'pins.json');
+    if (existsSync(file)) return (JSON.parse(readFileSync(file, 'utf8')) as { decision_families: Record<string, string> }).decision_families;
+    if (dirname(dir) === dir) throw new Error('conventions/contract/pins.json not found above ' + __dirname);
   }
 }
 
 describe('the kinds\' families', () => {
   it('are the reader\'s', () => {
-    const families = readerFamilies(repoRoot());
+    const families = readerFamilies();
     expect(Object.keys(families).length).toBeGreaterThan(5);
     expect(FAMILY).toEqual(families);
   });

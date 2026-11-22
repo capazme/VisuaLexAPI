@@ -2,8 +2,8 @@
  * The marked corpus of spec 2026-10-29-document-analysis (§3.1) and its score (§3.3), in the web suite: the port of
  * the measuring sketch's `corpus.py` and `score.py`. The documents are invented from start to end.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { CODES_TABLE } from '../../../../../utils/sources/actTypes';
 import type { DocumentCitation } from '../../documentCandidates';
 
@@ -46,16 +46,17 @@ export function readMarked(source: string): { text: string; expected: Expected[]
   return { text: text + source.slice(last), expected };
 }
 
-export function corpusDirectory(from: string): string {
-  for (let dir = from; ; dir = dirname(dir)) {
-    const candidate = join(dir, 'docs', 'superpowers', 'specs', '2026-10-29-document-analysis', 'corpus');
-    if (existsSync(candidate)) return candidate;
-    if (dirname(dir) === dir) throw new Error('the corpus of spec 2026-10-29-document-analysis not found above ' + from);
-  }
+/**
+ * The six invented documents of spec 2026-10-29-document-analysis, as the spec wrote them (its `corpus/`, kept in
+ * docs/ as the record of 29 October and read by its measure scripts). The web reads its own copy beside this file,
+ * so its suite needs nothing outside the app once the web is a repository of its own.
+ */
+export function corpusDirectory(): string {
+  return join(__dirname, 'documents');
 }
 
-export function loadCorpus(from: string): CorpusDocument[] {
-  const dir = corpusDirectory(from);
+export function loadCorpus(): CorpusDocument[] {
+  const dir = corpusDirectory();
   return readdirSync(dir).filter((f) => f.endsWith('.txt')).sort().map((name) => ({
     name, ...readMarked(readFileSync(join(dir, name), 'utf8')),
   }));

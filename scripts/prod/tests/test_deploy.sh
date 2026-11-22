@@ -720,6 +720,84 @@ outcome "$d" scripts/prod/preflight.sh host
 expect_status 0 "develop checked out is accepted without --allow-branch"
 expect_out "not a release" "with a warning that it is not a release"
 
+# --- the submodules: initialised before a build, checked before a deploy -----------------------
+# A repo as mkrepo makes it, with a submodule at apps/web (the web app's place) whose commit has a
+# release tag. Git refuses a file:// remote for submodules unless told otherwise: the scenarios that
+# clone one say so (ALLOW_FILE), for that call only.
+ALLOW_FILE="GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always"
+mksub() { # mksub <name>: prints the repo's path
+  d="$(mkrepo "$1")"
+  s="$work/$1.sub"
+  git init -q -b main "$s"
+  echo web >"$s/index"; git -C "$s" add -A; gitc -C "$s" commit -q -m "the web"
+  git -C "$s" tag v0.1.0
+  EXTRA_ENV="$ALLOW_FILE"
+  env $ALLOW_FILE git -C "$d" -c user.name=t -c user.email=t@example.invalid submodule add -q "$s" apps/web >/dev/null 2>&1
+  EXTRA_ENV=""
+  gitc -C "$d" commit -q -m "pin the web"
+  echo "$d"
+}
+
+d="$(mksub subok)"
+EXTRA_ENV="$ALLOW_FILE"; outcome "$d" scripts/prod/deploy.sh; EXTRA_ENV=""
+expect_status 0 "a deploy with its submodule at the recorded commit runs to the end"
+sub_sha="$(git -C "$d/apps/web" rev-parse --short HEAD)"
+expect_out "submodule apps/web at $sub_sha (v0.1.0)" "and says which commit and which tag of it was built"
+expect_out "built from:" "before the build ..."
+[ "$(grep -c 'submodule apps/web at' "$work/out")" = 2 ] && ok "... and again in the summary at the end" || bad "... and again in the summary at the end"
+
+d="$(mksub subdescribe)"
+gitc -C "$d/apps/web" commit -q --allow-empty -m "a commit that is no tag"
+git -C "$d" add apps/web && gitc -C "$d" commit -q -m "pin a later web"
+EXTRA_ENV="$ALLOW_FILE"; outcome "$d" scripts/prod/deploy.sh; EXTRA_ENV=""
+expect_status 0 "a submodule at a commit with no tag is deployed"
+expect_out "submodule apps/web at $(git -C "$d/apps/web" rev-parse --short HEAD)" "and its commit is printed"
+expect_no_out "(v0.1.0)" "with no tag after it"
+
+d="$(mksub submissing)"
+git -C "$d" submodule deinit -q -f apps/web
+outcome "$d" scripts/prod/preflight.sh host
+expect_status nonzero "a submodule that is not checked out is refused by the host check"
+expect_out "apps/web is not checked out" "naming it"
+expect_out "git submodule update --init --recursive" "and the way to fix it"
+EXTRA_ENV="$ALLOW_FILE"; outcome "$d" scripts/prod/deploy.sh; EXTRA_ENV=""
+expect_status 0 "but a deploy initialises it, and goes on"
+[ -f "$d/apps/web/index" ] && ok "the submodule is checked out" || bad "the submodule is checked out"
+a="$(grep -n 'initialising the submodules' "$work/out" | head -1 | cut -d: -f1)"; b="$(grep -n 'building and starting' "$work/out" | head -1 | cut -d: -f1)"
+if [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]; then ok "before the build"; else bad "before the build (line $a, the build starts at $b)"; fi
+
+d="$(mksub subnet)"
+git -C "$d" config -f .gitmodules submodule.apps/web.url "$work/no-such-repository"
+gitc -C "$d" commit -q -am "an address nothing answers at"
+git -C "$d" submodule deinit -q -f apps/web
+rm -rf "$d/.git/modules" # no clone kept from before: the commit has to come from the address
+EXTRA_ENV="$ALLOW_FILE"; outcome "$d" scripts/prod/deploy.sh; EXTRA_ENV=""
+expect_status nonzero "a submodule that cannot be fetched stops the deploy"
+expect_out "could not be initialised" "saying so"
+expect_out "nothing was built" "and that nothing was built"
+expect_no_log "$d" "--build" "before anything is built"
+
+d="$(mksub submoved)"
+gitc -C "$d/apps/web" commit -q --allow-empty -m "a commit the checkout does not record"
+moved="$(git -C "$d/apps/web" rev-parse HEAD)"
+outcome "$d" scripts/prod/preflight.sh host
+expect_status nonzero "a submodule at another commit than the recorded one is refused by the host check"
+expect_out "apps/web is at" "naming it"
+expect_out "not at the commit this checkout records" "and what is wrong, not only that the tree is dirty"
+EXTRA_ENV="$ALLOW_FILE"; outcome "$d" scripts/prod/deploy.sh; EXTRA_ENV=""
+expect_status nonzero "and so is a deploy"
+expect_no_log "$d" "--build" "before anything is built"
+[ "$(git -C "$d/apps/web" rev-parse HEAD)" = "$moved" ] && ok "and the deploy does not move the submodule back" || bad "and the deploy does not move the submodule back"
+
+d="$(mksub subpreflight)"
+outcome "$d" scripts/prod/preflight.sh submodules
+expect_status 0 "preflight.sh submodules passes with every submodule at its recorded commit"
+git -C "$d" submodule deinit -q -f apps/web
+outcome "$d" scripts/prod/preflight.sh submodules
+expect_status nonzero "and refuses one that is not checked out ..."
+outcome "$d" scripts/prod/preflight.sh submodules --allow-missing
+expect_status 0 "... unless it is told that the deploy will initialise it"
+
 # --- the flags of start.sh ------------------------------------------------------------------
 # start.sh parses its flags before it does anything, so these are safe to run for real.
 sh_out() { if bash "$root/start.sh" "$@" >"$work/out" 2>&1; then status=0; else status=$?; fi; }
@@ -770,6 +848,10 @@ mkdev() { # mkdev <name>: a repo as mkrepo makes it, plus what ./start.sh --dev 
   cp "$root/start.sh" "$d/start.sh"
   mkdir -p "$d/apps/web" "$d/apps/mcp" "$d/services/visualex" "$d/stubs"
   cp "$root/apps/mcp/.env.example" "$d/apps/mcp/.env.example"
+  # start.sh wants each app's package.json: a folder without one is an uninitialised submodule, or
+  # what is left of a folder that became one.
+  echo '{}' >"$d/apps/web/package.json"
+  echo '{}' >"$d/apps/mcp/package.json"
   echo redis >"$d/services/visualex/requirements-dev.txt"
   # the venv that the host python "creates", and the tools inside it
   cat >"$d/stubs/python" <<'EOF'
@@ -882,6 +964,60 @@ EXTRA_ENV="STUB_DOCKER_EXIT=1"; outcomeb "$d" start.sh; EXTRA_ENV=""
 expect_status nonzero "with no python 3.12 or newer, --dev stops"
 expect_out "Python 3.12 or newer not found" "and says so"
 expect_no_log "$d" "-m venv" "before making a venv with an old python"
+
+# Working clones: LEXCRAFT_WEB_DIR and LEXCRAFT_MCP_DIR name where the web app and the MCP server are.
+d="$(mkdev clones)"
+mkdir -p "$work/clone-web" "$work/clone-mcp"
+echo '{}' >"$work/clone-web/package.json"
+echo '{}' >"$work/clone-mcp/package.json"
+cp "$d/apps/mcp/.env.example" "$work/clone-mcp/.env.example"
+EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_WEB_DIR=$work/clone-web LEXCRAFT_MCP_DIR=$work/clone-mcp"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_log "$d" "npm ci --prefix $work/clone-web" "with LEXCRAFT_WEB_DIR set, the web app's packages are installed there"
+expect_log "$d" "npm ci --prefix $work/clone-mcp" "and the MCP server's in LEXCRAFT_MCP_DIR"
+expect_no_log "$d" "npm ci --prefix $d/apps/web" "not in the checkout's own apps/web"
+[ -f "$work/clone-mcp/.env" ] && [ ! -e "$d/apps/mcp/.env" ] && ok "the MCP server's .env is made in its folder" || bad "the MCP server's .env is made in its folder"
+[ "$(value_of "$work/clone-mcp/.env" MCP_CLIENT_SECRET)" = "$(value_of "$d/apps/server/.env" OAUTH_MCP_CLIENT_SECRET)" ] \
+  && ok "with the server's credential" || bad "with the server's credential"
+
+d="$(mkdev nowebdir)"
+EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_WEB_DIR=$work/no-such-web"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_status nonzero "a LEXCRAFT_WEB_DIR that is not there stops --dev"
+expect_out "LEXCRAFT_WEB_DIR" "naming the variable"
+expect_out "$work/no-such-web" "and the folder"
+[ -e "$d/apps/server/.env" ] && bad "before any env file is made" || ok "before any env file is made"
+# A relative folder is read from where start.sh is run, and made absolute before anything uses it.
+d="$(mkdev relclone)"
+mkdir -p "$work/rel-web"; echo '{}' >"$work/rel-web/package.json"
+rel="$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$work/rel-web" "$d")"
+EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_WEB_DIR=$rel"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_log "$d" "npm ci --prefix $(cd "$work/rel-web" && pwd)" "a relative LEXCRAFT_WEB_DIR is used as an absolute folder"
+# What the pull that turns apps/web into a submodule leaves behind: ignored files, no package.json.
+d="$(mkdev leftover)"
+rm "$d/apps/web/package.json"; mkdir -p "$d/apps/web/node_modules/x"
+EXTRA_ENV="STUB_DOCKER_EXIT=1"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_status nonzero "a web folder with no package.json stops --dev, node_modules or not"
+expect_out "move them away first" "saying what to do with the leftovers"
+d="$(mkdev nomcpdir)"
+EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_MCP_DIR=$work/no-such-mcp"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_status nonzero "and so is a LEXCRAFT_MCP_DIR that is not there"
+expect_out "LEXCRAFT_MCP_DIR" "naming it"
+
+# A submodule that is not initialised is initialised, and one that is is left as it is.
+d="$(mkdev subdev)"
+s="$work/subdev.sub"
+git init -q -b main "$s"; echo '{}' >"$s/package.json"; git -C "$s" add -A; gitc -C "$s" commit -q -m web
+rm -rf "$d/apps/web" "$d/stubs.web"
+git -C "$d" rm -rq --cached apps/web >/dev/null 2>&1 || true
+env $ALLOW_FILE git -C "$d" -c user.name=t -c user.email=t@example.invalid submodule add -q "$s" apps/web >/dev/null 2>&1
+gitc -C "$d" add -A; gitc -C "$d" commit -q -m "the web as a submodule"
+git -C "$d" submodule deinit -q -f apps/web
+EXTRA_ENV="STUB_DOCKER_EXIT=1 $ALLOW_FILE"; outcomeb "$d" start.sh; EXTRA_ENV=""
+[ -f "$d/apps/web/package.json" ] && ok "start.sh initialises a submodule that is not checked out" || { bad "start.sh initialises a submodule that is not checked out"; show "$work/out"; }
+expect_log_re "$d" "npm ci --prefix .*/apps/web$" "and installs its packages"
+gitc -C "$d/apps/web" commit -q --allow-empty -m "work in progress"
+mine="$(git -C "$d/apps/web" rev-parse HEAD)"
+EXTRA_ENV="STUB_DOCKER_EXIT=1 $ALLOW_FILE"; outcomeb "$d" start.sh; EXTRA_ENV=""
+[ "$(git -C "$d/apps/web" rev-parse HEAD)" = "$mine" ] && ok "one that is initialised is never updated, whatever commit it is on" || bad "one that is initialised is never updated"
 
 # Docker off: it says so before it installs anything
 d="$(mkdev nodocker)"

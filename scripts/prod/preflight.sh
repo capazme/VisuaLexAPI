@@ -1,7 +1,10 @@
 #!/bin/sh
 # What ./start.sh --prod checks before it changes anything.
 #
-#   preflight.sh host [--allow-branch]   the machine and the checkout
+#   preflight.sh host [--allow-branch]   the machine and the checkout (its submodules included)
+#   preflight.sh submodules [--allow-missing]
+#                                        the submodules alone: --allow-missing lets one that is not
+#                                        checked out yet pass, for the deploy to initialise it
 #   preflight.sh docker                  the machine alone (before a pull)
 #   preflight.sh env                     the two env files
 #   preflight.sh ports                   the ports the stack publishes, before a build
@@ -27,11 +30,41 @@ check_docker() {
   esac
 }
 
+# Every submodule (the web app, the MCP server, the conventions, the MCP legal tools) is checked
+# out at the commit this checkout records. The deploy builds what is on disk: a submodule missing,
+# left on another commit by hand, or in conflict would ship something nobody released. `git
+# submodule status` marks them: `-` not checked out, `+` another commit than the recorded one,
+# `U` in conflict.
+check_submodules() {
+  allow_missing="${1:-}"
+  git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  sub_bad=0
+  status_lines="$(git -C "$root" submodule status --recursive)" || return 1
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    flag="$(printf '%s\n' "$line" | cut -c1)"
+    path="$(printf '%s\n' "$line" | sed 's/^.[0-9a-f]* \([^ ]*\).*/\1/')"
+    case "$flag" in
+      -) if [ "$allow_missing" != --allow-missing ]; then
+           err "the submodule $path is not checked out: run 'git submodule update --init --recursive' (with the network up)"; sub_bad=1
+         fi ;;
+      +) err "the submodule $path is at $(git -C "$root/$path" rev-parse --short HEAD 2>/dev/null || echo 'another commit') and not at the commit this checkout records: 'git submodule update --recursive' brings it back; if the new commit is meant, commit it in the checkout first"; sub_bad=1 ;;
+      U) err "the submodule $path is in conflict: resolve it in this checkout, then run 'git submodule update --recursive'"; sub_bad=1 ;;
+    esac
+  done <<ENDSTATUS
+$status_lines
+ENDSTATUS
+  return "$sub_bad"
+}
+
 check_host() {
   allow="${1:-}"
   check_docker || return 1
 
   git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { err "$root is not a git checkout"; return 1; }
+  # Before the tree check: a submodule on another commit also makes the tree "dirty", but this
+  # message names it.
+  check_submodules || return 1
   if [ -n "$(git -C "$root" status --porcelain)" ]; then
     err "the working tree has uncommitted changes: commit or stash them (what is deployed must be something you can go back to)"
     return 1
@@ -196,8 +229,9 @@ check_ports() {
 
 case "${1:-}" in
   host) shift; check_host "$@" ;;
+  submodules) shift; check_submodules "$@" ;;
   docker) check_docker ;;
   env)  check_env ;;
   ports) check_ports ;;
-  *)    err "usage: preflight.sh host [--allow-branch] | docker | env | ports"; exit 2 ;;
+  *)    err "usage: preflight.sh host [--allow-branch] | submodules [--allow-missing] | docker | env | ports"; exit 2 ;;
 esac

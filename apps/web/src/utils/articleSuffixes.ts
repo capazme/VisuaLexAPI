@@ -15,7 +15,8 @@
  * truncation produced a plausible link to the wrong text rather than an error.
  * Mirrors `services/visualex/visualex_api/tools/article_suffixes.py`, as does
  * `apps/server/src/utils/articleSuffixes.ts`; change all three together (the
- * server's `tests/unit/articleSuffixes.test.ts` fails when a mirror drifts).
+ * server's `tests/unit/articleSuffixes.test.ts` fails when its mirror drifts, and
+ * `utils/__tests__/articleSuffixes.pins.test.ts` when this one does).
  *
  * Two spellings circulate for 15, 16, 18 and 19 ("quinquiesdecies" /
  * "quindecies", "sexiesdecies" / "sexdecies", "octiesdecies" / "duodevicies",

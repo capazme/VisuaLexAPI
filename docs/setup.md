@@ -72,6 +72,13 @@ minutes), creates the databases and applies the migrations. Open
 `http://localhost:5173`. Ctrl+C stops everything; the data stays in Docker's
 volumes.
 
+The web app and the MCP server are the folders `apps/web` and `apps/mcp` of the
+checkout. To run either from a working clone of its own repository, point
+`start.sh` at it: `LEXCRAFT_WEB_DIR=~/code/lexcraft-web ./start.sh` (and
+`LEXCRAFT_MCP_DIR` for the MCP server). A folder that is not there stops it with
+a message. A submodule of the checkout that is not initialised is initialised
+first; one that is, is never updated, so work inside it is safe.
+
 `./start.sh --prod` is not for this machine: it builds and runs the whole stack
 as containers on the deployment host (design:
 `docs/superpowers/specs/2026-09-29-modular-deployment-design.md`, section 6).

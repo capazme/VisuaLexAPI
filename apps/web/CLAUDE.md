@@ -310,10 +310,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `git log`, which the production image does not carry, so it is always empty there (the technical panel in
   Impostazioni still lists it). A note is plain Markdown and only this much: a bold line heads a group, `- `
   an item, `**bold**`, `*italic*`, `` `code` ``, drawn as React text (no HTML, no links, no `#` heading, no
-  numbered list). The release pull request adds the note with `version.txt` (`docs/git-workflow.md`):
-  `releaseNotes.test.ts` fails when `version.txt` names a version with no note, on a file not named after a
-  version, on a `#` heading or a numbered list, and on «Brocardi» in a note, which writes «una fonte esterna
-  di dottrina».
+  numbered list). The release pull request adds the note with `version.txt` (`docs/git-workflow.md`): the
+  core's `scripts/ci/check_release_note.sh` («Repository tooling») fails when `version.txt` names a version
+  with no note, and `releaseNotes.test.ts` fails on a file not named after a version, on a `#` heading or a
+  numbered list, and on «Brocardi» in a note, which writes «una fonte esterna di dottrina».
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`,
@@ -361,7 +361,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   descriptor; the central record with only its offset rewritten), deflates the changed parts with
   `CompressionStream`, keeps a part's encoding (UTF-16, a BOM) and the end record's comment, and refuses entries that share their bytes. The tests
   (`docxWriter.test.ts`) prove §10.2's round trip on `__tests__/docx/links/` and its variants and on a package
-  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `tools/e2e/docx-roundtrip/run.mjs` opens
+  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `scripts/docx-roundtrip/run.mjs` opens
   the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR.
   The citations are found and read as the search reads them
   (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts
@@ -3713,8 +3713,11 @@ meant to stay split; add new features as new files, not inside the shells:
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress
     does not. Call them through `legalFetch`. `services/__tests__/legalFetch.guard.test.ts`
-    reads the route list from `vite.config.ts` and fails on a bare `fetch('/fetch_…'`,
-    the way `infra/ingress/paths.test.mjs` keeps the ingress in step with the same list.
+    reads the route list from `vite.config.ts` and fails on a bare `fetch('/fetch_…'`.
+    The list itself is the contract's (`conventions/contract/legal-paths.json`):
+    `services/__tests__/legalPaths.contract.test.ts` holds Vite to it and the core's
+    `infra/ingress/paths.test.mjs` holds the ingress to it. A new Python route is added
+    there first, with the route, then here.
 
 28. **Two vocabularies name the same act, and they disagree on case.**
     `constants/actTypes.ts` spells it `Regolamento UE`; the backend resolver
