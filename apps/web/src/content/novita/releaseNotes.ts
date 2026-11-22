@@ -1,8 +1,8 @@
 /**
  * The version's news (R1): the note for the people who use VisuaLex, one file per release in this folder
  * (`1.9.1.md`), the same Italian text as the GitHub release. The release pull request adds the file with
- * `version.txt` (`releaseNotes.test.ts` fails on a version without its note). `/version` gives only the
- * number: its `changelog` is read from `git log`, which the production image does not have, so it came
+ * `version.txt`; the repository's check `scripts/ci/check_release_note.sh` fails on a version without its
+ * note. `/version` gives only the number: its `changelog` is read from `git log`, which the production image does not have, so it came
  * back empty and the window said «Nessun changelog disponibile».
  *
  * A note is plain Markdown, and only this much of it: a line that is all bold (`**Accesso**`) heads a

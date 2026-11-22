@@ -31,7 +31,6 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # file -> (why it still crosses, the pull request that removes it)
 ALLOWLIST: dict[str, tuple[str, str]] = {
-    "apps/web/src/content/novita/releaseNotes.test.ts": ("reads the repository's release notes and changelog", "PR-C"),
     "tools/e2e/docx-roundtrip/run.mjs": ("imports the web app's sources", "PR-C"),
 }
 

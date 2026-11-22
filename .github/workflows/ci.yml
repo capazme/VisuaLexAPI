@@ -286,6 +286,8 @@ jobs:
       # A directory argument fails on Node 26: the glob names the test files.
       - run: node --test '.claude/hooks/*.test.mjs'
       - run: sh scripts/ci/tests/test_checks.sh
+      # The version in version.txt has its Italian note in the web app (the window «Novità»).
+      - run: sh scripts/ci/check_release_note.sh
       - run: sh scripts/tests/test_release_notes.sh
       # The values the web copies from the core, pinned in conventions/contract: generated files fresh.
       - run: node --test 'scripts/contract/*.test.mjs'
