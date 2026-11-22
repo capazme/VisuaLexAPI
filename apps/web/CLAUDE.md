@@ -310,10 +310,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `git log`, which the production image does not carry, so it is always empty there (the technical panel in
   Impostazioni still lists it). A note is plain Markdown and only this much: a bold line heads a group, `- `
   an item, `**bold**`, `*italic*`, `` `code` ``, drawn as React text (no HTML, no links, no `#` heading, no
-  numbered list). The release pull request adds the note with `version.txt` (`docs/git-workflow.md`):
-  `releaseNotes.test.ts` fails when `version.txt` names a version with no note, on a file not named after a
-  version, on a `#` heading or a numbered list, and on «Brocardi» in a note, which writes «una fonte esterna
-  di dottrina».
+  numbered list). The release pull request adds the note with `version.txt` (`docs/git-workflow.md`): the
+  core's `scripts/ci/check_release_note.sh` («Repository tooling») fails when `version.txt` names a version
+  with no note, and `releaseNotes.test.ts` fails on a file not named after a version, on a `#` heading or a
+  numbered list, and on «Brocardi» in a note, which writes «una fonte esterna di dottrina».
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`,
@@ -361,7 +361,7 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   descriptor; the central record with only its offset rewritten), deflates the changed parts with
   `CompressionStream`, keeps a part's encoding (UTF-16, a BOM) and the end record's comment, and refuses entries that share their bytes. The tests
   (`docxWriter.test.ts`) prove §10.2's round trip on `__tests__/docx/links/` and its variants and on a package
-  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `tools/e2e/docx-roundtrip/run.mjs` opens
+  saved by LibreOffice (`__tests__/docx-saved/`, binary, checked clean); `scripts/docx-roundtrip/run.mjs` opens
   the copies in LibreOffice by hand (not in CI); Word is an owner's check per writer PR.
   The citations are found and read as the search reads them
   (spec `2026-10-29-document-analysis` §4, `documentCandidates.ts`, pure): the names of the acts

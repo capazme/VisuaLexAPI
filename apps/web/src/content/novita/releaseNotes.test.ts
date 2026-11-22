@@ -1,22 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { RELEASE_NOTES, VERSION_PATTERN, newsSince, parseInline, parseNote } from './releaseNotes';
+import { RELEASE_NOTES, newsSince, parseInline, parseNote } from './releaseNotes';
 
 const folder = __dirname;
 const notes = readdirSync(folder).filter((name) => name.endsWith('.md'));
 
 describe('the release notes kept with the web app', () => {
-  it('has the note of the version in version.txt, so a release cannot forget it', () => {
-    const version = readFileSync(resolve(folder, '../../../../../version.txt'), 'utf8').trim();
-
-    expect(version).toMatch(VERSION_PATTERN);
-    expect(
-      RELEASE_NOTES[version]?.trim(),
-      `apps/web/src/content/novita/${version}.md is missing: the release pull request adds it (docs/git-workflow.md)`
-    ).toBeTruthy();
-  });
-
   it('names every file after a version, so none is silently left out', () => {
     for (const name of notes) expect(name).toMatch(/^\d+\.\d+\.\d+\.md$/);
     expect(Object.keys(RELEASE_NOTES).sort()).toEqual(notes.map((name) => name.replace(/\.md$/, '')).sort());

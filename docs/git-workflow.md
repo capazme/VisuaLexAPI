@@ -93,6 +93,8 @@ source («una fonte esterna di dottrina»). The note is a file of the web app,
 `apps/web/src/content/novita/X.Y.Z.md` (a bold line per area, `- ` per item,
 no `#` heading): the window «Novità» shows it after an update, and the GitHub
 release carries the same text.
+The check «Repository tooling» fails on a `version.txt` with no note
+(`scripts/ci/check_release_note.sh`).
 
 ## Release
 
@@ -109,8 +111,8 @@ A release is cut when the owners say so. The checklist, in order:
    `[Unreleased]` in `CHANGELOG.md` up to date from `release-notes.sh` (pull
    requests do not edit it, so they never conflict on it), rename it to
    `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`; write the
-   Italian note in `apps/web/src/content/novita/X.Y.Z.md`, in the same pull request (the web suite fails
-   on a `version.txt` with no note). Pull request into `develop`, merge.
+   Italian note in `apps/web/src/content/novita/X.Y.Z.md`, in the same pull request (the check
+   «Repository tooling» fails on a `version.txt` with no note). Pull request into `develop`, merge.
    **The reviews' store:** if `SCHEMA_VERSION` in
    `services/visualex/visualex_api/services/massimario/store.py` changed since the last release, the
    host needs a store of the new schema before the deploy (build it there, or copy one built from the

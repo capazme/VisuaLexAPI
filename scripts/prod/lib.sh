@@ -51,3 +51,18 @@ version_ge() {
     exit 0
   }'
 }
+
+# The path of every submodule of the checkout at <root>, nested ones included, one per line.
+submodule_paths() {
+  git -C "$1" submodule status --recursive 2>/dev/null | sed 's/^.[0-9a-f]* \([^ ]*\).*/\1/'
+}
+
+# Which commit, and which release tag when it is exactly one, each submodule is at: the log of a
+# deploy says which web and which MCP it built.
+say_submodules() { # say_submodules <root>
+  for _p in $(submodule_paths "$1"); do
+    _sha="$(git -C "$1/$_p" rev-parse --short HEAD 2>/dev/null || echo '?')"
+    _tag="$(git -C "$1/$_p" describe --tags --exact-match 2>/dev/null || true)"
+    say "  submodule $_p at $_sha${_tag:+ ($_tag)}"
+  done
+}

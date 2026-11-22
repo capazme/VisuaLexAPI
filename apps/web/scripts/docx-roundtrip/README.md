@@ -5,7 +5,7 @@ writes a copy of a Word file with links on the citations. The Vitest suite prove
 script proves that the copies open: it converts every copy and its input with LibreOffice headless to HTML and PDF.
 
 ```bash
-node tools/e2e/docx-roundtrip/run.mjs [folder]   # SOFFICE=/path/to/soffice if it is not on the PATH
+node scripts/docx-roundtrip/run.mjs [folder]   # from apps/web; SOFFICE=/path/to/soffice if it is not on the PATH
 ```
 
 It fails on a conversion error, on a copy whose HTML does not hold exactly the links the writer reported, on a PDF
