@@ -848,7 +848,10 @@ mkdev() { # mkdev <name>: a repo as mkrepo makes it, plus what ./start.sh --dev 
   cp "$root/start.sh" "$d/start.sh"
   mkdir -p "$d/apps/web" "$d/apps/mcp" "$d/services/visualex" "$d/stubs"
   cp "$root/apps/mcp/.env.example" "$d/apps/mcp/.env.example"
-  echo '{}' >"$d/apps/web/package.json" # a folder with nothing in it is what an uninitialised submodule is
+  # start.sh wants each app's package.json: a folder without one is an uninitialised submodule, or
+  # what is left of a folder that became one.
+  echo '{}' >"$d/apps/web/package.json"
+  echo '{}' >"$d/apps/mcp/package.json"
   echo redis >"$d/services/visualex/requirements-dev.txt"
   # the venv that the host python "creates", and the tools inside it
   cat >"$d/stubs/python" <<'EOF'
@@ -966,6 +969,7 @@ expect_no_log "$d" "-m venv" "before making a venv with an old python"
 d="$(mkdev clones)"
 mkdir -p "$work/clone-web" "$work/clone-mcp"
 echo '{}' >"$work/clone-web/package.json"
+echo '{}' >"$work/clone-mcp/package.json"
 cp "$d/apps/mcp/.env.example" "$work/clone-mcp/.env.example"
 EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_WEB_DIR=$work/clone-web LEXCRAFT_MCP_DIR=$work/clone-mcp"; outcomeb "$d" start.sh; EXTRA_ENV=""
 expect_log "$d" "npm ci --prefix $work/clone-web" "with LEXCRAFT_WEB_DIR set, the web app's packages are installed there"
@@ -981,6 +985,18 @@ expect_status nonzero "a LEXCRAFT_WEB_DIR that is not there stops --dev"
 expect_out "LEXCRAFT_WEB_DIR" "naming the variable"
 expect_out "$work/no-such-web" "and the folder"
 [ -e "$d/apps/server/.env" ] && bad "before any env file is made" || ok "before any env file is made"
+# A relative folder is read from where start.sh is run, and made absolute before anything uses it.
+d="$(mkdev relclone)"
+mkdir -p "$work/rel-web"; echo '{}' >"$work/rel-web/package.json"
+rel="$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$work/rel-web" "$d")"
+EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_WEB_DIR=$rel"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_log "$d" "npm ci --prefix $(cd "$work/rel-web" && pwd)" "a relative LEXCRAFT_WEB_DIR is used as an absolute folder"
+# What the pull that turns apps/web into a submodule leaves behind: ignored files, no package.json.
+d="$(mkdev leftover)"
+rm "$d/apps/web/package.json"; mkdir -p "$d/apps/web/node_modules/x"
+EXTRA_ENV="STUB_DOCKER_EXIT=1"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_status nonzero "a web folder with no package.json stops --dev, node_modules or not"
+expect_out "move them away first" "saying what to do with the leftovers"
 d="$(mkdev nomcpdir)"
 EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_MCP_DIR=$work/no-such-mcp"; outcomeb "$d" start.sh; EXTRA_ENV=""
 expect_status nonzero "and so is a LEXCRAFT_MCP_DIR that is not there"

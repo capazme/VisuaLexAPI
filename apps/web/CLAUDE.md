@@ -310,10 +310,10 @@ and past release notes. `src/lexcraft.guard.test.ts` refuses «VisuaLex» on a l
   `git log`, which the production image does not carry, so it is always empty there (the technical panel in
   Impostazioni still lists it). A note is plain Markdown and only this much: a bold line heads a group, `- `
   an item, `**bold**`, `*italic*`, `` `code` ``, drawn as React text (no HTML, no links, no `#` heading, no
-  numbered list). The release pull request adds the note with `version.txt` (`docs/git-workflow.md`):
-  `releaseNotes.test.ts` fails when `version.txt` names a version with no note, on a file not named after a
-  version, on a `#` heading or a numbered list, and on «Brocardi» in a note, which writes «una fonte esterna
-  di dottrina».
+  numbered list). The release pull request adds the note with `version.txt` (`docs/git-workflow.md`): the
+  core's `scripts/ci/check_release_note.sh` («Repository tooling») fails when `version.txt` names a version
+  with no note, and `releaseNotes.test.ts` fails on a file not named after a version, on a `#` heading or a
+  numbered list, and on «Brocardi» in a note, which writes «una fonte esterna di dottrina».
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`,

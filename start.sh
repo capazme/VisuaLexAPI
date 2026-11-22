@@ -134,13 +134,18 @@ if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     done
 fi
 require_dir() { # require_dir <folder> <variable that names it> <what it holds>
-    # An empty folder is what a submodule not initialised leaves behind.
-    [ -d "$1" ] && [ -n "$(ls -A "$1" 2>/dev/null)" ] && return 0
-    echo -e "${RED}The $3 is not at $1${NC} (missing or empty) - $2 points there, or the submodule that holds it is not initialised: run 'git submodule update --init --recursive'"
+    # Its package.json, not just a folder: an uninitialised submodule leaves an empty one, and the
+    # pull that turns a folder into a submodule leaves the ignored files (node_modules, .env) behind,
+    # which also stops the submodule from being checked out there.
+    [ -f "$1/package.json" ] && return 0
+    echo -e "${RED}The $3 is not at $1${NC} (no package.json) - $2 points there, or the submodule that holds it is not initialised: run 'git submodule update --init --recursive'. If the folder still holds files from before it became a submodule (node_modules, .env), move them away first."
     exit 1
 }
 require_dir "$WEB_DIR" LEXCRAFT_WEB_DIR "web app"
 require_dir "$MCP_DIR" LEXCRAFT_MCP_DIR "MCP server"
+# Absolute from here on: the dev servers are started after a cd into apps/server.
+WEB_DIR="$(cd "$WEB_DIR" && pwd)"
+MCP_DIR="$(cd "$MCP_DIR" && pwd)"
 
 # First run on a fresh checkout: the two env files the stack and the server read, from their
 # examples. Never overwritten. The JWT secret is generated here, not left as the example's.
