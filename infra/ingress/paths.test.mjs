@@ -1,8 +1,9 @@
 // The ingress must send the browser's scraping calls to the scrapers and nothing
-// else of the Python API. The list of those calls already exists: it is what Vite
-// proxies to the Python API (PYTHON_API) in development. These tests keep the Caddyfile in step with
-// it, prefix for prefix (a Vite key matches by prefix, so '/health' also covers
-// '/health/detailed').
+// else of the Python API. The list of those calls is the contract's
+// (conventions/contract/legal-paths.json): what Vite proxies to the Python API (PYTHON_API) in
+// development, checked against it by the web's own suite (legalPaths.contract.test.ts). These
+// tests keep the Caddyfile in step with it, prefix for prefix (a Vite key matches by prefix, so
+// '/health' also covers '/health/detailed').
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -10,13 +11,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const vite = readFileSync(join(root, 'apps/web/vite.config.ts'), 'utf8');
+const contract = JSON.parse(readFileSync(join(root, 'conventions/contract/legal-paths.json'), 'utf8'));
 const caddyfile = readFileSync(join(root, 'infra/ingress/Caddyfile'), 'utf8');
 
-function vitePythonPaths() {
-  return [...vite.matchAll(/'(\/[\w\-/]+)'\s*:\s*PYTHON_API\b/g)]
-    .map((m) => m[1])
-    .sort();
+function contractPaths() {
+  return [...contract.paths].sort();
 }
 
 function legalBlock() {
@@ -43,17 +42,15 @@ function caddyExcludedPaths() {
   return line[1].trim().split(/\s+/);
 }
 
-test('every Vite proxy entry to the Python API was read', () => {
-  // A key the regex cannot read would drop out of the comparison below and let the
-  // ingress drift from Vite without a red test: count them another way.
-  const entries = vite.match(/:\s*PYTHON_API\b/g) ?? [];
-  assert.ok(entries.length >= 10, 'could not read the Vite proxy list');
-  assert.equal(vitePythonPaths().length, entries.length);
+test('the contract lists the paths, each once', () => {
+  assert.ok(contract.paths.length >= 10, 'could not read the contract\'s list');
+  assert.equal(new Set(contract.paths).size, contract.paths.length);
+  for (const path of contract.paths) assert.match(path, /^\/[\w\-/]+$/);
 });
 
-test('the ingress routes exactly the paths Vite sends to the Python API', () => {
+test('the ingress routes exactly the paths the browser sends to the Python API', () => {
   const routed = caddyLegalTokens().map((token) => token.replace(/\*$/, '')).sort();
-  assert.deepEqual(routed, vitePythonPaths());
+  assert.deepEqual(routed, contractPaths());
 });
 
 test('every scraping path is a prefix match, like a Vite proxy key', () => {
@@ -86,7 +83,7 @@ test('the page «Rassegne» searches every volume behind the login, by its own p
   // /search_rassegne matches no other prefix (not /search_decisions*): its own entry on both sides
   // (design 2026-11-01-rassegne-search-page §2), and never among the open paths.
   assert.ok(caddyLegalTokens().includes('/search_rassegne*'));
-  assert.ok(vitePythonPaths().includes('/search_rassegne'));
+  assert.ok(contractPaths().includes('/search_rassegne'));
   assert.ok(!caddyOpenPaths().some((token) => token.startsWith('/search_rassegne')));
   assert.ok(!caddyLegalTokens().some((t) => t !== '/search_rassegne*' && '/search_rassegne'.startsWith(t.replace(/\*$/, ''))));
 });
@@ -95,7 +92,7 @@ test('the links of «Analizza documento» go to the scrapers behind the login, b
   // /fetch_norm_links matches no other prefix (not /fetch_norma_data*): it needs its own entry
   // on both sides (design 2026-10-31-document-hyperlinks §3.1).
   assert.ok(caddyLegalTokens().includes('/fetch_norm_links*'));
-  assert.ok(vitePythonPaths().includes('/fetch_norm_links'));
+  assert.ok(contractPaths().includes('/fetch_norm_links'));
   assert.ok(!caddyLegalTokens().some((t) => t !== '/fetch_norm_links*' && '/fetch_norm_links'.startsWith(t.replace(/\*$/, ''))));
 });
 

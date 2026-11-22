@@ -3713,8 +3713,11 @@ meant to stay split; add new features as new files, not inside the shells:
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress
     does not. Call them through `legalFetch`. `services/__tests__/legalFetch.guard.test.ts`
-    reads the route list from `vite.config.ts` and fails on a bare `fetch('/fetch_…'`,
-    the way `infra/ingress/paths.test.mjs` keeps the ingress in step with the same list.
+    reads the route list from `vite.config.ts` and fails on a bare `fetch('/fetch_…'`.
+    The list itself is the contract's (`conventions/contract/legal-paths.json`):
+    `services/__tests__/legalPaths.contract.test.ts` holds Vite to it and the core's
+    `infra/ingress/paths.test.mjs` holds the ingress to it. A new Python route is added
+    there first, with the route, then here.
 
 28. **Two vocabularies name the same act, and they disagree on case.**
     `constants/actTypes.ts` spells it `Regolamento UE`; the backend resolver

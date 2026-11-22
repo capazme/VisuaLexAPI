@@ -9,8 +9,9 @@ core's source files.
 | `pins.json` | the password rule, the API's page ceiling, the codes table, the annexed acts and their sigle and headings, the decision kinds' families, the article ordinal suffixes | `apps/server/src/utils/password.ts`, `services/visualex/visualex_api/tools/{config,map,article_suffixes}.py`, `services/visualex/visualex_api/services/decisions/model.py` |
 | `frozen_projections.json` | the SHA-256 and length of each decision reader's projection, byte for byte | `services/visualex/tests/fixtures/decisions/frozen_projections.json` |
 | `anchors.json` | rule 23 across repositories: real article texts and synthetic decision texts, each with its projection and the passages the server would store on it | the texts: frozen inputs; the rest: the server's `apps/server/tests/assistant/anchorsContract.ts` |
+| `legal-paths.json` | the paths the browser sends to the Python API: what the web's Vite config proxies in development and the ingress routes to the scrapers in production | written by hand, with the Python route; the web's `legalPaths.contract.test.ts` holds Vite to it, the core's `infra/ingress/paths.test.mjs` the Caddyfile |
 
-Both files are generated: `node scripts/contract/build.mjs` writes them, `--check` writes nothing and
+`pins.json` and `frozen_projections.json` are generated: `node scripts/contract/build.mjs` writes them, `--check` writes nothing and
 exits 1 naming the stale one. Never edit them by hand, and never re-record the frozen projections to
 make a test pass (rule 23 of the root `CLAUDE.md`: the golden is the core's, this is its copy).
 
@@ -20,10 +21,12 @@ Regenerate and commit the result in the same change that touches one of the sour
 Who reads what:
 
 - the web tests read `pins.json` (`passwordRule`, `dossierUtils`, `sources/golden`, `adminCourts`,
-  `articleSuffixes.pins`) and `frozen_projections.json` (`decisionRender`), finding them by walking
-  up to the folder that holds `conventions/contract/`;
+  `articleSuffixes.pins`), `frozen_projections.json` (`decisionRender`), `anchors.json`
+  (`anchorsContract`) and `legal-paths.json` (`legalPaths.contract`), finding them by walking up to
+  the folder that holds `conventions/contract/`;
 - the core's own tests keep reading their sources and the original golden; of this folder they read
-  only `anchors.json` (below).
+  only `anchors.json` (the server's `ruleTwentyThree`, below) and `legal-paths.json` (the ingress's
+  `paths.test.mjs`).
 
 ## `anchors.json`: rule 23 across repositories
 
