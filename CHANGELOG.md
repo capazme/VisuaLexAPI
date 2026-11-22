@@ -12,6 +12,19 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.70.0] - 2026-11-22
+
+Trial release before the repository split (G-600): the contracts between core, web and mcp, and a deploy ready for
+submodules. Nothing changes for the user. No migration. MERL-T stays off.
+
+### Work
+
+- The values the web copies from the core are pinned as a contract (#743).
+- Rule 23 is checked across repositories, from `conventions/` (#744).
+- One list of Python paths for Vite and the ingress (#745).
+- The release note check and the deploy are ready for submodules: the deploy initialises and checks each one,
+  `start.sh` takes `LEXCRAFT_WEB_DIR` and `LEXCRAFT_MCP_DIR` (#747).
+
 ## [1.69.0] - 2026-11-21
 
 The Pratiche sort menu as a plain menu with short options, readable in light and dark. Web only, no migration.
