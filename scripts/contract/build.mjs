@@ -78,7 +78,9 @@ function decisionFamilies() {
   const python = read('services', 'visualex', 'visualex_api', 'services', 'decisions', 'model.py');
   const start = python.indexOf('FAMIGLIE');
   need(start !== -1, 'FAMIGLIE not found in services/visualex/visualex_api/services/decisions/model.py');
-  const block = python.slice(start, python.indexOf('\n}', start));
+  const end = python.indexOf('\n}', start);
+  need(end !== -1, 'FAMIGLIE: the block is never closed');
+  const block = python.slice(start, end);
   const families = Object.fromEntries([...block.matchAll(/"(\w+)":\s*\(([^)]*)\)/g)]
     .flatMap((m) => [...m[2].matchAll(/"(\w+)"/g)].map((k) => [k[1], m[1]])));
   need(Object.keys(families).length > 5, `FAMIGLIE yields ${Object.keys(families).length} kinds, expected more than 5`);
@@ -91,7 +93,9 @@ function articleOrdinalSuffixes() {
   const text = read('services', 'visualex', 'visualex_api', 'tools', 'article_suffixes.py');
   const start = text.search(/ARTICLE_ORDINAL_SUFFIXES = \(/);
   need(start !== -1, 'ARTICLE_ORDINAL_SUFFIXES not found in services/visualex/visualex_api/tools/article_suffixes.py');
-  const block = text.slice(start, text.indexOf('\n)', start));
+  const end = text.indexOf('\n)', start);
+  need(end !== -1, 'ARTICLE_ORDINAL_SUFFIXES: the tuple is never closed');
+  const block = text.slice(start, end);
   const suffixes = [...block.matchAll(/["']([a-z]+)["']/g)].map((m) => m[1]);
   need(suffixes.length > 20, `ARTICLE_ORDINAL_SUFFIXES has ${suffixes.length} entries, expected more than 20`);
   return suffixes;

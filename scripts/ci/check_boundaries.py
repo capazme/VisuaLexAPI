@@ -40,6 +40,7 @@ ALLOWLIST: dict[str, tuple[str, str]] = {
 }
 
 APPS = ("apps/web", "apps/mcp")
+ROOT_ONLY = {"version.txt", "CHANGELOG.md", "SECURITY.md", "start.sh", ".gitmodules"}
 # Top-level folders of the repository a literal can start with.
 TOP = ("apps", "services", "tools", "infra", "scripts", "conventions", "docs", "vendor")
 
@@ -55,6 +56,12 @@ SKIP_FILES = {
 COMMENT_START = ("//", "/*", "*", "#", "<!--")
 
 QUOTED = re.compile(r"""(["'`])((?:\\.|(?!\1).)*)\1""")
+# A template literal's interpolations: what follows each is still a path (`${ROOT}/services/…`).
+PLACEHOLDER = re.compile(r"\$\{[^}]*\}")
+# A relative path inside a longer literal: "file:../server", "node ../../scripts/x.mjs".
+INNER_UP = re.compile(r"(?<![\w.])(?:\.\./)+[^\s\"'`]*")
+# A literal that is only parent steps, passed as an argument of its own: join(__dirname, '..', '..').
+ONLY_UPS = re.compile(r"""(["'])((?:\.\.(?:/|(?=["'])))+)\1""")
 JOIN = re.compile(r"""(["'])(%s)\1\s*\)?\s*[,/]\s*(["'])([^"'`]+)\3""" % "|".join(TOP))
 
 
@@ -110,9 +117,17 @@ def forbidden(target: str, app: str | None) -> bool:
     return any(under(target, a) for a in APPS)
 
 
-def crossings(path: str, text: str, prefixes: set[str]) -> list[tuple[int, str]]:
+def crossings(path: str, text: str, prefixes: set[str], root_files: set[str] = frozenset()) -> list[tuple[int, str]]:
+    """The lines of a file that reach where it may not go.
+
+    Not seen, on purpose: Python strings in triple quotes and lines that start like a comment
+    (`//`, `/*`, `*`, `#`) are read as prose; a path built from variables alone (no literal says
+    where it goes) cannot be read from the text.
+    """
     app = own_app(path)
     folder = posixpath.dirname(path)
+    # How many folders the file sits below its app's root: more parent steps than that leave the app.
+    depth = len(folder.split("/")) - len(app.split("/")) if app else 0
     found: list[tuple[int, str]] = []
     python = path.endswith(".py")
     in_docstring = False
@@ -125,20 +140,37 @@ def crossings(path: str, text: str, prefixes: set[str]) -> list[tuple[int, str]]
         if is_comment(line):
             continue
         for match in QUOTED.finditer(line if not python else line.replace("`", " ")):
-            literal = match.group(2).split("${")[0]
+            whole = match.group(2)
+            pieces = PLACEHOLDER.split(whole)
+            literal = pieces[0]
             # (a) relative literals, resolved against the file's folder
             if literal == ".." or literal.startswith("../"):
                 target = posixpath.normpath(posixpath.join(folder, literal))
                 if target.startswith("..") or forbidden(target, app):
                     found.append((number, f"relative path {literal!r} reaches {target}"))
                 continue
-            # (c) literals that start with a path of the repository
-            first = literal.split("/")[0]
-            if "/" in literal and first in TOP:
-                if app and "/".join(literal.split("/")[:2]) in prefixes and forbidden(literal, app):
-                    found.append((number, f"path {literal!r} is outside {app}"))
-                elif not app and forbidden(literal, app):
-                    found.append((number, f"path {literal!r} is under the web or MCP folder"))
+            # (a') a relative path inside a longer literal
+            for inner in INNER_UP.finditer(whole):
+                target = posixpath.normpath(posixpath.join(folder, inner.group(0)))
+                # Outside the repository counts for the apps only: a core test may hold a hostile path.
+                if (app and target.startswith("..")) or (not target.startswith("..") and forbidden(target, app)):
+                    found.append((number, f"relative path {inner.group(0)!r} in {whole!r} reaches {target}"))
+            # (c) literals, or what follows an interpolation, that start with a path of the repository
+            for piece in [literal] + [p.lstrip("/") for p in pieces[1:]]:
+                first = piece.split("/")[0]
+                if "/" in piece and first in TOP:
+                    if app and "/".join(piece.split("/")[:2]) in prefixes and forbidden(piece, app):
+                        found.append((number, f"path {piece!r} is outside {app}"))
+                    elif not app and forbidden(piece, app):
+                        found.append((number, f"path {piece!r} is under the web or MCP folder"))
+            # (d) a file of the repository's root the app does not have (version.txt, CHANGELOG.md)
+            if app and whole in root_files:
+                found.append((number, f"{whole!r} is a file of the repository's root, outside {app}"))
+        # (e) parent steps passed one by one: join(__dirname, '..', '..', '..', '..')
+        if app:
+            ups = sum(m.group(2).count("..") for m in ONLY_UPS.finditer(line))
+            if ups > depth:
+                found.append((number, f"{ups} parent steps from a file {depth} folder(s) below {app}"))
         # (b) joins of path segments: 'apps', 'server' / "services" / "visualex"
         for match in JOIN.finditer(line):
             candidate = f"{match.group(2)}/{match.group(4)}"
@@ -155,17 +187,23 @@ def main() -> int:
     prefixes = {"/".join(p.split("/")[:2]) for p in files if p.count("/") >= 1}
     prefixes = {p for p in prefixes if p.split("/")[0] in TOP}
 
+    # Files only the repository's root has; LICENSE, README.md and the like are every package's too.
+    # An app that has a file of the same name at its own root may name it.
+    top_files = {p for p in files if "/" not in p} & ROOT_ONLY
     crossing: dict[str, list[tuple[int, str]]] = {}
     for path in files:
         if not scanned(path) or not (own_app(path) or in_core(path)):
             continue
         text = (ROOT / path).read_text(encoding="utf-8", errors="replace")
-        found = crossings(path, text, prefixes)
+        app = own_app(path)
+        root_files = {f for f in top_files if f"{app}/{f}" not in files} if app else set()
+        found = crossings(path, text, prefixes, root_files)
         if found:
             crossing[path] = found
 
     problems: list[str] = []
     for path, found in sorted(crossing.items()):
+        # An allowlisted file is exempt as a whole until its entry goes: the list only shrinks.
         if path in ALLOWLIST:
             continue
         for number, why in found:
