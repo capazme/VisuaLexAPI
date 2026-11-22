@@ -36,9 +36,16 @@ const TIPO_ABBR: Record<string, string> = {
   sentenza: 'sent.', ordinanza: 'ord.', 'ordinanza interlocutoria': 'ord. interl.', decreto: 'decr.',
 };
 
+/** The text without the dots at its end, in one pass (a regex `\.+$` is quadratic on a long run of dots). */
+function withoutTrailingDots(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '.') end -= 1;
+  return text.slice(0, end);
+}
+
 /** `U` → "sez. un.", `3` → "sez. III", `6-1` → "sez. VI-1"; null for none. */
 function citationSection(raw: string | null | undefined): string | null {
-  const code = (raw ?? '').replace(/\s+/g, '').toUpperCase().replace(/\.+$/, '');
+  const code = withoutTrailingDots((raw ?? '').replace(/\s+/g, '').toUpperCase());
   if (!code) return null;
   if (Object.hasOwn(SECTIONS, code)) return SECTIONS[code];
   const [head, ...tail] = code.split('-');
