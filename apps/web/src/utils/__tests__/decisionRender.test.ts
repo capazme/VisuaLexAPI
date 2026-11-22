@@ -25,9 +25,9 @@ const note = (startOffset: number, anchorText: string, id = `n${startOffset}`) =
 
 function findGolden(from: string): string {
   for (let dir = from; ; dir = dirname(dir)) {
-    const candidate = join(dir, 'services', 'visualex', 'tests', 'fixtures', 'decisions', 'frozen_projections.json');
+    const candidate = join(dir, 'conventions', 'contract', 'frozen_projections.json');
     if (existsSync(candidate)) return candidate;
-    if (dirname(dir) === dir) throw new Error('frozen_projections.json not found above ' + from);
+    if (dirname(dir) === dir) throw new Error('conventions/contract/frozen_projections.json not found above ' + from);
   }
 }
 

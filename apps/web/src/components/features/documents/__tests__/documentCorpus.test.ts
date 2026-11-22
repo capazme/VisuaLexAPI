@@ -25,7 +25,7 @@ const recorded = JSON.parse(readFileSync(join(__dirname, 'corpus', 'server.json'
   act_names: string[];
   answers: Record<string, ServerNormReading>;
 };
-const corpus = loadCorpus(__dirname);
+const corpus = loadCorpus();
 const vocabulary = buildVocabulary(recorded.act_names);
 
 function proposed(text: string) {

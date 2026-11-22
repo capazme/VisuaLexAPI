@@ -287,6 +287,10 @@ jobs:
       - run: node --test '.claude/hooks/*.test.mjs'
       - run: sh scripts/ci/tests/test_checks.sh
       - run: sh scripts/tests/test_release_notes.sh
+      # The values the web copies from the core, pinned in conventions/contract: generated files fresh.
+      - run: node --test 'scripts/contract/*.test.mjs'
+      # The web and the MCP server reach nothing outside their folders, the core nothing inside them.
+      - run: python3 scripts/ci/check_boundaries.py
 
   deploy:
     name: Production deploy scripts and stack

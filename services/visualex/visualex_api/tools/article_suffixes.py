@@ -14,7 +14,9 @@ read as art. 25-ter — an article that exists, so the truncation produced a
 plausible link to the wrong text rather than an error. Mirrored by
 ``apps/web/src/utils/articleSuffixes.ts`` and
 ``apps/server/src/utils/articleSuffixes.ts``; change all three together (the
-server's ``tests/unit/articleSuffixes.test.ts`` fails when a mirror drifts).
+server's ``tests/unit/articleSuffixes.test.ts`` fails when its mirror drifts; the
+web's is held to ``conventions/contract/pins.json``, which
+``scripts/contract/build.mjs`` writes from this tuple).
 
 Two spellings circulate for 9, 15, 16, 18 and 19 ("novies" / "nonies",
 "quinquiesdecies" / "quindecies", "sexiesdecies" / "sexdecies", "octiesdecies"

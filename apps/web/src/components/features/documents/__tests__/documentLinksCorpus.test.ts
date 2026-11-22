@@ -18,7 +18,7 @@ const readings = JSON.parse(readFileSync(join(DIR, 'server.json'), 'utf8')) as {
 const linksFile = join(DIR, 'links.json');
 const recorded = existsSync(linksFile) ? JSON.parse(readFileSync(linksFile, 'utf8')) as { answers: Record<string, LinkAnswer> } : { answers: {} };
 const vocabulary = buildVocabulary(readings.act_names);
-const corpus = loadCorpus(__dirname);
+const corpus = loadCorpus();
 
 function analyse(text: string) {
   const candidates = findCandidates(text, vocabulary);

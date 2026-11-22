@@ -1,0 +1,11 @@
+TRIBUNALE DI ESEMPIO
+COMPARSA DI COSTITUZIONE E RISPOSTA
+nell'interesse di Epsilon S.r.l., convenuta, contro Mevio, attore.
+COSTITUZIONE IN GIUDIZIO
+Costituzione del convenuto: la convenuta si costituisce nel termine previsto dall'[[art. 167|codice di procedura civile|||167|ctx]] e propone le difese che seguono.
+1. Sulla responsabilità precontrattuale. L'attore invoca il [[codice civile, art. 1337|codice civile|||1337]], ma le trattative non erano giunte a uno stadio tale da ingenerare affidamento. Le clausole vanno interpretate secondo gli [[artt. 1362-1371 c.c.|codice civile|||1362-1371]], e in particolare secondo il criterio letterale dell'[[art 1362 c.c.|codice civile|||1362]].
+2. Sulla responsabilità extracontrattuale. Il danno non è risarcibile ai sensi dell'[[art 2043 c.c.|codice civile|||2043]], difettando il nesso causale. Il datore è tenuto ad adottare le misure di cui all'[[art. 2087 c.c.|codice civile|||2087]]. La CTU ha accertato che le misure dell'[[art. 2087|codice civile|||2087|ctx]] erano state adottate tutte.
+3. Sul trattamento dei dati. Il trattamento dei dati sanitari dell'attore è lecito: [[Regolamento (UE) 2016/679, art. 9|regolamento ue|679|2016|9]], e [[d.lgs. 196/2003, art. 2-sexies|decreto legislativo|196|2003|2-sexies]]. L'informativa è stata resa a mezzo raccomandata all'indirizzo di residenza (CAP 00100), come previsto dall'[[art. 13|regolamento ue|679|2016|13|ctx]] del Regolamento.
+4. Sul procedimento amministrativo. Il preavviso di rigetto di cui alla [[l. 241/1990, art. 10-bis|legge|241|1990|10-bis]] è stato regolarmente comunicato.
+5. Sulle spese. Le spese vanno liquidate secondo i parametri dell'[[art. 4 del d.m. 10 marzo 2014, n. 55|decreto ministeriale|55|2014|4]], con la riduzione prevista dall'[[art. 4, comma 4|decreto ministeriale|55|2014|4|ctx]] per le questioni di pronta soluzione. In materia di smart working, art. 4 dell'accordo individuale, si rinvia alla volontà delle parti; il TUA non rileva, e l'art. 5 dell'accordo individuale esclude il lavoro festivo.
+6. Sulla consulenza. Come rilevato dalla CTU, art. 3 della relazione, il danno lamentato non è provato; quanto alla costituzione, art. 5 del contratto di consulenza, l'attore non l'ha mai contestata.
