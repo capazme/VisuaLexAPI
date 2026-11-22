@@ -16,7 +16,7 @@ from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .alias_resolver import get_all_presets, resolve_alias, split_article
 from .nl_parser import parse_nl_query
 from .recital_clause import split_recital_clause
-from .regional_law import cites_regional_law
+from .regional_law import local_law
 from .sources import cite_act
 
 # The acts with numbered recitals (spec 2026-11-17 §1): a regulation or a directive of the Union.
@@ -42,8 +42,9 @@ def read_norm_query(query: str, day: Optional[date] = None) -> tuple[Optional[di
     """(parameters, source): the preset aliases first («gdpr» → regolamento UE 2016/679),
     then the parser («art 1453 cc»). (None, None) when neither reads it.
 
-    A regional law is never read as a State law (G-577): `({"refusal": "regional_law"},
-    "regional")`, before anything else reads the query. A dated name («art. 1 tuir»,
+    A regional or a provincial law is never read as a State law (G-577): `({"refusal":
+    "regional_law"}, "regional")` or `({"refusal": "provincial_law"}, "provincial")`, before
+    anything else reads the query. A dated name («art. 1 tuir»,
     `dated_names`) is read at `day`, today in Rome when None: the reading adds `annex` when the
     act's text is an annex, and `notice`, the one line the search shows with it. An ambiguous
     name («art. 1 tua») reads nothing: `ambiguous_choices` names the acts it could mean.
@@ -60,8 +61,9 @@ def read_norm_query(query: str, day: Optional[date] = None) -> tuple[Optional[di
     beside one: the «considerando» is the gerund, and the query is read as if the clause were not
     there, as before.
     """
-    if cites_regional_law(query):
-        return {"refusal": "regional_law"}, "regional"
+    refusal = local_law(query)
+    if refusal:
+        return {"refusal": refusal}, refusal.removesuffix("_law")
     spec, rest = split_recital_clause(query)
     if spec is None:
         return _read(query, day)

@@ -72,7 +72,7 @@ from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex
 from visualex_api.tools.sources import cite_act, cite_article, cite_recital, recital_numbers
 from visualex_api.tools.act_identity import identifies_act
 from visualex_api.tools.norm_query import act_names, ambiguous_choices, read_norm_query
-from visualex_api.tools.regional_law import REGIONAL_LAW_REFUSAL, is_regional_act_type
+from visualex_api.tools.regional_law import LOCAL_LAW_REFUSALS, local_act_type_refusal
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
 from visualex_api.tools.exceptions import (
@@ -162,7 +162,7 @@ def _link_refused_before_lookup(norm):
     act, and a range or a list (the browser sends the first article, §4.4; a range would
     read the act's index for nothing)."""
     if (not identifies_act(norm) or _LINK_RANGE_OR_LIST.search(norm['article'])
-            or is_regional_act_type(norm['act_type'])):
+            or local_act_type_refusal(norm['act_type'])):
         return 'not_linkable'
     return None
 
@@ -805,10 +805,11 @@ class NormaController:
         act_number = data.get('act_number')
         norma_date = data.get('date')
 
-        # No address for a regional act (G-577): Normattiva would answer it with the State's act
-        # of the same number, the wrong text in silence.
-        if is_regional_act_type(act_type):
-            raise ValidationError(REGIONAL_LAW_REFUSAL)
+        # No address for a regional or a provincial act (G-577): Normattiva would answer it with
+        # the State's act of the same number, the wrong text in silence.
+        refused = local_act_type_refusal(act_type)
+        if refused:
+            raise ValidationError(refused)
 
         # A consolidated EU version. Validated here so a Normattiva request
         # carrying the field fails loudly instead of being silently ignored.
@@ -1465,13 +1466,13 @@ class NormaController:
         Returns:
             { recognized: bool, parsed?: {...api params}, urn?: str,
               display?: str, source?: 'alias' | 'nl_parser' | 'recital',
-              refusal?: 'recital_not_eu' | 'recital_with_article' | 'regional_law',
+              refusal?: 'recital_not_eu' | 'recital_with_article' | 'regional_law' | 'provincial_law',
               notice?: str, ambiguous?: [{name, parsed, display}] }
 
         G-577: a dated name («art. 1 tuir») is read at today's date in Rome; its `parsed` carries
         `annex` when the act's text is an annex, and `notice` is the one line to show with it. A
-        regional law is not recognised, with `refusal: "regional_law"`, never read as a State
-        law. An ambiguous name («art. 1 tua») is not recognised, and `ambiguous` lists the acts
+        regional or a provincial law is not recognised, with `refusal: "regional_law"` or
+        `"provincial_law"`, never read as a State law. An ambiguous name («art. 1 tua») is not recognised, and `ambiguous` lists the acts
         it could mean, each with its own `parsed`.
         """
         try:
@@ -1489,9 +1490,9 @@ class NormaController:
                 if choices:
                     answer["ambiguous"] = choices
                 return jsonify(answer)
-            if parsed_params.get("refusal") == "regional_law":
+            if parsed_params.get("refusal") in LOCAL_LAW_REFUSALS:
                 return jsonify({"parsed": None, "recognized": False, "identifies_act": False,
-                                "refusal": "regional_law"})
+                                "refusal": parsed_params["refusal"]})
             if parsed_params.get("recital"):
                 return jsonify(_recital_reading(parsed_params, source))
             notice = parsed_params.pop("notice", None)

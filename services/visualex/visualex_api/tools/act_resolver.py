@@ -21,7 +21,7 @@ from .map import (
     NORMATTIVA_URN_CODICI,
     extract_codice_details,
 )
-from .regional_law import cites_regional_law
+from .regional_law import cites_local_law
 
 # Leading articles and prepositions: "art. 111 *della* Costituzione".
 # The trailing \s+ is load-bearing: without it "le" would be stripped from "legge".
@@ -156,11 +156,11 @@ def resolve_atto(name: str, day: Optional[date] = None) -> dict | None:
     """Resolve a common act name to scraper parameters.
 
     Returns {"tipo_atto", "data", "numero_atto"}, or None. Never guesses: an ambiguous
-    spelling and a regional law (`regional_law`) are None. A dated name («tuir»,
+    spelling and a regional or provincial law (`regional_law`) are None. A dated name («tuir»,
     `dated_names`) is read at `day`, today in Rome when None; its act carries `notice`, and
     `allegato` when its text is an annex.
     """
-    if not name or ambiguous_act(name) or cites_regional_law(name):
+    if not name or ambiguous_act(name) or cites_local_law(name):
         return None
     for key in _candidate_keys(name):
         result = _lookup_key(key, day)
