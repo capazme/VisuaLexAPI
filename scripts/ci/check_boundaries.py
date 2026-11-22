@@ -37,9 +37,6 @@ ALLOWLIST: dict[str, tuple[str, str]] = {
     "infra/ingress/paths.test.mjs": ("reads the web app's proxy list to check the ingress routes", "PR-B"),
     "apps/web/src/content/novita/releaseNotes.test.ts": ("reads the repository's release notes and changelog", "PR-C"),
     "tools/e2e/docx-roundtrip/run.mjs": ("imports the web app's sources", "PR-C"),
-    # Found by this check, not in the plan's list: the web's corpus tests read the spec's corpus in docs/.
-    "apps/web/src/components/features/documents/__tests__/corpus/corpus.ts": (
-        "reads the corpus of docs/superpowers/specs/2026-10-29-document-analysis", "PR to be assigned"),
 }
 
 APPS = ("apps/web", "apps/mcp")

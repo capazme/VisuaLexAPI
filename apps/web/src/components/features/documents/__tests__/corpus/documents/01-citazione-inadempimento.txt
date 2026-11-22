@@ -1,0 +1,32 @@
+TRIBUNALE DI ESEMPIO
+ATTO DI CITAZIONE
+
+La società Alfa S.r.l., in persona del legale rappresentante pro tempore, rappresentata e difesa dall'avv. Tizio, cita la società Beta S.p.A. a comparire innanzi al Tribunale di Esempio, con invito a costituirsi nel termine di settanta giorni prima dell'udienza ai sensi e nelle forme stabilite dall'[[art. 166 c.p.c.|codice di procedura civile|||166]] e a comparire all'udienza indicata, con l'avvertimento che la costituzione oltre il suddetto termine implica le decadenze di cui agli [[artt. 38 e 167 c.p.c.|codice di procedura civile|||38,167]].
+
+FATTO
+
+1. Con contratto di fornitura del 3 marzo 2023 Beta si obbligava a consegnare ad Alfa duecento macchinari entro il 30 giugno 2023. L'art. 7 del contratto prevedeva una penale per ogni giorno di ritardo; l'articolo 12 delle condizioni generali regolava il foro competente.
+
+2. Beta consegnava soltanto quaranta macchinari, e con un ritardo di oltre tre mesi. Alfa le intimava per iscritto di adempiere ai sensi dell'[[art. 1454 c.c.|codice civile|||1454]], assegnandole un termine di quindici giorni, inutilmente decorso.
+
+DIRITTO
+
+3. Sulla risoluzione per inadempimento. Il contratto è risolto di diritto per effetto della diffida rimasta senza esito. In ogni caso, l'inadempimento di Beta non è di scarsa importanza ai sensi dell'[[articolo 1455 del codice civile|codice civile|||1455]], avuto riguardo all'interesse di Alfa, sicché ricorrono i presupposti dell'[[art. 1453, comma 1, c.c.|codice civile|||1453]].
+
+4. Sul risarcimento del danno. Il debitore che non esegue esattamente la prestazione dovuta è tenuto al risarcimento del danno, se non prova che l'inadempimento è stato determinato da impossibilità della prestazione derivante da causa a lui non imputabile ([[art. 1218 cod. civ.|codice civile|||1218]]). Il risarcimento comprende la perdita subita e il mancato guadagno, in quanto ne siano conseguenza immediata e diretta ([[artt. 1223 e 1225 c.c.|codice civile|||1223,1225]]). Quanto alla prova, si richiama il principio di cui all'[[art. 2697 c.c.|codice civile|||2697]]: il creditore deve provare la fonte del suo diritto e limitarsi ad allegare l'inadempimento della controparte (Cass. civ., Sez. Un., n. 13533/2001).
+
+5. Sulla buona fede. Beta ha violato altresì i doveri di correttezza e buona fede che presiedono all'esecuzione del contratto ([[artt. 1175 e 1375 c.c.|codice civile|||1175,1375]]), omettendo di avvisare tempestivamente Alfa delle difficoltà di approvvigionamento.
+
+6. Sulla clausola di esonero. La clausola n. 9 delle condizioni generali, che limita la responsabilità di Beta, è inefficace: non è stata specificamente approvata per iscritto come richiede l'[[art. 1341, secondo comma, c.c.|codice civile|||1341]], e in ogni caso è nulla ai sensi dell'[[art. 1229 c.c.|codice civile|||1229]] per i casi di colpa grave.
+
+7. Sugli interessi. Sulle somme dovute sono dovuti gli interessi moratori nella misura prevista dal [[d.lgs. 9 ottobre 2002, n. 231|decreto legislativo|231|2002||act]], trattandosi di transazione commerciale; in particolare [[l'art. 5|decreto legislativo|231|2002|5|ctx]] ne fissa il saggio.
+
+8. Sulla competenza. Il Tribunale adito è competente per valore e per territorio ai sensi degli [[artt. 18 e 20 c.p.c.|codice di procedura civile|||18,20]], essendo il luogo in cui è sorta l'obbligazione.
+
+9. Sulla mediazione. La presente controversia non rientra tra le materie per le quali la mediazione è condizione di procedibilità ai sensi dell'[[art. 5 del d.lgs. 4 marzo 2010, n. 28|decreto legislativo|28|2010|5]].
+
+P.Q.M.
+
+Voglia l'Ill.mo Tribunale, contrariis reiectis: dichiarare risolto il contratto ex [[art. 1457 c.c.|codice civile|||1457]] o, in subordine, pronunciarne la risoluzione; condannare Beta al risarcimento del danno; con vittoria di spese, ai sensi dell'[[art. 91 c.p.c.|codice di procedura civile|||91]].
+
+Si producono i documenti indicati in calce. Ai fini del contributo unificato si dichiara che il valore della causa è di euro 480.000,00, ai sensi del [[d.P.R. n. 115 del 2002|decreto del presidente della repubblica|115|2002||act]].
