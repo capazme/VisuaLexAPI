@@ -1,0 +1,807 @@
+{
+  "version": 1,
+  "note": "Rule 23 across repositories (root CLAUDE.md). raw and testo are inputs, frozen: the web fixtures articleTexts.ts and decisionTexts.ts of 22 November 2026. projection and passages are what the server computes from them (apps/server/tests/assistant/anchorsContract.ts); the web checks that its renderer draws each passage's text at its start. Never edit by hand: see conventions/contract/README.md.",
+  "articles": [
+    {
+      "id": "nrm-cc-1453",
+      "raw": "Art. 1453. \n\n (Risolubilità del contratto per inadempimento). \n\n Nei contratti con prestazioni corrispettive, quando uno dei contraenti non adempie le sue obbligazioni, l'altro può a sua scelta chiedere l'adempimento o la risoluzione del contratto, salvo, in ogni caso, il risarcimento del danno. \n\n La risoluzione può essere domandata anche quando il giudizio è stato promosso per ottenere l'adempimento; ma non può più chiedersi l'adempimento quando è stata domandata la risoluzione. \n\n Dalla data della domanda di risoluzione l'inadempiente non può più adempiere la propria obbligazione.",
+      "projection": "Art. 1453.  (Risolubilità del contratto per inadempimento).  Nei contratti con prestazioni corrispettive, quando uno dei contraenti non adempie le sue obbligazioni, l'altro può a sua scelta chiedere l'adempimento o la risoluzione del contratto, salvo, in ogni caso, il risarcimento del danno.  La risoluzione può essere domandata anche quando il giudizio è stato promosso per ottenere l'adempimento; ma non può più chiedersi l'adempimento quando è stata domandata la risoluzione.  Dalla data della domanda di risoluzione l'inadempiente non può più adempiere la propria obbligazione.",
+      "passages": [
+        {
+          "quote": "prestazioni corrispettive, quando uno dei contraenti non ade",
+          "start": 79,
+          "text": "prestazioni corrispettive, quando uno dei contraenti non ade"
+        },
+        {
+          "quote": "caso, il risarcimento del danno. \n\n La risoluzione può essere ",
+          "start": 260,
+          "text": "caso, il risarcimento del danno.  La risoluzione può essere"
+        },
+        {
+          "quote": "la risoluzione. \n\n Dalla data della domanda di risoluzione l'i",
+          "start": 464,
+          "text": "la risoluzione.  Dalla data della domanda di risoluzione l'i"
+        }
+      ]
+    },
+    {
+      "id": "nrm-cp-640",
+      "raw": "Art. 640. \n\n (Truffa) \n\n Chiunque, con artifizi o raggiri, inducendo taluno in errore, procura a sé o ad altri un ingiusto profitto con altrui danno, è punito con la reclusione da sei mesi a tre anni e con la multa da lire cinquecento a diecimila. \n\n La pena è della reclusione da uno a cinque anni e della multa da lire tremila a quindicimila: \n\n 1° se il fatto è commesso a danno dello Stato o di un altro ente pubblico o dell'Unione europea o col pretesto di far esonerare taluno dal servizio militare; \n\n 2° se il fatto è commesso ingenerando nella persona offesa il timore di un pericolo immaginario o l'erroneo convincimento di dovere eseguire un ordine dell'Autorità; (119) (154) \n\n 2-bis) ((NUMERO ABROGATO DAL D.L. 11 APRILE 2025, N. 48)). \n\n 2-ter) se il fatto è commesso a distanza attraverso strumenti informatici o telematici idonei a ostacolare la propria o altrui identificazione. \n\n((Quando ricorre la circostanza di cui all'articolo 61, numero 5), la pena è della reclusione da due a sei anni e della multa da euro 700 a euro 3.000.))\n\n Il delitto è punibile a querela della persona offesa, salvo che ricorra taluna delle circostanze previste dal secondo comma, a eccezione di quella di cui al numero 2-ter) ((, e dal terzo comma)).\n\n-------------\nAGGIORNAMENTO (119)\n\n Il D.P.R. 12 aprile 1990, n. 75 ha disposto (con l'art. 1, comma 1, lettera c)) che è concessa amnistia per il delitto previsto dal comma secondo del presente articolo, sempre che non ricorra la circostanza aggravante prevista dall'articolo 61, n. 7, del codice penale. \n\n Ha inoltre disposto (con l'articolo 6, comma 1) che l'amnistia ha efficacia per i reati commessi fino a tutto il giorno 24 ottobre 1989.\n\n--------------\nAGGIORNAMENTO (154)\n\n Successivamente la Corte Costituzionale, con sentenza 18-25 luglio 1997, n. 272 (in G.U. 1ª s.s. 30/7/1997, n. 31), ha dichiarato l'illegittimità costituzionale dell'art. 1, comma 1, lettera c), n. 4 del D.P.R. 12 aprile 1990, n. 75 (che ha modificato il secondo comma del presente articolo) \"nella parte in cui non prevede l'applicazione dell'amnistia per il delitto di truffa militare aggravata, previsto e punito dall'art. 234, secondo comma, del codice penale militare di pace, sempre che non ricorra la circostanza aggravante prevista dall'art. 61, n. 7, del codice penale\".",
+      "projection": "Art. 640.  (Truffa)  Chiunque, con artifizi o raggiri, inducendo taluno in errore, procura a sé o ad altri un ingiusto profitto con altrui danno, è punito con la reclusione da sei mesi a tre anni e con la multa da lire cinquecento a diecimila.  La pena è della reclusione da uno a cinque anni e della multa da lire tremila a quindicimila:  1° se il fatto è commesso a danno dello Stato o di un altro ente pubblico o dell'Unione europea o col pretesto di far esonerare taluno dal servizio militare;  2° se il fatto è commesso ingenerando nella persona offesa il timore di un pericolo immaginario o l'erroneo convincimento di dovere eseguire un ordine dell'Autorità; (119) (154)  2-bis) ((NUMERO ABROGATO DAL D.L. 11 APRILE 2025, N. 48)).  2-ter) se il fatto è commesso a distanza attraverso strumenti informatici o telematici idonei a ostacolare la propria o altrui identificazione. ((Quando ricorre la circostanza di cui all'articolo 61, numero 5), la pena è della reclusione da due a sei anni e della multa da euro 700 a euro 3.000.)) Il delitto è punibile a querela della persona offesa, salvo che ricorra taluna delle circostanze previste dal secondo comma, a eccezione di quella di cui al numero 2-ter) ((, e dal terzo comma)).-------------AGGIORNAMENTO (119) Il D.P.R. 12 aprile 1990, n. 75 ha disposto (con l'art. 1, comma 1, lettera c)) che è concessa amnistia per il delitto previsto dal comma secondo del presente articolo, sempre che non ricorra la circostanza aggravante prevista dall'articolo 61, n. 7, del codice penale.  Ha inoltre disposto (con l'articolo 6, comma 1) che l'amnistia ha efficacia per i reati commessi fino a tutto il giorno 24 ottobre 1989.--------------AGGIORNAMENTO (154) Successivamente la Corte Costituzionale, con sentenza 18-25 luglio 1997, n. 272 (in G.U. 1ª s.s. 30/7/1997, n. 31), ha dichiarato l'illegittimità costituzionale dell'art. 1, comma 1, lettera c), n. 4 del D.P.R. 12 aprile 1990, n. 75 (che ha modificato il secondo comma del presente articolo) \"nella parte in cui non prevede l'applicazione dell'amnistia per il delitto di truffa militare aggravata, previsto e punito dall'art. 234, secondo comma, del codice penale militare di pace, sempre che non ricorra la circostanza aggravante prevista dall'art. 61, n. 7, del codice penale\".",
+      "passages": [
+        {
+          "quote": "1° se il fatto è commesso a danno dello Stato o di un altro ",
+          "start": 340,
+          "text": "1° se il fatto è commesso a danno dello Stato o di un altro"
+        },
+        {
+          "quote": "3.000.))\n\n Il delitto è punibile a querela della persona offes",
+          "start": 1027,
+          "text": "3.000.)) Il delitto è punibile a querela della persona offes"
+        },
+        {
+          "quote": "dichiarato l'illegittimità costituzionale dell'art. 1, comma",
+          "start": 1824,
+          "text": "dichiarato l'illegittimità costituzionale dell'art. 1, comma"
+        }
+      ]
+    },
+    {
+      "id": "nrm-cost-3",
+      "raw": "Art. 3\n\nTutti i cittadini hanno pari dignità sociale e sono eguali davanti alla legge, senza distinzione di sesso, di razza, di lingua, di religione, di opinioni politiche, di condizioni personali e sociali.\n\n È compito della Repubblica rimuovere gli ostacoli di ordine economico e sociale, che, limitando di fatto la libertà e l'eguaglianza dei cittadini, impediscono il pieno sviluppo della persona umana e l'effettiva partecipazione di tutti i lavoratori all'organizzazione politica, economica e sociale del Paese.",
+      "projection": "Art. 3Tutti i cittadini hanno pari dignità sociale e sono eguali davanti alla legge, senza distinzione di sesso, di razza, di lingua, di religione, di opinioni politiche, di condizioni personali e sociali. È compito della Repubblica rimuovere gli ostacoli di ordine economico e sociale, che, limitando di fatto la libertà e l'eguaglianza dei cittadini, impediscono il pieno sviluppo della persona umana e l'effettiva partecipazione di tutti i lavoratori all'organizzazione politica, economica e sociale del Paese.",
+      "passages": [
+        {
+          "quote": "alla legge, senza distinzione di sesso, di razza, di lingua,",
+          "start": 73,
+          "text": "alla legge, senza distinzione di sesso, di razza, di lingua,"
+        },
+        {
+          "quote": "Repubblica rimuovere gli ostacoli di ordine economico e soci",
+          "start": 222,
+          "text": "Repubblica rimuovere gli ostacoli di ordine economico e soci"
+        },
+        {
+          "quote": "l'effettiva partecipazione di tutti i lavoratori all'organiz",
+          "start": 405,
+          "text": "l'effettiva partecipazione di tutti i lavoratori all'organiz"
+        }
+      ]
+    },
+    {
+      "id": "nrm-privacy-2ter",
+      "raw": "Art. 2-ter\n(Base giuridica per il trattamento di dati personali effettuato per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri)\n\n1. La base giuridica prevista dall'articolo 6, paragrafo 3, lettera b), del regolamento è costituita ((...)) da una norma di legge o ((...)) di regolamento ((o da atti amministrativi generali)). ((49))\n\n((1-bis. Fermo restando ogni altro obbligo previsto dal Regolamento e dal presente codice, il trattamento dei dati personali da parte di un'amministrazione pubblica di cui all'articolo 1, comma 2, del decreto legislativo 30 marzo 2001, n. 165, ivi comprese le autorità indipendenti e le amministrazioni inserite nell'elenco di cui all'articolo 1, comma 3, della legge 31 dicembre 2009, n. 196, nonché da parte di una società a controllo pubblico statale o, limitatamente ai gestori di servizi pubblici, locale, di cui all'articolo 16 del testo unico in materia di società a partecipazione pubblica, di cui al decreto legislativo 19 agosto 2016, n. 175, con esclusione, per le società a controllo pubblico, dei trattamenti correlati ad attività svolte in regime di libero mercato, è anche consentito se necessario per l'adempimento di un compito svolto nel pubblico interesse o per l'esercizio di pubblici poteri ad esse attribuiti. In modo da assicurare che tale esercizio non possa arrecare un pregiudizio effettivo e concreto alla tutela dei diritti e delle libertà degli interessati, le disposizioni di cui al presente comma sono esercitate nel rispetto dell'articolo 6 del Regolamento))\n\n2. La comunicazione fra titolari che effettuano trattamenti di dati personali, diversi da quelli ricompresi nelle particolari categorie di cui all'articolo 9 del Regolamento e di quelli relativi a condanne penali e reati di cui all'articolo 10 del Regolamento, per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri è ammessa se prevista ai sensi del comma 1 ((o se necessaria ai sensi del comma 1-bis)). ((PERIODO SOPPRESSO DAL D.L. 8 OTTOBRE 2021, N. 139, CONVERTITO CON MODIFICAZIONI DALLA L. 3 DICEMBRE 2021, N. 205)).\n\n3. La diffusione e la comunicazione di dati personali, trattati per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri, a soggetti che intendono trattarli per altre finalità sono ammesse unicamente se previste ai sensi del comma 1 ((o se necessarie ai sensi del comma 1-bis. In tale ultimo caso, ne viene data notizia al Garante almeno dieci giorni prima dell'inizio della comunicazione o diffusione)).\n\n4. Si intende per: \n\na) \"comunicazione\", il dare conoscenza dei dati personali a uno o più soggetti determinati diversi dall'interessato, dal rappresentante del titolare nel territorio dell'Unione europea, dal responsabile o dal suo rappresentante nel territorio dell'Unione europea, dalle persone autorizzate, ai sensi dell'articolo 2-quaterdecies, al trattamento dei dati personali sotto l'autorità diretta del titolare o del responsabile, in qualunque forma, anche mediante la loro messa a disposizione, consultazione o mediante interconnessione; \n\nb) \"diffusione\", il dare conoscenza dei dati personali a soggetti indeterminati, in qualunque forma, anche mediante la loro messa a disposizione o consultazione.",
+      "projection": "Art. 2-ter(Base giuridica per il trattamento di dati personali effettuato per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri)1. La base giuridica prevista dall'articolo 6, paragrafo 3, lettera b), del regolamento è costituita ((...)) da una norma di legge o ((...)) di regolamento ((o da atti amministrativi generali)). ((49))((1-bis. Fermo restando ogni altro obbligo previsto dal Regolamento e dal presente codice, il trattamento dei dati personali da parte di un'amministrazione pubblica di cui all'articolo 1, comma 2, del decreto legislativo 30 marzo 2001, n. 165, ivi comprese le autorità indipendenti e le amministrazioni inserite nell'elenco di cui all'articolo 1, comma 3, della legge 31 dicembre 2009, n. 196, nonché da parte di una società a controllo pubblico statale o, limitatamente ai gestori di servizi pubblici, locale, di cui all'articolo 16 del testo unico in materia di società a partecipazione pubblica, di cui al decreto legislativo 19 agosto 2016, n. 175, con esclusione, per le società a controllo pubblico, dei trattamenti correlati ad attività svolte in regime di libero mercato, è anche consentito se necessario per l'adempimento di un compito svolto nel pubblico interesse o per l'esercizio di pubblici poteri ad esse attribuiti. In modo da assicurare che tale esercizio non possa arrecare un pregiudizio effettivo e concreto alla tutela dei diritti e delle libertà degli interessati, le disposizioni di cui al presente comma sono esercitate nel rispetto dell'articolo 6 del Regolamento))2. La comunicazione fra titolari che effettuano trattamenti di dati personali, diversi da quelli ricompresi nelle particolari categorie di cui all'articolo 9 del Regolamento e di quelli relativi a condanne penali e reati di cui all'articolo 10 del Regolamento, per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri è ammessa se prevista ai sensi del comma 1 ((o se necessaria ai sensi del comma 1-bis)). ((PERIODO SOPPRESSO DAL D.L. 8 OTTOBRE 2021, N. 139, CONVERTITO CON MODIFICAZIONI DALLA L. 3 DICEMBRE 2021, N. 205)).3. La diffusione e la comunicazione di dati personali, trattati per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri, a soggetti che intendono trattarli per altre finalità sono ammesse unicamente se previste ai sensi del comma 1 ((o se necessarie ai sensi del comma 1-bis. In tale ultimo caso, ne viene data notizia al Garante almeno dieci giorni prima dell'inizio della comunicazione o diffusione)).4. Si intende per: a) \"comunicazione\", il dare conoscenza dei dati personali a uno o più soggetti determinati diversi dall'interessato, dal rappresentante del titolare nel territorio dell'Unione europea, dal responsabile o dal suo rappresentante nel territorio dell'Unione europea, dalle persone autorizzate, ai sensi dell'articolo 2-quaterdecies, al trattamento dei dati personali sotto l'autorità diretta del titolare o del responsabile, in qualunque forma, anche mediante la loro messa a disposizione, consultazione o mediante interconnessione; b) \"diffusione\", il dare conoscenza dei dati personali a soggetti indeterminati, in qualunque forma, anche mediante la loro messa a disposizione o consultazione.",
+      "passages": [
+        {
+          "quote": "personali da parte di un'amministrazione pubblica di cui all",
+          "start": 487,
+          "text": "personali da parte di un'amministrazione pubblica di cui all"
+        },
+        {
+          "quote": "di cui al presente comma sono esercitate nel rispetto dell'a",
+          "start": 1475,
+          "text": "di cui al presente comma sono esercitate nel rispetto dell'a"
+        },
+        {
+          "quote": "conoscenza dei dati personali a uno o più soggetti determina",
+          "start": 2617,
+          "text": "conoscenza dei dati personali a uno o più soggetti determina"
+        }
+      ]
+    },
+    {
+      "id": "nrm-dlgs36-1",
+      "raw": "Articolo 1\nPrincipio del risultato\n\n1. Le stazioni appaltanti e gli enti concedenti perseguono il risultato dell'affidamento del contratto e della sua esecuzione con la massima tempestività e il migliore rapporto possibile tra qualità e prezzo, nel rispetto dei principi di legalità, trasparenza e concorrenza.\n\n2. La concorrenza tra gli operatori economici è funzionale a conseguire il miglior risultato possibile nell'affidare ed eseguire i contratti. La trasparenza è funzionale alla massima semplicità e celerità nella corretta applicazione delle regole del presente decreto, di seguito denominato «codice» e ne assicura la piena verificabilità.\n\n3. Il principio del risultato costituisce attuazione, nel settore dei contratti pubblici, del principio del buon andamento e dei correlati principi di efficienza, efficacia ed economicità. Esso è perseguito nell'interesse della comunità e per il raggiungimento degli obiettivi dell'Unione europea.\n\n4. Il principio del risultato costituisce criterio prioritario per l'esercizio del potere discrezionale e per l'individuazione della regola del caso concreto, nonché per: \n\na) valutare la responsabilità del personale che svolge funzioni amministrative o tecniche nelle fasi di programmazione, progettazione, affidamento ed esecuzione dei contratti; \n\nb) attribuire gli incentivi secondo le modalità previste dalla contrattazione collettiva.",
+      "projection": "Articolo 1Principio del risultato1. Le stazioni appaltanti e gli enti concedenti perseguono il risultato dell'affidamento del contratto e della sua esecuzione con la massima tempestività e il migliore rapporto possibile tra qualità e prezzo, nel rispetto dei principi di legalità, trasparenza e concorrenza.2. La concorrenza tra gli operatori economici è funzionale a conseguire il miglior risultato possibile nell'affidare ed eseguire i contratti. La trasparenza è funzionale alla massima semplicità e celerità nella corretta applicazione delle regole del presente decreto, di seguito denominato «codice» e ne assicura la piena verificabilità.3. Il principio del risultato costituisce attuazione, nel settore dei contratti pubblici, del principio del buon andamento e dei correlati principi di efficienza, efficacia ed economicità. Esso è perseguito nell'interesse della comunità e per il raggiungimento degli obiettivi dell'Unione europea.4. Il principio del risultato costituisce criterio prioritario per l'esercizio del potere discrezionale e per l'individuazione della regola del caso concreto, nonché per: a) valutare la responsabilità del personale che svolge funzioni amministrative o tecniche nelle fasi di programmazione, progettazione, affidamento ed esecuzione dei contratti; b) attribuire gli incentivi secondo le modalità previste dalla contrattazione collettiva.",
+      "passages": [
+        {
+          "quote": "rapporto possibile tra qualità e prezzo, nel rispetto dei pr",
+          "start": 201,
+          "text": "rapporto possibile tra qualità e prezzo, nel rispetto dei pr"
+        },
+        {
+          "quote": "assicura la piena verificabilità.\n\n3. Il principio del risulta",
+          "start": 611,
+          "text": "assicura la piena verificabilità.3. Il principio del risulta"
+        },
+        {
+          "quote": "nonché per: \n\na) valutare la responsabilità del personale che ",
+          "start": 1100,
+          "text": "nonché per: a) valutare la responsabilità del personale che"
+        }
+      ]
+    },
+    {
+      "id": "nrm-cc-2359",
+      "raw": "Art. 2359. \n\n (Società controllate e società collegate). \n\n Sono considerate società controllate: \n\n 1) le società in cui un'altra società dispone della maggioranza dei voti esercitabili nell'assemblea ordinaria; \n\n 2) le società in cui un'altra società dispone di voti sufficienti per esercitare un'influenza dominante nell'assemblea ordinaria; \n\n 3) le società che sono sotto influenza dominante di un'altra società in virtù di particolari vincoli contrattuali con essa. \n\n Ai fini dell'applicazione dei numeri 1) e 2) del primo comma si computano anche i voti spettanti a società controllate, a società fiduciarie e a persona interposta: non si computano i voti spettanti per conto di terzi. \n\n Sono considerate collegate le società sulle quali un'altra società esercita un'influenza notevole. L'influenza si presume quando nell'assemblea ordinaria può essere esercitato almeno un quinto dei voti ovvero un decimo se la società ha azioni quotate ((in mercati regolamentati)).",
+      "projection": "Art. 2359.  (Società controllate e società collegate).  Sono considerate società controllate:  1) le società in cui un'altra società dispone della maggioranza dei voti esercitabili nell'assemblea ordinaria;  2) le società in cui un'altra società dispone di voti sufficienti per esercitare un'influenza dominante nell'assemblea ordinaria;  3) le società che sono sotto influenza dominante di un'altra società in virtù di particolari vincoli contrattuali con essa.  Ai fini dell'applicazione dei numeri 1) e 2) del primo comma si computano anche i voti spettanti a società controllate, a società fiduciarie e a persona interposta: non si computano i voti spettanti per conto di terzi.  Sono considerate collegate le società sulle quali un'altra società esercita un'influenza notevole. L'influenza si presume quando nell'assemblea ordinaria può essere esercitato almeno un quinto dei voti ovvero un decimo se la società ha azioni quotate ((in mercati regolamentati)).",
+      "passages": [
+        {
+          "quote": "della maggioranza dei voti esercitabili nell'assemblea ordin",
+          "start": 141,
+          "text": "della maggioranza dei voti esercitabili nell'assemblea ordin"
+        },
+        {
+          "quote": "vincoli contrattuali con essa. \n\n Ai fini dell'applicazione de",
+          "start": 432,
+          "text": "vincoli contrattuali con essa.  Ai fini dell'applicazione de"
+        },
+        {
+          "quote": "un'influenza notevole. L'influenza si presume quando nell'as",
+          "start": 760,
+          "text": "un'influenza notevole. L'influenza si presume quando nell'as"
+        }
+      ]
+    },
+    {
+      "id": "nrm-cc-1284",
+      "raw": "Art. 1284. \n\n (Saggio degli interessi). \n\n Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d'anno. Il Ministro del tesoro, con proprio decreto pubblicato nella Gazzetta Ufficiale della Repubblica italiana non oltre il 15 dicembre dell'anno precedente a quello cui il saggio si riferisce, può modificarne annualmente la misura, sulla base del rendimento medio annuo lordo dei titoli di Stato di durata non superiore a dodici mesi e tenuto conto del tasso di inflazione registrato nell'anno. Qualora entro il 15 dicembre non sia fissata una nuova misura del saggio, questo rimane invariato per l'anno successivo. (129a) (140a) (151a) (161a) (193a) (211a) (221a) (237a) (244a) (252a) (260a)(276) (280) (299) (307) (314) (321a) (327)(336a) ((348))\n\n Allo stesso saggio si computano gli interessi convenzionali, se le parti non ne hanno determinato la misura. \n\n Gli interessi superiori alla misura legale devono essere determinati per iscritto; altrimenti sono dovuti nella misura legale. \n\n Se le parti non ne hanno determinato la misura, dal momento in cui è proposta domanda giudiziale il saggio degli interessi legali è pari a quello previsto dalla legislazione speciale relativa ai ritardi di pagamento nelle transazioni commerciali. (242) \n\n La disposizione del quarto comma si applica anche all'atto con cui si promuove il procedimento arbitrale. (242)\n\n---------------\nAGGIORNAMENTO (129a)\n\n Il Decreto 10 dicembre 1998 (in G.U. 11/12/1998, n. 289) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2,5 per cento in ragione d'anno, con decorrenza dal 1 gennaio 1999\".\n\n---------------\nAGGIORNAMENTO (140a)\n\n Il Decreto 11 dicembre 2000 (in G.U. 15/12/2000, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 3,5 per cento in ragione d'anno, con decorrenza dal 1o gennaio 2001\".\n\n---------------\nAGGIORNAMENTO (151a)\n\n Il Decreto 11 dicembre 2001 (in G.U. 14/12/2001, n. 290) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 3 per cento in ragione d'anno, con decorrenza dal 1 gennaio 2002\".\n\n---------------\nAGGIORNAMENTO (161a)\n\n Il Decreto 1 dicembre 2003 (in G.U. 10/12/2003, n. 286) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2,5 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2004\".\n\n---------------\nAGGIORNAMENTO (193a)\n\n Il Decreto 12 dicembre 2007 (in G.U. 15/12/2007, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 3 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2008\".\n\n---------------\nAGGIORNAMENTO (207a)\n\n Il Decreto 4 dicembre 2009 (in G.U. 15/12/2009, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata all'1% in ragione d'anno, con decorrenza dal 1° gennaio 2010\".\n\n---------------\nAGGIORNAMENTO (211a)\n\n Il Decreto 7 dicembre 2010 (in G.U. 15/12/2010, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata all'1,5% in ragione d'anno, con decorrenza dal 1° gennaio 2011\".\n\n---------------\nAGGIORNAMENTO (221a)\n\n Il Decreto 12 dicembre 2011 (in G.U. 15/12/2011, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2,5% in ragione d'anno, con decorrenza dal 1° gennaio 2012\".\n\n---------------\nAGGIORNAMENTO (237a)\n\n Il Decreto 12 dicembre 2013 (in G.U. 13/12/2013, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata all'1 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2014\".\n\n---------------\nAGGIORNAMENTO (242)\n\n Il D.L. 12 settembre 2014, n. 132 convertito con modificazioni dalla L. 10 novembre 2014, n. 162 ha disposto (con l'art. 17, comma 2) che le presenti modifiche producono effetti rispetto ai procedimenti iniziati a decorrere dal trentesimo giorno successivo all'entrata in vigore della legge di conversione del decreto medesimo.\n\n---------------\nAGGIORNAMENTO (244a)\n\n Il Decreto 11 dicembre 2014 (in G.U. 15/12/2014, n. 290) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata allo 0,5 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2015\".\n\n---------------\nAGGIORNAMENTO (252a)\n\n Il Decreto 11 dicembre 2015 (in G.U. 15/12/2015, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata allo 0,2 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2016\".\n\n---------------\nAGGIORNAMENTO (260a)\n\n Il Decreto 7 dicembre 2016 (in G.U. 14/12/2016, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,1 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2017\".\n\n---------------\nAGGIORNAMENTO (276)\n\n Il Decreto 13 dicembre 2017 (in G.U. 15/12/2017, n. 292) ha disposto (con l'art. 1, comam 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,3 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2018\".\n\n---------------\nAGGIORNAMENTO (280)\n\n Il Decreto 12 dicembre 2018 (in G.U. 15/12/2018, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,8 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2019\".\n\n---------------\nAGGIORNAMENTO (299)\n\n Il Decreto 12 dicembre 2019 (in G.U. 14/12/2019, n. 293) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata allo 0,05 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2020\".\n\n---------------\nAGGIORNAMENTO (307)\n\n Il Decreto 11 dicembre 2020 (in G.U. 15/12/2020, n. 310) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,01 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2021\".\n\n---------------\nAGGIORNAMENTO (314)\n\n Il Decreto 13 dicembre 2021 (in G.U. 15/12/2021, n. 297) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata all'1,25 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2022\".\n\n---------------\nAGGIORNAMENTO (321a)\n\n Il Decreto 13 dicembre 2022 (in G.U. 15/12/2022, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 5 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2023\".\n\n---------------\nAGGIORNAMENTO (327)\n\n Il Decreto 29 novembre 2023 (in G.U. 11/12/2023, n. 288) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata al 2,50 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2024\".\n\n---------------\nAGGIORNAMENTO (336a)\n\n Il Decreto 10 dicembre 2024 (in G.U. 16/12/2024, n. 294) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2025\".\n\n---------------\nAGGIORNAMENTO (348)\n\n Il Decreto 10 dicembre 2025 (in G.U. 13/12/2025, n. 289) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata all'1,60 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2026\".",
+      "projection": "Art. 1284.  (Saggio degli interessi).  Il saggio degli interessi legali è determinato in misura pari al 5 per cento in ragione d'anno. Il Ministro del tesoro, con proprio decreto pubblicato nella Gazzetta Ufficiale della Repubblica italiana non oltre il 15 dicembre dell'anno precedente a quello cui il saggio si riferisce, può modificarne annualmente la misura, sulla base del rendimento medio annuo lordo dei titoli di Stato di durata non superiore a dodici mesi e tenuto conto del tasso di inflazione registrato nell'anno. Qualora entro il 15 dicembre non sia fissata una nuova misura del saggio, questo rimane invariato per l'anno successivo. (129a) (140a) (151a) (161a) (193a) (211a) (221a) (237a) (244a) (252a) (260a)(276) (280) (299) (307) (314) (321a) (327)(336a) ((348)) Allo stesso saggio si computano gli interessi convenzionali, se le parti non ne hanno determinato la misura.  Gli interessi superiori alla misura legale devono essere determinati per iscritto; altrimenti sono dovuti nella misura legale.  Se le parti non ne hanno determinato la misura, dal momento in cui è proposta domanda giudiziale il saggio degli interessi legali è pari a quello previsto dalla legislazione speciale relativa ai ritardi di pagamento nelle transazioni commerciali. (242)  La disposizione del quarto comma si applica anche all'atto con cui si promuove il procedimento arbitrale. (242)---------------AGGIORNAMENTO (129a) Il Decreto 10 dicembre 1998 (in G.U. 11/12/1998, n. 289) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2,5 per cento in ragione d'anno, con decorrenza dal 1 gennaio 1999\".---------------AGGIORNAMENTO (140a) Il Decreto 11 dicembre 2000 (in G.U. 15/12/2000, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 3,5 per cento in ragione d'anno, con decorrenza dal 1o gennaio 2001\".---------------AGGIORNAMENTO (151a) Il Decreto 11 dicembre 2001 (in G.U. 14/12/2001, n. 290) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 3 per cento in ragione d'anno, con decorrenza dal 1 gennaio 2002\".---------------AGGIORNAMENTO (161a) Il Decreto 1 dicembre 2003 (in G.U. 10/12/2003, n. 286) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2,5 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2004\".---------------AGGIORNAMENTO (193a) Il Decreto 12 dicembre 2007 (in G.U. 15/12/2007, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 3 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2008\".---------------AGGIORNAMENTO (207a) Il Decreto 4 dicembre 2009 (in G.U. 15/12/2009, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata all'1% in ragione d'anno, con decorrenza dal 1° gennaio 2010\".---------------AGGIORNAMENTO (211a) Il Decreto 7 dicembre 2010 (in G.U. 15/12/2010, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata all'1,5% in ragione d'anno, con decorrenza dal 1° gennaio 2011\".---------------AGGIORNAMENTO (221a) Il Decreto 12 dicembre 2011 (in G.U. 15/12/2011, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2,5% in ragione d'anno, con decorrenza dal 1° gennaio 2012\".---------------AGGIORNAMENTO (237a) Il Decreto 12 dicembre 2013 (in G.U. 13/12/2013, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata all'1 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2014\".---------------AGGIORNAMENTO (242) Il D.L. 12 settembre 2014, n. 132 convertito con modificazioni dalla L. 10 novembre 2014, n. 162 ha disposto (con l'art. 17, comma 2) che le presenti modifiche producono effetti rispetto ai procedimenti iniziati a decorrere dal trentesimo giorno successivo all'entrata in vigore della legge di conversione del decreto medesimo.---------------AGGIORNAMENTO (244a) Il Decreto 11 dicembre 2014 (in G.U. 15/12/2014, n. 290) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata allo 0,5 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2015\".---------------AGGIORNAMENTO (252a) Il Decreto 11 dicembre 2015 (in G.U. 15/12/2015, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata allo 0,2 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2016\".---------------AGGIORNAMENTO (260a) Il Decreto 7 dicembre 2016 (in G.U. 14/12/2016, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,1 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2017\".---------------AGGIORNAMENTO (276) Il Decreto 13 dicembre 2017 (in G.U. 15/12/2017, n. 292) ha disposto (con l'art. 1, comam 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,3 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2018\".---------------AGGIORNAMENTO (280) Il Decreto 12 dicembre 2018 (in G.U. 15/12/2018, n. 291) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,8 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2019\".---------------AGGIORNAMENTO (299) Il Decreto 12 dicembre 2019 (in G.U. 14/12/2019, n. 293) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata allo 0,05 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2020\".---------------AGGIORNAMENTO (307) Il Decreto 11 dicembre 2020 (in G.U. 15/12/2020, n. 310) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata allo 0,01 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2021\".---------------AGGIORNAMENTO (314) Il Decreto 13 dicembre 2021 (in G.U. 15/12/2021, n. 297) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata all'1,25 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2022\".---------------AGGIORNAMENTO (321a) Il Decreto 13 dicembre 2022 (in G.U. 15/12/2022, n. 292) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 5 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2023\".---------------AGGIORNAMENTO (327) Il Decreto 29 novembre 2023 (in G.U. 11/12/2023, n. 288) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'articolo 1284 del codice civile è fissata al 2,50 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2024\".---------------AGGIORNAMENTO (336a) Il Decreto 10 dicembre 2024 (in G.U. 16/12/2024, n. 294) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata al 2 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2025\".---------------AGGIORNAMENTO (348) Il Decreto 10 dicembre 2025 (in G.U. 13/12/2025, n. 289) ha disposto (con l'art. 1, comma 1) che \"La misura del saggio degli interessi legali di cui all'art. 1284 del codice civile è fissata all'1,60 per cento in ragione d'anno, con decorrenza dal 1° gennaio 2026\".",
+      "passages": [
+        {
+          "quote": "relativa ai ritardi di pagamento nelle transazioni commercia",
+          "start": 1201,
+          "text": "relativa ai ritardi di pagamento nelle transazioni commercia"
+        },
+        {
+          "quote": "degli interessi legali di cui all'art. 1284 del codice civil",
+          "refused": "ambiguous"
+        },
+        {
+          "quote": "1284 del codice civile è fissata allo 0,01 per cento in ragi",
+          "start": 6415,
+          "text": "1284 del codice civile è fissata allo 0,01 per cento in ragi"
+        }
+      ]
+    },
+    {
+      "id": "nrm-l241-21octies",
+      "raw": "Art. 21-octies\n(Annullabilità del provvedimento).\n\n1. È annullabile il provvedimento amministrativo adottato in violazione di legge o viziato da eccesso di potere o da incompetenza.\n\n2. Non è annullabile il provvedimento adottato in violazione di norme sul procedimento o sulla forma degli atti qualora, per la natura vincolata del provvedimento, sia palese che il suo contenuto dispositivo non avrebbe potuto essere diverso da quello in concreto adottato. Il provvedimento amministrativo non è comunque annullabile per mancata comunicazione dell'avvio del procedimento qualora l'amministrazione dimostri in giudizio che il contenuto del provvedimento non avrebbe potuto essere diverso da quello in concreto adottato. ((La disposizione di cui al secondo periodo non si applica al provvedimento adottato in violazione dell'articolo 10-bis.))",
+      "projection": "Art. 21-octies(Annullabilità del provvedimento).1. È annullabile il provvedimento amministrativo adottato in violazione di legge o viziato da eccesso di potere o da incompetenza.2. Non è annullabile il provvedimento adottato in violazione di norme sul procedimento o sulla forma degli atti qualora, per la natura vincolata del provvedimento, sia palese che il suo contenuto dispositivo non avrebbe potuto essere diverso da quello in concreto adottato. Il provvedimento amministrativo non è comunque annullabile per mancata comunicazione dell'avvio del procedimento qualora l'amministrazione dimostri in giudizio che il contenuto del provvedimento non avrebbe potuto essere diverso da quello in concreto adottato. ((La disposizione di cui al secondo periodo non si applica al provvedimento adottato in violazione dell'articolo 10-bis.))",
+      "passages": [
+        {
+          "quote": "legge o viziato da eccesso di potere o da incompetenza.\n\n2. No",
+          "start": 123,
+          "text": "legge o viziato da eccesso di potere o da incompetenza.2. No"
+        },
+        {
+          "quote": "dispositivo non avrebbe potuto essere diverso da quello in c",
+          "start": 374,
+          "text": "dispositivo non avrebbe potuto essere diverso da quello in c"
+        },
+        {
+          "quote": "essere diverso da quello in concreto adottato. ((La disposiz",
+          "start": 666,
+          "text": "essere diverso da quello in concreto adottato. ((La disposiz"
+        }
+      ]
+    },
+    {
+      "id": "nrm-dlgs231-25ter",
+      "raw": "Art. 25-ter\n(Reati societari).\n\n1. In relazione ai reati in materia societaria previsti dal codice civile ((o da altre leggi speciali)), si applicano all'ente le seguenti sanzioni pecuniarie: \n\na) per il delitto di false comunicazioni sociali previsto dall'articolo 2621 del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; \n\na-bis) per il delitto di false comunicazioni sociali previsto dall'articolo 2621-bis del codice civile, la sanzione pecuniaria da cento a duecento quote; \n\nb) per il delitto di false comunicazioni sociali previsto dall'articolo 2622 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote; \n\nc) LETTERA ABROGATA DALLA L. 27 MAGGIO 2015, N. 69; \n\nd) per la contravvenzione di falso in prospetto, prevista dall'articolo 2623, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9) \n\ne) per il delitto di falso in prospetto, previsto dall'articolo 2623, secondo comma, del codice civile, la sanzione pecuniaria da duecento a trecentotrenta quote; (9) \n\nf) per la contravvenzione di falsità nelle relazioni o nelle comunicazioni delle società di revisione, prevista dall'articolo 2624, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9) \n\ng) per il delitto di falsità nelle relazioni o nelle comunicazioni delle società di revisione, previsto dall'articolo 2624, secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9) \n\nh) per il delitto di impedito controllo, previsto dall'articolo 2625, secondo comma, del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) \n\ni) per il delitto di formazione fittizia del capitale, previsto dall'articolo 2632 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) \n\nl) per il delitto di indebita restituzione dei conferimenti, previsto dall'articolo 2626 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) \n\nm) per la contravvenzione di illegale ripartizione degli utili e delle riserve, prevista dall'articolo 2627 del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9) \n\nn) per il delitto di illecite operazioni sulle azioni o quote sociali o della società controllante, previsto dall'articolo 2628 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) \n\no) per il delitto di operazioni in pregiudizio dei creditori, previsto dall'articolo 2629 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9) \n\np) per il delitto di indebita ripartizione dei beni sociali da parte dei liquidatori, previsto dall'articolo 2633 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9) \nq) per il delitto di illecita influenza sull'assemblea, previsto dall'articolo 2636 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9) \n\nr) per il delitto di aggiotaggio, previsto dall'articolo 2637 del codice civile e per il delitto di omessa comunicazione del conflitto d'interessi previsto dall'articolo 2629-bis del codice civile, la sanzione pecuniaria da duecento a cinquecento quote; (9) \n\ns) per i delitti di ostacolo all'esercizio delle funzioni delle autorità pubbliche di vigilanza, previsti dall'articolo 2638, primo e secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9) \n\ns-bis) per il delitto di corruzione tra privati, nei casi previsti dal terzo comma dell'articolo 2635 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote e, nei casi di istigazione di cui al primo comma dell'articolo 2635-bis del codice civile, la sanzione pecuniaria da duecento a quattrocento quote. Si applicano altresì le sanzioni interdittive previste dall'articolo 9, comma 2((;))\n\n((s-ter) per il delitto di false o omesse dichiarazioni per il rilascio del certificato preliminare previsto dalla normativa attuativa della direttiva (UE) 2019/2121, del Parlamento europeo e del Consiglio, del 27 novembre 2019, la sanzione pecuniaria da centocinquanta a trecento quote.))",
+      "projection": "Art. 25-ter(Reati societari).1. In relazione ai reati in materia societaria previsti dal codice civile ((o da altre leggi speciali)), si applicano all'ente le seguenti sanzioni pecuniarie: a) per il delitto di false comunicazioni sociali previsto dall'articolo 2621 del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; a-bis) per il delitto di false comunicazioni sociali previsto dall'articolo 2621-bis del codice civile, la sanzione pecuniaria da cento a duecento quote; b) per il delitto di false comunicazioni sociali previsto dall'articolo 2622 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote; c) LETTERA ABROGATA DALLA L. 27 MAGGIO 2015, N. 69; d) per la contravvenzione di falso in prospetto, prevista dall'articolo 2623, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9) e) per il delitto di falso in prospetto, previsto dall'articolo 2623, secondo comma, del codice civile, la sanzione pecuniaria da duecento a trecentotrenta quote; (9) f) per la contravvenzione di falsità nelle relazioni o nelle comunicazioni delle società di revisione, prevista dall'articolo 2624, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9) g) per il delitto di falsità nelle relazioni o nelle comunicazioni delle società di revisione, previsto dall'articolo 2624, secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9) h) per il delitto di impedito controllo, previsto dall'articolo 2625, secondo comma, del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) i) per il delitto di formazione fittizia del capitale, previsto dall'articolo 2632 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) l) per il delitto di indebita restituzione dei conferimenti, previsto dall'articolo 2626 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) m) per la contravvenzione di illegale ripartizione degli utili e delle riserve, prevista dall'articolo 2627 del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9) n) per il delitto di illecite operazioni sulle azioni o quote sociali o della società controllante, previsto dall'articolo 2628 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9) o) per il delitto di operazioni in pregiudizio dei creditori, previsto dall'articolo 2629 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9) p) per il delitto di indebita ripartizione dei beni sociali da parte dei liquidatori, previsto dall'articolo 2633 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9) q) per il delitto di illecita influenza sull'assemblea, previsto dall'articolo 2636 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9) r) per il delitto di aggiotaggio, previsto dall'articolo 2637 del codice civile e per il delitto di omessa comunicazione del conflitto d'interessi previsto dall'articolo 2629-bis del codice civile, la sanzione pecuniaria da duecento a cinquecento quote; (9) s) per i delitti di ostacolo all'esercizio delle funzioni delle autorità pubbliche di vigilanza, previsti dall'articolo 2638, primo e secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9) s-bis) per il delitto di corruzione tra privati, nei casi previsti dal terzo comma dell'articolo 2635 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote e, nei casi di istigazione di cui al primo comma dell'articolo 2635-bis del codice civile, la sanzione pecuniaria da duecento a quattrocento quote. Si applicano altresì le sanzioni interdittive previste dall'articolo 9, comma 2((;))((s-ter) per il delitto di false o omesse dichiarazioni per il rilascio del certificato preliminare previsto dalla normativa attuativa della direttiva (UE) 2019/2121, del Parlamento europeo e del Consiglio, del 27 novembre 2019, la sanzione pecuniaria da centocinquanta a trecento quote.))",
+      "passages": [
+        {
+          "quote": "pecuniaria da quattrocento a seicento quote; \n\nc) LETTERA ABRO",
+          "start": 604,
+          "text": "pecuniaria da quattrocento a seicento quote; c) LETTERA ABRO"
+        },
+        {
+          "quote": "dei conferimenti, previsto dall'articolo 2626 del codice civ",
+          "start": 1838,
+          "text": "dei conferimenti, previsto dall'articolo 2626 del codice civ"
+        },
+        {
+          "quote": "dall'articolo 2638, primo e secondo comma, del codice civile",
+          "start": 3264,
+          "text": "dall'articolo 2638, primo e secondo comma, del codice civile"
+        }
+      ]
+    },
+    {
+      "id": "nrm-fx-akn-comma-div",
+      "raw": "Art. 3\n(( (Motivazione del provvedimento) ))\n\n1. Ogni provvedimento amministrativo, compresi quelli concernenti l'organizzazione amministrativa, lo svolgimento dei pubblici concorsi ed il personale, deve essere motivato, salvo che nelle ipotesi previste dal comma 2. La motivazione deve indicare i presupposti di fatto e le ragioni giuridiche che hanno determinato la decisione dell'amministrazione, in relazione alle risultanze dell'istruttoria.\n\n2. La motivazione non è richiesta per gli atti normativi e per quelli a contenuto generale.\n\n3. Se le ragioni della decisione risultano da altro atto dell'amministrazione richiamato dalla decisione stessa, insieme alla comunicazione di quest'ultima deve essere indicato e reso disponibile, a norma della presente legge, anche l'atto cui essa si richiama.\n\n4. In ogni atto notificato al destinatario devono essere indicati il termine e l'autorità cui è possibile ricorrere.",
+      "projection": "Art. 3(( (Motivazione del provvedimento) ))1. Ogni provvedimento amministrativo, compresi quelli concernenti l'organizzazione amministrativa, lo svolgimento dei pubblici concorsi ed il personale, deve essere motivato, salvo che nelle ipotesi previste dal comma 2. La motivazione deve indicare i presupposti di fatto e le ragioni giuridiche che hanno determinato la decisione dell'amministrazione, in relazione alle risultanze dell'istruttoria.2. La motivazione non è richiesta per gli atti normativi e per quelli a contenuto generale.3. Se le ragioni della decisione risultano da altro atto dell'amministrazione richiamato dalla decisione stessa, insieme alla comunicazione di quest'ultima deve essere indicato e reso disponibile, a norma della presente legge, anche l'atto cui essa si richiama.4. In ogni atto notificato al destinatario devono essere indicati il termine e l'autorità cui è possibile ricorrere.",
+      "passages": [
+        {
+          "quote": "amministrativa, lo svolgimento dei pubblici concorsi ed il p",
+          "start": 126,
+          "text": "amministrativa, lo svolgimento dei pubblici concorsi ed il p"
+        },
+        {
+          "quote": "relazione alle risultanze dell'istruttoria.\n\n2. La motivazione",
+          "start": 400,
+          "text": "relazione alle risultanze dell'istruttoria.2. La motivazione"
+        },
+        {
+          "quote": "disponibile, a norma della presente legge, anche l'atto cui ",
+          "start": 718,
+          "text": "disponibile, a norma della presente legge, anche l'atto cui"
+        }
+      ]
+    },
+    {
+      "id": "nrm-fx-fallback",
+      "raw": "Art. 6-bis\n\n(( (Conflitto di interessi). ))\n\n((1. Il responsabile del procedimento e i titolari degli uffici competenti ad adottare i pareri, le valutazioni tecniche, gli atti endoprocedimentali e il provvedimento finale devono astenersi in caso di conflitto di interessi, segnalando ogni situazione di conflitto, anche potenziale))",
+      "projection": "Art. 6-bis(( (Conflitto di interessi). ))((1. Il responsabile del procedimento e i titolari degli uffici competenti ad adottare i pareri, le valutazioni tecniche, gli atti endoprocedimentali e il provvedimento finale devono astenersi in caso di conflitto di interessi, segnalando ogni situazione di conflitto, anche potenziale))",
+      "passages": [
+        {
+          "quote": "responsabile del procedimento e i titolari degli uffici comp",
+          "start": 49,
+          "text": "responsabile del procedimento e i titolari degli uffici comp"
+        },
+        {
+          "quote": "valutazioni tecniche, gli atti endoprocedimentali e il provv",
+          "start": 141,
+          "text": "valutazioni tecniche, gli atti endoprocedimentali e il provv"
+        },
+        {
+          "quote": "interessi, segnalando ogni situazione di conflitto, anche po",
+          "start": 258,
+          "text": "interessi, segnalando ogni situazione di conflitto, anche po"
+        }
+      ]
+    },
+    {
+      "id": "nrm-fx-abrogato",
+      "raw": "Art. 3\n\n((ARTICOLO ABROGATO DAL D.LGS. 10 AGOSTO 2018, N. 101))",
+      "projection": "Art. 3((ARTICOLO ABROGATO DAL D.LGS. 10 AGOSTO 2018, N. 101))",
+      "passages": [
+        {
+          "quote": "3\n\n((ARTICOLO ABROGATO DAL D.LGS. 10 AGOSTO 2018, N. 101))",
+          "start": 5,
+          "text": "3((ARTICOLO ABROGATO DAL D.LGS. 10 AGOSTO 2018, N. 101))"
+        },
+        {
+          "quote": "DAL D.LGS. 10 AGOSTO 2018, N. 101))",
+          "start": 26,
+          "text": "DAL D.LGS. 10 AGOSTO 2018, N. 101))"
+        }
+      ]
+    },
+    {
+      "id": "nrm-fx-attachment",
+      "raw": "Art. 2043. \n\n (Risarcimento per fatto illecito). \n\n Qualunque fatto doloso o colposo, che cagiona ad altri un danno ingiusto, obbliga colui che ha commesso il fatto a risarcire il danno.",
+      "projection": "Art. 2043.  (Risarcimento per fatto illecito).  Qualunque fatto doloso o colposo, che cagiona ad altri un danno ingiusto, obbliga colui che ha commesso il fatto a risarcire il danno.",
+      "passages": [
+        {
+          "quote": "per fatto illecito). \n\n Qualunque fatto doloso o colposo, che ",
+          "start": 26,
+          "text": "per fatto illecito).  Qualunque fatto doloso o colposo, che"
+        },
+        {
+          "quote": "colposo, che cagiona ad altri un danno ingiusto, obbliga col",
+          "start": 73,
+          "text": "colposo, che cagiona ad altri un danno ingiusto, obbliga col"
+        },
+        {
+          "quote": "commesso il fatto a risarcire il danno.",
+          "start": 143,
+          "text": "commesso il fatto a risarcire il danno."
+        }
+      ]
+    },
+    {
+      "id": "nrm-fx-cp544",
+      "raw": "Art. 544. \n\n((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))",
+      "projection": "Art. 544. ((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))",
+      "passages": [
+        {
+          "quote": "544. \n\n((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))",
+          "start": 5,
+          "text": "544. ((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))"
+        },
+        {
+          "quote": "ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))",
+          "start": 21,
+          "text": "ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))"
+        }
+      ]
+    },
+    {
+      "id": "nrm-fx-cp524",
+      "raw": "Codice Penale-art. 524\n\n((ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996, N. 66))",
+      "projection": "Codice Penale-art. 524((ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996, N. 66))",
+      "passages": [
+        {
+          "quote": "Penale-art. 524\n\n((ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996",
+          "start": 7,
+          "text": "Penale-art. 524((ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996"
+        },
+        {
+          "quote": "ABROGATO DALLA L. 15 FEBBRAIO 1996, N. 66))",
+          "start": 33,
+          "text": "ABROGATO DALLA L. 15 FEBBRAIO 1996, N. 66))"
+        },
+        {
+          "quote": "FEBBRAIO 1996, N. 66))",
+          "start": 54,
+          "text": "FEBBRAIO 1996, N. 66))"
+        }
+      ]
+    },
+    {
+      "id": "eu-gdpr-6",
+      "raw": "Articolo 6\nLiceità del trattamento\n1.\u00a0\u00a0\u00a0Il trattamento è lecito solo se e nella misura in cui ricorre almeno una delle seguenti condizioni:a)l'interessato ha espresso il consenso al trattamento dei propri dati personali per una o più specifiche finalità;b)il trattamento è necessario all'esecuzione di un contratto di cui l'interessato è parte o all'esecuzione di misure precontrattuali adottate su richiesta dello stesso;c)il trattamento è necessario per adempiere un obbligo legale al quale è soggetto il titolare del trattamento;d)il trattamento è necessario per la salvaguardia degli interessi vitali dell'interessato o di un'altra persona fisica;e)il trattamento è necessario per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri di cui è investito il titolare del trattamento;f)il trattamento è necessario per il perseguimento del legittimo interesse del titolare del trattamento o di terzi, a condizione che non prevalgano gli interessi o i diritti e le libertà fondamentali dell'interessato che richiedono la protezione dei dati personali, in particolare se l'interessato è un minore.La lettera f) del primo comma non si applica al trattamento di dati effettuato dalle autorità pubbliche nell'esecuzione dei loro compiti.\n2.\u00a0\u00a0\u00a0Gli Stati membri possono mantenere o introdurre disposizioni più specifiche per adeguare l'applicazione delle norme del presente regolamento con riguardo al trattamento, in conformità del paragrafo\u00a01, lettere\u00a0c) ed e), determinando con maggiore precisione requisiti specifici per il trattamento e altre misure atte a garantire un trattamento lecito e corretto anche per le altre specifiche situazioni di trattamento di cui al capo IX.\n3.\u00a0\u00a0\u00a0La base su cui si fonda il trattamento dei dati di cui al paragrafo 1, lettere c) ed e), deve essere stabilita:a)dal diritto dell'Unione; ob)dal diritto dello Stato membro cui è soggetto il titolare del trattamento.La finalità del trattamento è determinata in tale base giuridica o, per quanto riguarda il trattamento di cui al paragrafo 1, lettera e), è necessaria per l'esecuzione di un compito svolto nel pubblico interesse o connesso all'esercizio di pubblici poteri di cui è investito il titolare del trattamento. Tale base giuridica potrebbe contenere disposizioni specifiche per adeguare l'applicazione delle norme del presente regolamento, tra cui: le condizioni generali relative alla liceità del trattamento da parte del titolare del trattamento; le tipologie di dati oggetto del trattamento; gli interessati; i soggetti cui possono essere comunicati i dati personali e le finalità per cui sono comunicati; le limitazioni della finalità, i periodi di conservazione e le operazioni e procedure di trattamento, comprese le misure atte a garantire un trattamento lecito e corretto, quali quelle per altre specifiche situazioni di trattamento di cui al capo IX. Il diritto dell'Unione o degli Stati membri persegue un obiettivo di interesse pubblico ed è proporzionato all'obiettivo legittimo perseguito.\n4.\u00a0\u00a0\u00a0Laddove il trattamento per una finalità diversa da quella per la quale i dati personali sono stati raccolti non sia basato sul consenso dell'interessato o su un atto legislativo dell'Unione o degli Stati membri che costituisca una misura necessaria e proporzionata in una società democratica per la salvaguardia degli obiettivi di cui all'articolo\u00a023, paragrafo\u00a01, al fine di verificare se il trattamento per un'altra finalità sia compatibile con la finalità per la quale i dati personali sono stati inizialmente raccolti, il titolare del trattamento tiene conto, tra l'altro:a)di ogni nesso tra le finalità per cui i dati personali sono stati raccolti e le finalità dell'ulteriore trattamento previsto;b)del contesto in cui i dati personali sono stati raccolti, in particolare relativamente alla relazione tra l'interessato e il titolare del trattamento;c)della natura dei dati personali, specialmente se siano trattate categorie particolari di dati personali ai sensi dell'articolo\u00a09, oppure se siano trattati dati relativi a condanne penali e a reati ai sensi dell'articolo\u00a010;d)delle possibili conseguenze dell'ulteriore trattamento previsto per gli interessati;e)dell'esistenza di garanzie adeguate, che possono comprendere la cifratura o la pseudonimizzazione.",
+      "projection": "Articolo 6Liceità del trattamento1.\u00a0\u00a0\u00a0Il trattamento è lecito solo se e nella misura in cui ricorre almeno una delle seguenti condizioni:a)l'interessato ha espresso il consenso al trattamento dei propri dati personali per una o più specifiche finalità;b)il trattamento è necessario all'esecuzione di un contratto di cui l'interessato è parte o all'esecuzione di misure precontrattuali adottate su richiesta dello stesso;c)il trattamento è necessario per adempiere un obbligo legale al quale è soggetto il titolare del trattamento;d)il trattamento è necessario per la salvaguardia degli interessi vitali dell'interessato o di un'altra persona fisica;e)il trattamento è necessario per l'esecuzione di un compito di interesse pubblico o connesso all'esercizio di pubblici poteri di cui è investito il titolare del trattamento;f)il trattamento è necessario per il perseguimento del legittimo interesse del titolare del trattamento o di terzi, a condizione che non prevalgano gli interessi o i diritti e le libertà fondamentali dell'interessato che richiedono la protezione dei dati personali, in particolare se l'interessato è un minore.La lettera f) del primo comma non si applica al trattamento di dati effettuato dalle autorità pubbliche nell'esecuzione dei loro compiti.2.\u00a0\u00a0\u00a0Gli Stati membri possono mantenere o introdurre disposizioni più specifiche per adeguare l'applicazione delle norme del presente regolamento con riguardo al trattamento, in conformità del paragrafo\u00a01, lettere\u00a0c) ed e), determinando con maggiore precisione requisiti specifici per il trattamento e altre misure atte a garantire un trattamento lecito e corretto anche per le altre specifiche situazioni di trattamento di cui al capo IX.3.\u00a0\u00a0\u00a0La base su cui si fonda il trattamento dei dati di cui al paragrafo 1, lettere c) ed e), deve essere stabilita:a)dal diritto dell'Unione; ob)dal diritto dello Stato membro cui è soggetto il titolare del trattamento.La finalità del trattamento è determinata in tale base giuridica o, per quanto riguarda il trattamento di cui al paragrafo 1, lettera e), è necessaria per l'esecuzione di un compito svolto nel pubblico interesse o connesso all'esercizio di pubblici poteri di cui è investito il titolare del trattamento. Tale base giuridica potrebbe contenere disposizioni specifiche per adeguare l'applicazione delle norme del presente regolamento, tra cui: le condizioni generali relative alla liceità del trattamento da parte del titolare del trattamento; le tipologie di dati oggetto del trattamento; gli interessati; i soggetti cui possono essere comunicati i dati personali e le finalità per cui sono comunicati; le limitazioni della finalità, i periodi di conservazione e le operazioni e procedure di trattamento, comprese le misure atte a garantire un trattamento lecito e corretto, quali quelle per altre specifiche situazioni di trattamento di cui al capo IX. Il diritto dell'Unione o degli Stati membri persegue un obiettivo di interesse pubblico ed è proporzionato all'obiettivo legittimo perseguito.4.\u00a0\u00a0\u00a0Laddove il trattamento per una finalità diversa da quella per la quale i dati personali sono stati raccolti non sia basato sul consenso dell'interessato o su un atto legislativo dell'Unione o degli Stati membri che costituisca una misura necessaria e proporzionata in una società democratica per la salvaguardia degli obiettivi di cui all'articolo\u00a023, paragrafo\u00a01, al fine di verificare se il trattamento per un'altra finalità sia compatibile con la finalità per la quale i dati personali sono stati inizialmente raccolti, il titolare del trattamento tiene conto, tra l'altro:a)di ogni nesso tra le finalità per cui i dati personali sono stati raccolti e le finalità dell'ulteriore trattamento previsto;b)del contesto in cui i dati personali sono stati raccolti, in particolare relativamente alla relazione tra l'interessato e il titolare del trattamento;c)della natura dei dati personali, specialmente se siano trattate categorie particolari di dati personali ai sensi dell'articolo\u00a09, oppure se siano trattati dati relativi a condanne penali e a reati ai sensi dell'articolo\u00a010;d)delle possibili conseguenze dell'ulteriore trattamento previsto per gli interessati;e)dell'esistenza di garanzie adeguate, che possono comprendere la cifratura o la pseudonimizzazione.",
+      "passages": [
+        {
+          "quote": "fisica;e)il trattamento è necessario per l'esecuzione di un ",
+          "start": 642,
+          "text": "fisica;e)il trattamento è necessario per l'esecuzione di un"
+        },
+        {
+          "quote": "finalità del trattamento è determinata in tale base giuridic",
+          "start": 1932,
+          "text": "finalità del trattamento è determinata in tale base giuridic"
+        },
+        {
+          "quote": "per un'altra finalità sia compatibile con la finalità per la",
+          "start": 3434,
+          "text": "per un'altra finalità sia compatibile con la finalità per la"
+        }
+      ]
+    },
+    {
+      "id": "eu-gdpr-17",
+      "raw": "Articolo 17\nDiritto alla cancellazione («diritto all'oblio»)\n1.\u00a0\u00a0\u00a0L'interessato ha il diritto di ottenere dal titolare del trattamento la cancellazione dei dati personali che lo riguardano senza ingiustificato ritardo e il titolare del trattamento ha l'obbligo di cancellare senza ingiustificato ritardo i dati personali, se sussiste uno dei motivi seguenti:a)i dati personali non sono più necessari rispetto alle finalità per le quali sono stati raccolti o altrimenti trattati;b)l'interessato revoca il consenso su cui si basa il trattamento conformemente all'articolo 6, paragrafo 1, lettera a), o all'articolo 9, paragrafo 2, lettera a), e se non sussiste altro fondamento giuridico per il trattamento;c)l'interessato si oppone al trattamento ai sensi dell'articolo 21, paragrafo 1, e non sussiste alcun motivo legittimo prevalente per procedere al trattamento, oppure si oppone al trattamento ai sensi dell'articolo 21, paragrafo 2;d)i dati personali sono stati trattati illecitamente;e)i dati personali devono essere cancellati per adempiere un obbligo legale previsto dal diritto dell'Unione o dello Stato membro cui è soggetto il titolare del trattamento;f)i dati personali sono stati raccolti relativamente all'offerta di servizi della società dell'informazione di cui all'articolo\u00a08, paragrafo\u00a01.\n2.\u00a0\u00a0\u00a0Il titolare del trattamento, se ha reso pubblici dati personali ed è obbligato, ai sensi del paragrafo 1, a cancellarli, tenendo conto della tecnologia disponibile e dei costi di attuazione adotta le misure ragionevoli, anche tecniche, per informare i titolari del trattamento che stanno trattando i dati personali della richiesta dell'interessato di cancellare qualsiasi link, copia o riproduzione dei suoi dati personali.\n3.\u00a0\u00a0\u00a0I paragrafi 1 e 2 non si applicano nella misura in cui il trattamento sia necessario:a)per l'esercizio del diritto alla libertà di espressione e di informazione;b)per l'adempimento di un obbligo legale che richieda il trattamento previsto dal diritto dell'Unione o dello Stato membro cui è soggetto il titolare del trattamento o per l'esecuzione di un compito svolto nel pubblico interesse oppure nell'esercizio di pubblici poteri di cui è investito il titolare del trattamento;c)per motivi di interesse pubblico nel settore della sanità pubblica in conformità dell'articolo 9, paragrafo 2, lettere\u00a0h) e\u00a0i), e dell'articolo\u00a09, paragrafo 3;d)a fini di archiviazione nel pubblico interesse, di ricerca scientifica o storica o a fini statistici conformemente all'articolo 89, paragrafo 1, nella misura in cui il diritto di cui al paragrafo 1 rischi di rendere impossibile o di pregiudicare gravemente il conseguimento degli obiettivi di tale trattamento; oe)per l'accertamento, l'esercizio o la difesa di un diritto in sede giudiziaria.",
+      "projection": "Articolo 17Diritto alla cancellazione («diritto all'oblio»)1.\u00a0\u00a0\u00a0L'interessato ha il diritto di ottenere dal titolare del trattamento la cancellazione dei dati personali che lo riguardano senza ingiustificato ritardo e il titolare del trattamento ha l'obbligo di cancellare senza ingiustificato ritardo i dati personali, se sussiste uno dei motivi seguenti:a)i dati personali non sono più necessari rispetto alle finalità per le quali sono stati raccolti o altrimenti trattati;b)l'interessato revoca il consenso su cui si basa il trattamento conformemente all'articolo 6, paragrafo 1, lettera a), o all'articolo 9, paragrafo 2, lettera a), e se non sussiste altro fondamento giuridico per il trattamento;c)l'interessato si oppone al trattamento ai sensi dell'articolo 21, paragrafo 1, e non sussiste alcun motivo legittimo prevalente per procedere al trattamento, oppure si oppone al trattamento ai sensi dell'articolo 21, paragrafo 2;d)i dati personali sono stati trattati illecitamente;e)i dati personali devono essere cancellati per adempiere un obbligo legale previsto dal diritto dell'Unione o dello Stato membro cui è soggetto il titolare del trattamento;f)i dati personali sono stati raccolti relativamente all'offerta di servizi della società dell'informazione di cui all'articolo\u00a08, paragrafo\u00a01.2.\u00a0\u00a0\u00a0Il titolare del trattamento, se ha reso pubblici dati personali ed è obbligato, ai sensi del paragrafo 1, a cancellarli, tenendo conto della tecnologia disponibile e dei costi di attuazione adotta le misure ragionevoli, anche tecniche, per informare i titolari del trattamento che stanno trattando i dati personali della richiesta dell'interessato di cancellare qualsiasi link, copia o riproduzione dei suoi dati personali.3.\u00a0\u00a0\u00a0I paragrafi 1 e 2 non si applicano nella misura in cui il trattamento sia necessario:a)per l'esercizio del diritto alla libertà di espressione e di informazione;b)per l'adempimento di un obbligo legale che richieda il trattamento previsto dal diritto dell'Unione o dello Stato membro cui è soggetto il titolare del trattamento o per l'esecuzione di un compito svolto nel pubblico interesse oppure nell'esercizio di pubblici poteri di cui è investito il titolare del trattamento;c)per motivi di interesse pubblico nel settore della sanità pubblica in conformità dell'articolo 9, paragrafo 2, lettere\u00a0h) e\u00a0i), e dell'articolo\u00a09, paragrafo 3;d)a fini di archiviazione nel pubblico interesse, di ricerca scientifica o storica o a fini statistici conformemente all'articolo 89, paragrafo 1, nella misura in cui il diritto di cui al paragrafo 1 rischi di rendere impossibile o di pregiudicare gravemente il conseguimento degli obiettivi di tale trattamento; oe)per l'accertamento, l'esercizio o la difesa di un diritto in sede giudiziaria.",
+      "passages": [
+        {
+          "quote": "finalità per le quali sono stati raccolti o altrimenti tratt",
+          "start": 412,
+          "text": "finalità per le quali sono stati raccolti o altrimenti tratt"
+        },
+        {
+          "quote": "società dell'informazione di cui all'articolo\u00a08, paragrafo\u00a01",
+          "start": 1242,
+          "text": "società dell'informazione di cui all'articolo\u00a08, paragrafo\u00a01"
+        },
+        {
+          "quote": "trattamento;c)per motivi di interesse pubblico nel settore d",
+          "start": 2202,
+          "text": "trattamento;c)per motivi di interesse pubblico nel settore d"
+        }
+      ]
+    },
+    {
+      "id": "eu-aiact-3",
+      "raw": "Articolo\u00a03\nDefinizioni\nAi fini del presente regolamento si applicano le definizioni seguenti:\n1) «sistema di IA»: un sistema automatizzato progettato per funzionare con livelli di autonomia variabili e\u00a0che può presentare adattabilità dopo la diffusione e\u00a0che, per obiettivi espliciti o\u00a0impliciti, deduce dall'input che riceve come generare output quali previsioni, contenuti, raccomandazioni o\u00a0decisioni che possono influenzare ambienti fisici o\u00a0virtuali;\n2) «rischio»: la combinazione della probabilità del verificarsi di un danno e\u00a0la gravità del danno stesso;\n3) «fornitore»: una persona fisica o\u00a0giuridica, un'autorità pubblica, un'agenzia o\u00a0un altro organismo che sviluppa un sistema di IA o\u00a0un modello di IA per finalità generali o\u00a0che fa sviluppare un sistema di IA o\u00a0un modello di IA per finalità generali e\u00a0immette tale sistema o\u00a0modello sul mercato o\u00a0mette in servizio il sistema di IA con il proprio nome o\u00a0marchio, a\u00a0titolo oneroso o\u00a0gratuito;\n4) «deployer»: una persona fisica o\u00a0giuridica, un’autorità pubblica, un’agenzia o\u00a0un altro organismo che utilizza un sistema di IA sotto la propria autorità, tranne nel caso in cui il sistema di IA sia utilizzato nel corso di un'attività personale non professionale;\n5) «rappresentante autorizzato»: una persona fisica o\u00a0giuridica ubicata o\u00a0stabilita nell'Unione che ha ricevuto e\u00a0accettato un mandato scritto da un fornitore di un sistema di IA o\u00a0di un modello di IA per finalità generali al fine, rispettivamente, di adempiere ed eseguire per suo conto gli obblighi e\u00a0le procedure stabiliti dal presente regolamento;\n6) «importatore»: una persona fisica o\u00a0giuridica ubicata o\u00a0stabilita nell'Unione che immette sul mercato un sistema di IA recante il nome o\u00a0il marchio di una persona fisica o\u00a0giuridica stabilita in un paese terzo;\n7) «distributore»: una persona fisica o\u00a0giuridica nella catena di approvvigionamento, diversa dal fornitore o\u00a0dall'importatore, che mette a\u00a0disposizione un sistema di IA sul mercato dell'Unione;\n8) «operatore»: un fornitore, un fabbricante del prodotto, un deployer, un rappresentante autorizzato, un importatore o\u00a0un distributore;\n9) «immissione sul mercato»: la prima messa a\u00a0disposizione di un sistema di IA o\u00a0di un modello di IA per finalità generali sul mercato dell'Unione;",
+      "projection": "Articolo\u00a03DefinizioniAi fini del presente regolamento si applicano le definizioni seguenti:1) «sistema di IA»: un sistema automatizzato progettato per funzionare con livelli di autonomia variabili e\u00a0che può presentare adattabilità dopo la diffusione e\u00a0che, per obiettivi espliciti o\u00a0impliciti, deduce dall'input che riceve come generare output quali previsioni, contenuti, raccomandazioni o\u00a0decisioni che possono influenzare ambienti fisici o\u00a0virtuali;2) «rischio»: la combinazione della probabilità del verificarsi di un danno e\u00a0la gravità del danno stesso;3) «fornitore»: una persona fisica o\u00a0giuridica, un'autorità pubblica, un'agenzia o\u00a0un altro organismo che sviluppa un sistema di IA o\u00a0un modello di IA per finalità generali o\u00a0che fa sviluppare un sistema di IA o\u00a0un modello di IA per finalità generali e\u00a0immette tale sistema o\u00a0modello sul mercato o\u00a0mette in servizio il sistema di IA con il proprio nome o\u00a0marchio, a\u00a0titolo oneroso o\u00a0gratuito;4) «deployer»: una persona fisica o\u00a0giuridica, un’autorità pubblica, un’agenzia o\u00a0un altro organismo che utilizza un sistema di IA sotto la propria autorità, tranne nel caso in cui il sistema di IA sia utilizzato nel corso di un'attività personale non professionale;5) «rappresentante autorizzato»: una persona fisica o\u00a0giuridica ubicata o\u00a0stabilita nell'Unione che ha ricevuto e\u00a0accettato un mandato scritto da un fornitore di un sistema di IA o\u00a0di un modello di IA per finalità generali al fine, rispettivamente, di adempiere ed eseguire per suo conto gli obblighi e\u00a0le procedure stabiliti dal presente regolamento;6) «importatore»: una persona fisica o\u00a0giuridica ubicata o\u00a0stabilita nell'Unione che immette sul mercato un sistema di IA recante il nome o\u00a0il marchio di una persona fisica o\u00a0giuridica stabilita in un paese terzo;7) «distributore»: una persona fisica o\u00a0giuridica nella catena di approvvigionamento, diversa dal fornitore o\u00a0dall'importatore, che mette a\u00a0disposizione un sistema di IA sul mercato dell'Unione;8) «operatore»: un fornitore, un fabbricante del prodotto, un deployer, un rappresentante autorizzato, un importatore o\u00a0un distributore;9) «immissione sul mercato»: la prima messa a\u00a0disposizione di un sistema di IA o\u00a0di un modello di IA per finalità generali sul mercato dell'Unione;",
+      "passages": [
+        {
+          "quote": "output quali previsioni, contenuti, raccomandazioni o\u00a0decisi",
+          "start": 337,
+          "text": "output quali previsioni, contenuti, raccomandazioni o\u00a0decisi"
+        },
+        {
+          "quote": "pubblica, un’agenzia o\u00a0un altro organismo che utilizza un si",
+          "start": 1009,
+          "text": "pubblica, un’agenzia o\u00a0un altro organismo che utilizza un si"
+        },
+        {
+          "quote": "persona fisica o\u00a0giuridica nella catena di approvvigionament",
+          "start": 1803,
+          "text": "persona fisica o\u00a0giuridica nella catena di approvvigionament"
+        }
+      ]
+    },
+    {
+      "id": "eu-aiact-5",
+      "raw": "Articolo\u00a05\nPratiche di IA vietate\n1.\u00a0\u00a0\u00a0Sono vietate le pratiche di IA seguenti:a)l'immissione sul mercato, la messa in servizio o\u00a0l'uso di un sistema di IA che utilizza tecniche subliminali che agiscono senza che una persona ne sia consapevole o\u00a0tecniche volutamente manipolative o\u00a0ingannevoli aventi lo scopo o\u00a0l'effetto di distorcere materialmente il comportamento di una persona o\u00a0di un gruppo di persone, pregiudicando in modo considerevole la loro capacità di prendere una decisione informata, inducendole pertanto a\u00a0prendere una decisione che non avrebbero altrimenti preso, in un modo che provochi o\u00a0possa ragionevolmente provocare a\u00a0tale persona, a\u00a0un'altra persona o\u00a0a un gruppo di persone un danno significativo;b)l'immissione sul mercato, la messa in servizio o\u00a0l'uso di un sistema di IA che sfrutta le vulnerabilità di una persona fisica o\u00a0di uno specifico gruppo di persone, dovute all'età, alla disabilità o\u00a0a una specifica situazione sociale o\u00a0economica, con l'obiettivo o\u00a0l'effetto di distorcere materialmente il comportamento di tale persona o\u00a0di una persona che appartiene a\u00a0tale gruppo in un modo che provochi o\u00a0possa ragionevolmente provocare a\u00a0tale persona o\u00a0a un'altra persona un danno significativo;c)l'immissione sul mercato, la messa in servizio o\u00a0l'uso di sistemi di IAper la valutazione o\u00a0la classificazione delle persone fisiche o\u00a0di gruppi di persone per un determinato periodo di tempo sulla base del loro comportamento sociale o\u00a0di caratteristiche personali o\u00a0della personalità note, inferite o\u00a0previste, in cui il punteggio sociale così ottenuto comporti il verificarsi di uno o\u00a0di entrambi gli scenari seguenti:i)un trattamento pregiudizievole o\u00a0sfavorevole di determinate persone fisiche o\u00a0di gruppi di persone in contesti sociali che non sono collegati ai contesti in cui i\u00a0dati sono stati originariamente generati o\u00a0raccolti;ii)un trattamento pregiudizievole o\u00a0sfavorevole di determinate persone fisiche o\u00a0di gruppi di persone che sia ingiustificato o\u00a0sproporzionato rispetto al loro comportamento sociale o\u00a0alla sua gravità;d)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di un sistema di IA per effettuare valutazioni del rischio relative a\u00a0persone fisiche al fine di valutare o\u00a0prevedere il rischio che una persona fisica commetta un reato, unicamente sulla base della profilazione di una persona fisica o\u00a0della valutazione dei tratti e\u00a0delle caratteristiche della personalità; tale divieto non si applica ai sistemi di IA utilizzati a\u00a0sostegno della valutazione umana del coinvolgimento di una persona in un'attività criminosa, che si basa già su fatti oggettivi e\u00a0verificabili direttamente connessi a\u00a0un'attività criminosa;e)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di sistemi di IA che creano o\u00a0ampliano le banche dati di riconoscimento facciale mediante scraping non mirato di immagini facciali da internet o\u00a0da filmati di telecamere a\u00a0circuito chiuso;f)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di sistemi di IA per inferire le emozioni di una persona fisica nell'ambito del luogo di lavoro e\u00a0degli istituti di istruzione, tranne laddove l'uso del sistema di IA sia destinato a\u00a0essere messo in funzione o\u00a0immesso sul mercato per motivi medici o\u00a0di sicurezza;g)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di sistemi di categorizzazione biometrica che classificano individualmente le persone fisiche sulla base dei loro dati biometrici per trarre deduzioni o\u00a0inferenze in merito a\u00a0razza, opinioni politiche, appartenenza sindacale, convinzioni religiose o\u00a0filosofiche, vita sessuale o\u00a0orientamento sessuale; tale divieto non riguarda l'etichettatura o\u00a0il filtraggio di set di dati biometrici acquisiti legalmente, come le immagini, sulla base di dati biometrici o\u00a0della categorizzazione di dati biometrici nel settore delle attività di contrasto;h)l'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrastoa meno che, e\u00a0nella misura in cui, tale uso sia strettamente necessario per uno degli obiettivi seguenti:i)la ricerca mirata di specifichevittime di sottrazione, tratta di esseri umani o\u00a0sfruttamento sessuale di esseri umani, nonché la ricerca di persone scomparse;ii)la prevenzione di una minaccia specifica, sostanziale e\u00a0imminente per la vita o\u00a0l'incolumità fisica delle persone fisiche o\u00a0di una minaccia reale e\u00a0attuale o\u00a0reale e\u00a0prevedibile di un attacco terroristico;iii)lalocalizzazione o\u00a0l'identificazione di una persona sospettata di aver commesso un reato, ai fini dello svolgimento di un'indagine penale, o\u00a0dell'esercizio di un'azione penale o\u00a0dell'esecuzione di una sanzione penale per i\u00a0reati di cui all'allegato\u00a0II, punibile nello Stato membro interessato con una pena o\u00a0una misura di sicurezza privativa della libertà della durata massima di almeno quattro anni.La lettera\u00a0h) del primo comma lascia impregiudicato l'articolo\u00a09 del regolamento (UE)\u00a02016/679 per quanto riguarda il trattamento dei dati biometrici a\u00a0fini diversi dall'attività di contrasto.\n2.\u00a0\u00a0\u00a0L'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto per uno qualsiasi degli obiettivi di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), è applicato ai fini di cui a\u00a0tale lettera, solo per confermare l'identità della persona specificamente interessata e\u00a0tiene conto degli elementi seguenti:a)la natura della situazione che dà luogo al possibile uso, in particolare la gravità, la probabilità e\u00a0l'entità del danno che sarebbe causato in caso di mancato uso del sistema;b)le conseguenze dell'uso del sistema per i\u00a0diritti e\u00a0le libertà di tutte le persone interessate, in particolare la gravità, la probabilità e\u00a0l'entità di tali conseguenze.L'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto per uno qualsiasi degli obiettivi di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), del presente articolo rispetta inoltre le tutele e\u00a0le condizioni necessarie e\u00a0proporzionate in relazione all'uso, conformemente al diritto nazionale che autorizza tale uso, in particolare per quanto riguarda le limitazioni temporali, geografiche e\u00a0personali. L'uso del sistema di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico è autorizzato solo se l'autorità di contrasto ha completato una valutazione d'impatto sui diritti fondamentali come previsto all'articolo\u00a027 e\u00a0ha registrato il sistema nella banca dati UE conformemente all'articolo\u00a049. Tuttavia, in situazioni di urgenza debitamente giustificate, è possibile iniziare a\u00a0usare tali sistemi senza la registrazione nella banca dati dell'UE, a\u00a0condizione che tale registrazione sia completata senza indebito ritardo.\n3.\u00a0\u00a0\u00a0Ai fini del paragrafo\u00a01, primo comma, lettera\u00a0h), e\u00a0del paragrafo\u00a02, ogniuso di un sistema di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto è subordinato a\u00a0un'autorizzazione preventiva rilasciata da un'autorità giudiziaria oda un'autorità amministrativa indipendente, la cui decisione è vincolante, dello Stato membro in cui deve avvenire l'uso, rilasciata su richiesta motivata e\u00a0in conformità delle regole dettagliate del diritto nazionale di cui al paragrafo\u00a05. Tuttavia, in una situazione di urgenza debitamente giustificata, è possibile iniziare a\u00a0usare il sistema senza autorizzazione a\u00a0condizione che tale autorizzazione sia richiesta senza indebito ritardo, al più tardi entro 24 ore. Se tale autorizzazione è respinta, l'uso è interrotto con effetto immediato e\u00a0tutti i\u00a0dati nonché i\u00a0risultati e\u00a0gli output di tale uso sono immediatamente eliminati e\u00a0cancellati.L'autorità giudiziaria competente o\u00a0un'autorità amministrativa indipendente la cui decisione è vincolante rilascia l'autorizzazione solo se ha accertato, sulla base di prove oggettive o\u00a0indicazioni chiare che le sono state presentate, che l'uso del sistema di identificazione biometrica remota «in tempo reale» in questione è necessario e\u00a0proporzionato al conseguimento di uno degli obiettivi di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), come indicato nella richiesta e, in particolare, rimane limitato a\u00a0quanto strettamente necessario per quanto riguarda il periodo di tempo e\u00a0l'ambito geografico e\u00a0personale. Nel decidere in merito alla richiesta, tale autorità tiene conto degli elementi di cui al paragrafo\u00a02. Nessuna decisione che produca effetti giuridici negativi su una persona può essere presa unicamente sulla base dell'output del sistema di identificazione biometrica remota «in tempo reale».\n4.\u00a0\u00a0\u00a0Fatto salvo il paragrafo\u00a03, ogni uso di un sistema di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto è notificato alla pertinente autorità di vigilanza del mercato e\u00a0all'autorità nazionale per la protezione dei dati conformemente alle regole nazionali di cui al paragrafo\u00a05. La notifica contiene almeno le informazioni di cui al paragrafo\u00a06 e\u00a0non include dati operativi sensibili.\n5.\u00a0\u00a0\u00a0Uno Stato membro può decidere di prevedere la possibilità di autorizzare in tutto o\u00a0in parte l'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto, entro i\u00a0limiti e\u00a0alle condizioni di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), e\u00a0ai paragrafi\u00a02 e\u00a03. Gli Stati membri interessati stabiliscono nel proprio diritto nazionale le necessarie regole dettagliate per la richiesta, il rilascio, l'esercizio delle autorizzazioni di cui al paragrafo\u00a03, nonché per le attività di controllo e\u00a0comunicazione ad esse relative. Tali regole specificano inoltre per quali degli obiettivi elencati al paragrafo\u00a01, primo comma, lettera\u00a0h), compresi i\u00a0reati di cui alla lettera\u00a0h), punto iii), le autorità competenti possono essere autorizzate ad utilizzare tali sistemi a\u00a0fini di attività di contrasto. Gli Stati membri notificano tali regole alla Commissione al più tardi 30 giorni dopo la loro adozione. Gli Stati membri possono introdurre, in conformità del diritto dell'Unione, disposizioni più restrittive sull'uso dei sistemi di identificazione biometrica remota.\n6.\u00a0\u00a0\u00a0Le autorità nazionali di vigilanza del mercato e\u00a0le autorità nazionali per la protezione dei dati degli Stati membri cui è stato notificato l'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto a\u00a0norma del paragrafo\u00a04, presentano alla Commissione relazioni annuali su tale uso. A\u00a0tal fine, la Commissione fornisce agli Stati membri e\u00a0alle autorità nazionali di vigilanza del mercato e\u00a0di protezione dei dati un modello comprendente informazioni sul numero di decisioni che le autorità giudiziarie competenti, o\u00a0un'autorità amministrativa indipendente la cui decisione è vincolante, hanno adottato in risposta alle richieste di autorizzazione a\u00a0norma del paragrafo\u00a03 e\u00a0il loro esito.\n7.\u00a0\u00a0\u00a0La Commissione pubblica relazioni annuali sull'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto, fondate sui dati aggregati negli Stati membri sulla base delle relazioni annuali di cui al paragrafo\u00a06. Tali relazioni annuali non includono dati operativi sensibili delle relative attività di contrasto.\n8.\u00a0\u00a0\u00a0Il presente articolo lascia impregiudicati i\u00a0divieti che si applicano qualora una pratica di IA violi altre disposizioni di diritto dell'Unione.",
+      "projection": "Articolo\u00a05Pratiche di IA vietate1.\u00a0\u00a0\u00a0Sono vietate le pratiche di IA seguenti:a)l'immissione sul mercato, la messa in servizio o\u00a0l'uso di un sistema di IA che utilizza tecniche subliminali che agiscono senza che una persona ne sia consapevole o\u00a0tecniche volutamente manipolative o\u00a0ingannevoli aventi lo scopo o\u00a0l'effetto di distorcere materialmente il comportamento di una persona o\u00a0di un gruppo di persone, pregiudicando in modo considerevole la loro capacità di prendere una decisione informata, inducendole pertanto a\u00a0prendere una decisione che non avrebbero altrimenti preso, in un modo che provochi o\u00a0possa ragionevolmente provocare a\u00a0tale persona, a\u00a0un'altra persona o\u00a0a un gruppo di persone un danno significativo;b)l'immissione sul mercato, la messa in servizio o\u00a0l'uso di un sistema di IA che sfrutta le vulnerabilità di una persona fisica o\u00a0di uno specifico gruppo di persone, dovute all'età, alla disabilità o\u00a0a una specifica situazione sociale o\u00a0economica, con l'obiettivo o\u00a0l'effetto di distorcere materialmente il comportamento di tale persona o\u00a0di una persona che appartiene a\u00a0tale gruppo in un modo che provochi o\u00a0possa ragionevolmente provocare a\u00a0tale persona o\u00a0a un'altra persona un danno significativo;c)l'immissione sul mercato, la messa in servizio o\u00a0l'uso di sistemi di IAper la valutazione o\u00a0la classificazione delle persone fisiche o\u00a0di gruppi di persone per un determinato periodo di tempo sulla base del loro comportamento sociale o\u00a0di caratteristiche personali o\u00a0della personalità note, inferite o\u00a0previste, in cui il punteggio sociale così ottenuto comporti il verificarsi di uno o\u00a0di entrambi gli scenari seguenti:i)un trattamento pregiudizievole o\u00a0sfavorevole di determinate persone fisiche o\u00a0di gruppi di persone in contesti sociali che non sono collegati ai contesti in cui i\u00a0dati sono stati originariamente generati o\u00a0raccolti;ii)un trattamento pregiudizievole o\u00a0sfavorevole di determinate persone fisiche o\u00a0di gruppi di persone che sia ingiustificato o\u00a0sproporzionato rispetto al loro comportamento sociale o\u00a0alla sua gravità;d)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di un sistema di IA per effettuare valutazioni del rischio relative a\u00a0persone fisiche al fine di valutare o\u00a0prevedere il rischio che una persona fisica commetta un reato, unicamente sulla base della profilazione di una persona fisica o\u00a0della valutazione dei tratti e\u00a0delle caratteristiche della personalità; tale divieto non si applica ai sistemi di IA utilizzati a\u00a0sostegno della valutazione umana del coinvolgimento di una persona in un'attività criminosa, che si basa già su fatti oggettivi e\u00a0verificabili direttamente connessi a\u00a0un'attività criminosa;e)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di sistemi di IA che creano o\u00a0ampliano le banche dati di riconoscimento facciale mediante scraping non mirato di immagini facciali da internet o\u00a0da filmati di telecamere a\u00a0circuito chiuso;f)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di sistemi di IA per inferire le emozioni di una persona fisica nell'ambito del luogo di lavoro e\u00a0degli istituti di istruzione, tranne laddove l'uso del sistema di IA sia destinato a\u00a0essere messo in funzione o\u00a0immesso sul mercato per motivi medici o\u00a0di sicurezza;g)l'immissione sul mercato, la messa in servizio per tale finalità specifica o\u00a0l'uso di sistemi di categorizzazione biometrica che classificano individualmente le persone fisiche sulla base dei loro dati biometrici per trarre deduzioni o\u00a0inferenze in merito a\u00a0razza, opinioni politiche, appartenenza sindacale, convinzioni religiose o\u00a0filosofiche, vita sessuale o\u00a0orientamento sessuale; tale divieto non riguarda l'etichettatura o\u00a0il filtraggio di set di dati biometrici acquisiti legalmente, come le immagini, sulla base di dati biometrici o\u00a0della categorizzazione di dati biometrici nel settore delle attività di contrasto;h)l'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrastoa meno che, e\u00a0nella misura in cui, tale uso sia strettamente necessario per uno degli obiettivi seguenti:i)la ricerca mirata di specifichevittime di sottrazione, tratta di esseri umani o\u00a0sfruttamento sessuale di esseri umani, nonché la ricerca di persone scomparse;ii)la prevenzione di una minaccia specifica, sostanziale e\u00a0imminente per la vita o\u00a0l'incolumità fisica delle persone fisiche o\u00a0di una minaccia reale e\u00a0attuale o\u00a0reale e\u00a0prevedibile di un attacco terroristico;iii)lalocalizzazione o\u00a0l'identificazione di una persona sospettata di aver commesso un reato, ai fini dello svolgimento di un'indagine penale, o\u00a0dell'esercizio di un'azione penale o\u00a0dell'esecuzione di una sanzione penale per i\u00a0reati di cui all'allegato\u00a0II, punibile nello Stato membro interessato con una pena o\u00a0una misura di sicurezza privativa della libertà della durata massima di almeno quattro anni.La lettera\u00a0h) del primo comma lascia impregiudicato l'articolo\u00a09 del regolamento (UE)\u00a02016/679 per quanto riguarda il trattamento dei dati biometrici a\u00a0fini diversi dall'attività di contrasto.2.\u00a0\u00a0\u00a0L'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto per uno qualsiasi degli obiettivi di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), è applicato ai fini di cui a\u00a0tale lettera, solo per confermare l'identità della persona specificamente interessata e\u00a0tiene conto degli elementi seguenti:a)la natura della situazione che dà luogo al possibile uso, in particolare la gravità, la probabilità e\u00a0l'entità del danno che sarebbe causato in caso di mancato uso del sistema;b)le conseguenze dell'uso del sistema per i\u00a0diritti e\u00a0le libertà di tutte le persone interessate, in particolare la gravità, la probabilità e\u00a0l'entità di tali conseguenze.L'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto per uno qualsiasi degli obiettivi di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), del presente articolo rispetta inoltre le tutele e\u00a0le condizioni necessarie e\u00a0proporzionate in relazione all'uso, conformemente al diritto nazionale che autorizza tale uso, in particolare per quanto riguarda le limitazioni temporali, geografiche e\u00a0personali. L'uso del sistema di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico è autorizzato solo se l'autorità di contrasto ha completato una valutazione d'impatto sui diritti fondamentali come previsto all'articolo\u00a027 e\u00a0ha registrato il sistema nella banca dati UE conformemente all'articolo\u00a049. Tuttavia, in situazioni di urgenza debitamente giustificate, è possibile iniziare a\u00a0usare tali sistemi senza la registrazione nella banca dati dell'UE, a\u00a0condizione che tale registrazione sia completata senza indebito ritardo.3.\u00a0\u00a0\u00a0Ai fini del paragrafo\u00a01, primo comma, lettera\u00a0h), e\u00a0del paragrafo\u00a02, ogniuso di un sistema di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto è subordinato a\u00a0un'autorizzazione preventiva rilasciata da un'autorità giudiziaria oda un'autorità amministrativa indipendente, la cui decisione è vincolante, dello Stato membro in cui deve avvenire l'uso, rilasciata su richiesta motivata e\u00a0in conformità delle regole dettagliate del diritto nazionale di cui al paragrafo\u00a05. Tuttavia, in una situazione di urgenza debitamente giustificata, è possibile iniziare a\u00a0usare il sistema senza autorizzazione a\u00a0condizione che tale autorizzazione sia richiesta senza indebito ritardo, al più tardi entro 24 ore. Se tale autorizzazione è respinta, l'uso è interrotto con effetto immediato e\u00a0tutti i\u00a0dati nonché i\u00a0risultati e\u00a0gli output di tale uso sono immediatamente eliminati e\u00a0cancellati.L'autorità giudiziaria competente o\u00a0un'autorità amministrativa indipendente la cui decisione è vincolante rilascia l'autorizzazione solo se ha accertato, sulla base di prove oggettive o\u00a0indicazioni chiare che le sono state presentate, che l'uso del sistema di identificazione biometrica remota «in tempo reale» in questione è necessario e\u00a0proporzionato al conseguimento di uno degli obiettivi di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), come indicato nella richiesta e, in particolare, rimane limitato a\u00a0quanto strettamente necessario per quanto riguarda il periodo di tempo e\u00a0l'ambito geografico e\u00a0personale. Nel decidere in merito alla richiesta, tale autorità tiene conto degli elementi di cui al paragrafo\u00a02. Nessuna decisione che produca effetti giuridici negativi su una persona può essere presa unicamente sulla base dell'output del sistema di identificazione biometrica remota «in tempo reale».4.\u00a0\u00a0\u00a0Fatto salvo il paragrafo\u00a03, ogni uso di un sistema di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto è notificato alla pertinente autorità di vigilanza del mercato e\u00a0all'autorità nazionale per la protezione dei dati conformemente alle regole nazionali di cui al paragrafo\u00a05. La notifica contiene almeno le informazioni di cui al paragrafo\u00a06 e\u00a0non include dati operativi sensibili.5.\u00a0\u00a0\u00a0Uno Stato membro può decidere di prevedere la possibilità di autorizzare in tutto o\u00a0in parte l'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto, entro i\u00a0limiti e\u00a0alle condizioni di cui al paragrafo\u00a01, primo comma, lettera\u00a0h), e\u00a0ai paragrafi\u00a02 e\u00a03. Gli Stati membri interessati stabiliscono nel proprio diritto nazionale le necessarie regole dettagliate per la richiesta, il rilascio, l'esercizio delle autorizzazioni di cui al paragrafo\u00a03, nonché per le attività di controllo e\u00a0comunicazione ad esse relative. Tali regole specificano inoltre per quali degli obiettivi elencati al paragrafo\u00a01, primo comma, lettera\u00a0h), compresi i\u00a0reati di cui alla lettera\u00a0h), punto iii), le autorità competenti possono essere autorizzate ad utilizzare tali sistemi a\u00a0fini di attività di contrasto. Gli Stati membri notificano tali regole alla Commissione al più tardi 30 giorni dopo la loro adozione. Gli Stati membri possono introdurre, in conformità del diritto dell'Unione, disposizioni più restrittive sull'uso dei sistemi di identificazione biometrica remota.6.\u00a0\u00a0\u00a0Le autorità nazionali di vigilanza del mercato e\u00a0le autorità nazionali per la protezione dei dati degli Stati membri cui è stato notificato l'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto a\u00a0norma del paragrafo\u00a04, presentano alla Commissione relazioni annuali su tale uso. A\u00a0tal fine, la Commissione fornisce agli Stati membri e\u00a0alle autorità nazionali di vigilanza del mercato e\u00a0di protezione dei dati un modello comprendente informazioni sul numero di decisioni che le autorità giudiziarie competenti, o\u00a0un'autorità amministrativa indipendente la cui decisione è vincolante, hanno adottato in risposta alle richieste di autorizzazione a\u00a0norma del paragrafo\u00a03 e\u00a0il loro esito.7.\u00a0\u00a0\u00a0La Commissione pubblica relazioni annuali sull'uso di sistemi di identificazione biometrica remota «in tempo reale» in spazi accessibili al pubblico a\u00a0fini di attività di contrasto, fondate sui dati aggregati negli Stati membri sulla base delle relazioni annuali di cui al paragrafo\u00a06. Tali relazioni annuali non includono dati operativi sensibili delle relative attività di contrasto.8.\u00a0\u00a0\u00a0Il presente articolo lascia impregiudicati i\u00a0divieti che si applicano qualora una pratica di IA violi altre disposizioni di diritto dell'Unione.",
+      "passages": [
+        {
+          "quote": "contesti sociali che non sono collegati ai contesti in cui i",
+          "start": 1746,
+          "text": "contesti sociali che non sono collegati ai contesti in cui i"
+        },
+        {
+          "quote": "accessibili al pubblico a\u00a0fini di attività di contrasto per ",
+          "refused": "ambiguous"
+        },
+        {
+          "quote": "sistemi di identificazione biometrica remota «in tempo reale",
+          "refused": "ambiguous"
+        }
+      ]
+    },
+    {
+      "id": "eu-fx-gdpr-2",
+      "raw": "Articolo 2\nAmbito di applicazione materiale\n1.\u00a0\u00a0\u00a0Il presente regolamento si applica al trattamento interamente o parzialmente automatizzato di dati personali e al trattamento non automatizzato di dati personali contenuti in un archivio o destinati a figurarvi.\n2.\u00a0\u00a0\u00a0Il presente regolamento non si applica ai trattamenti di dati personali:a)effettuati per attività che non rientrano nell'ambito di applicazione del diritto dell'Unione;b)effettuati dagli Stati membri nell'esercizio di attività che rientrano nell'ambito di applicazione del titolo V, capo 2, TUE;c)effettuati da una persona fisica per l'esercizio di attività a carattere esclusivamente personale o domestico;d)effettuati dalle autorità competenti a fini di prevenzione, indagine, accertamento o perseguimento di reati o esecuzione di sanzioni penali, incluse la salvaguardia contro minacce alla sicurezza pubblica e la prevenzione delle stesse.\n3.\u00a0\u00a0\u00a0Per il trattamento dei dati personali da parte di istituzioni, organi, uffici e agenzie dell'Unione, si applica il regolamento (CE) n. 45/2001. Il regolamento (CE) n.\u00a045/2001 e gli altri atti giuridici dell'Unione applicabili a tale trattamento di dati personali devono essere adeguati ai principi e alle norme del presente regolamento conformemente all'articolo 98.\n4.\u00a0\u00a0\u00a0Il presente regolamento non pregiudica pertanto l'applicazione della direttiva\u00a02000/31/CE, in particolare le norme relative alla responsabilità dei prestatori intermediari di servizi di cui agli articoli da 12 a 15 della medesima direttiva.",
+      "projection": "Articolo 2Ambito di applicazione materiale1.\u00a0\u00a0\u00a0Il presente regolamento si applica al trattamento interamente o parzialmente automatizzato di dati personali e al trattamento non automatizzato di dati personali contenuti in un archivio o destinati a figurarvi.2.\u00a0\u00a0\u00a0Il presente regolamento non si applica ai trattamenti di dati personali:a)effettuati per attività che non rientrano nell'ambito di applicazione del diritto dell'Unione;b)effettuati dagli Stati membri nell'esercizio di attività che rientrano nell'ambito di applicazione del titolo V, capo 2, TUE;c)effettuati da una persona fisica per l'esercizio di attività a carattere esclusivamente personale o domestico;d)effettuati dalle autorità competenti a fini di prevenzione, indagine, accertamento o perseguimento di reati o esecuzione di sanzioni penali, incluse la salvaguardia contro minacce alla sicurezza pubblica e la prevenzione delle stesse.3.\u00a0\u00a0\u00a0Per il trattamento dei dati personali da parte di istituzioni, organi, uffici e agenzie dell'Unione, si applica il regolamento (CE) n. 45/2001. Il regolamento (CE) n.\u00a045/2001 e gli altri atti giuridici dell'Unione applicabili a tale trattamento di dati personali devono essere adeguati ai principi e alle norme del presente regolamento conformemente all'articolo 98.4.\u00a0\u00a0\u00a0Il presente regolamento non pregiudica pertanto l'applicazione della direttiva\u00a02000/31/CE, in particolare le norme relative alla responsabilità dei prestatori intermediari di servizi di cui agli articoli da 12 a 15 della medesima direttiva.",
+      "passages": [
+        {
+          "quote": "archivio o destinati a figurarvi.\n2.\u00a0\u00a0\u00a0Il presente regolament",
+          "start": 225,
+          "text": "archivio o destinati a figurarvi.2.\u00a0\u00a0\u00a0Il presente regolament"
+        },
+        {
+          "quote": "dalle autorità competenti a fini di prevenzione, indagine, a",
+          "start": 683,
+          "text": "dalle autorità competenti a fini di prevenzione, indagine, a"
+        },
+        {
+          "quote": "norme del presente regolamento conformemente all'articolo 98",
+          "start": 1216,
+          "text": "norme del presente regolamento conformemente all'articolo 98"
+        }
+      ]
+    },
+    {
+      "id": "eu-fx-eprivacy-5-oj",
+      "raw": "Articolo 5\nRiservatezza delle comunicazioni\n1. Gli Stati membri assicurano, mediante disposizioni di legge nazionali, la riservatezza delle comunicazioni effettuate tramite la rete pubblica di comunicazione e i servizi di comunicazione elettronica accessibili al pubblico, nonché dei relativi dati sul traffico. In particolare essi vietano l'ascolto, la captazione, la memorizzazione e altre forme di intercettazione o di sorveglianza delle comunicazioni, e dei relativi dati sul traffico, ad opera di persone diverse dagli utenti, senza consenso di questi ultimi, eccetto quando sia autorizzato legalmente a norma dell'articolo 15, paragrafo 1. Questo paragrafo non impedisce la memorizzazione tecnica necessaria alla trasmissione della comunicazione fatto salvo il principio della riservatezza.\n2. Il paragrafo 1 non pregiudica la registrazione legalmente autorizzata di comunicazioni e dei relativi dati sul traffico se effettuata nel quadro di legittime prassi commerciali allo scopo di fornire la prova di una transazione o di una qualsiasi altra comunicazione commerciale.\n3. Gli Stati membri assicurano che l'uso di reti di comunicazione elettronica per archiviare informazioni o per avere accesso a informazioni archiviate nell'apparecchio terminale di un abbonato o di un utente sia consentito unicamente a condizione che l'abbonato o l'utente interessato sia stato informato in modo chiaro e completo, tra l'altro, sugli scopi del trattamento in conformità della direttiva 95/46/CE e che gli sia offerta la possibilità di rifiutare tale trattamento da parte del responsabile del trattamento. Ciò non impedisce l'eventuale memorizzazione tecnica o l'accesso al solo fine di effettuare o facilitare la trasmissione di una comunicazione su una rete di comunicazione elettronica, o nella misura strettamente necessaria a fornire un servizio della società dell'informazione esplicitamente richiesto dall'abbonato o dall'utente.",
+      "projection": "Articolo 5Riservatezza delle comunicazioni1. Gli Stati membri assicurano, mediante disposizioni di legge nazionali, la riservatezza delle comunicazioni effettuate tramite la rete pubblica di comunicazione e i servizi di comunicazione elettronica accessibili al pubblico, nonché dei relativi dati sul traffico. In particolare essi vietano l'ascolto, la captazione, la memorizzazione e altre forme di intercettazione o di sorveglianza delle comunicazioni, e dei relativi dati sul traffico, ad opera di persone diverse dagli utenti, senza consenso di questi ultimi, eccetto quando sia autorizzato legalmente a norma dell'articolo 15, paragrafo 1. Questo paragrafo non impedisce la memorizzazione tecnica necessaria alla trasmissione della comunicazione fatto salvo il principio della riservatezza.2. Il paragrafo 1 non pregiudica la registrazione legalmente autorizzata di comunicazioni e dei relativi dati sul traffico se effettuata nel quadro di legittime prassi commerciali allo scopo di fornire la prova di una transazione o di una qualsiasi altra comunicazione commerciale.3. Gli Stati membri assicurano che l'uso di reti di comunicazione elettronica per archiviare informazioni o per avere accesso a informazioni archiviate nell'apparecchio terminale di un abbonato o di un utente sia consentito unicamente a condizione che l'abbonato o l'utente interessato sia stato informato in modo chiaro e completo, tra l'altro, sugli scopi del trattamento in conformità della direttiva 95/46/CE e che gli sia offerta la possibilità di rifiutare tale trattamento da parte del responsabile del trattamento. Ciò non impedisce l'eventuale memorizzazione tecnica o l'accesso al solo fine di effettuare o facilitare la trasmissione di una comunicazione su una rete di comunicazione elettronica, o nella misura strettamente necessaria a fornire un servizio della società dell'informazione esplicitamente richiesto dall'abbonato o dall'utente.",
+      "passages": [
+        {
+          "quote": "relativi dati sul traffico. In particolare essi vietano l'as",
+          "start": 282,
+          "text": "relativi dati sul traffico. In particolare essi vietano l'as"
+        },
+        {
+          "quote": "di comunicazioni e dei relativi dati sul traffico se effettu",
+          "start": 867,
+          "text": "di comunicazioni e dei relativi dati sul traffico se effettu"
+        },
+        {
+          "quote": "tale trattamento da parte del responsabile del trattamento. ",
+          "start": 1538,
+          "text": "tale trattamento da parte del responsabile del trattamento."
+        }
+      ]
+    },
+    {
+      "id": "eu-fx-eprivacy-5-cons",
+      "raw": "Articolo 5\nRiservatezza delle comunicazioni\n1. Gli Stati membri assicurano, mediante disposizioni di legge nazionali, la riservatezza delle comunicazioni effettuate tramite la rete pubblica di comunicazione e i servizi di comunicazione elettronica accessibili al pubblico, nonché dei relativi dati sul traffico. In particolare essi vietano l'ascolto, la captazione, la memorizzazione e altre forme di intercettazione o di sorveglianza delle comunicazioni, e dei relativi dati sul traffico, ad opera di persone diverse dagli utenti, senza consenso di questi ultimi, eccetto quando sia autorizzato legalmente a norma dell'articolo 15, paragrafo 1. Questo paragrafo non impedisce la memorizzazione tecnica necessaria alla trasmissione della comunicazione fatto salvo il principio della riservatezza.\n2. Il paragrafo 1 non pregiudica la registrazione legalmente autorizzata di comunicazioni e dei relativi dati sul traffico se effettuata nel quadro di legittime prassi commerciali allo scopo di fornire la prova di una transazione o di una qualsiasi altra comunicazione commerciale.\n3. Gli Stati membri assicurano che l’archiviazione di informazioni oppure l’accesso a informazioni già archiviate nell’apparecchiatura terminale di un abbonato o di un utente sia consentito unicamente a condizione che l’abbonato o l’utente in questione abbia espresso preliminarmente il proprio consenso, dopo essere stato informato in modo chiaro e completo, a norma della direttiva 95/46/CE, tra l’altro sugli scopi del trattamento. Ciò non vieta l’eventuale archiviazione tecnica o l’accesso al solo fine di effettuare la trasmissione di una comunicazione su una rete di comunicazione elettronica, o nella misura strettamente necessaria al fornitore di un servizio della società dell’informazione esplicitamente richiesto dall’abbonato o dall’utente a erogare tale servizio.",
+      "projection": "Articolo 5Riservatezza delle comunicazioni1. Gli Stati membri assicurano, mediante disposizioni di legge nazionali, la riservatezza delle comunicazioni effettuate tramite la rete pubblica di comunicazione e i servizi di comunicazione elettronica accessibili al pubblico, nonché dei relativi dati sul traffico. In particolare essi vietano l'ascolto, la captazione, la memorizzazione e altre forme di intercettazione o di sorveglianza delle comunicazioni, e dei relativi dati sul traffico, ad opera di persone diverse dagli utenti, senza consenso di questi ultimi, eccetto quando sia autorizzato legalmente a norma dell'articolo 15, paragrafo 1. Questo paragrafo non impedisce la memorizzazione tecnica necessaria alla trasmissione della comunicazione fatto salvo il principio della riservatezza.2. Il paragrafo 1 non pregiudica la registrazione legalmente autorizzata di comunicazioni e dei relativi dati sul traffico se effettuata nel quadro di legittime prassi commerciali allo scopo di fornire la prova di una transazione o di una qualsiasi altra comunicazione commerciale.3. Gli Stati membri assicurano che l’archiviazione di informazioni oppure l’accesso a informazioni già archiviate nell’apparecchiatura terminale di un abbonato o di un utente sia consentito unicamente a condizione che l’abbonato o l’utente in questione abbia espresso preliminarmente il proprio consenso, dopo essere stato informato in modo chiaro e completo, a norma della direttiva 95/46/CE, tra l’altro sugli scopi del trattamento. Ciò non vieta l’eventuale archiviazione tecnica o l’accesso al solo fine di effettuare la trasmissione di una comunicazione su una rete di comunicazione elettronica, o nella misura strettamente necessaria al fornitore di un servizio della società dell’informazione esplicitamente richiesto dall’abbonato o dall’utente a erogare tale servizio.",
+      "passages": [
+        {
+          "quote": "nonché dei relativi dati sul traffico. In particolare essi v",
+          "start": 271,
+          "text": "nonché dei relativi dati sul traffico. In particolare essi v"
+        },
+        {
+          "quote": "registrazione legalmente autorizzata di comunicazioni e dei ",
+          "start": 830,
+          "text": "registrazione legalmente autorizzata di comunicazioni e dei"
+        },
+        {
+          "quote": "sugli scopi del trattamento. Ciò non vieta l’eventuale archi",
+          "start": 1481,
+          "text": "sugli scopi del trattamento. Ciò non vieta l’eventuale archi"
+        }
+      ]
+    },
+    {
+      "id": "eu-fx-eidas-1-cons",
+      "raw": "Articolo 1\nOggetto\nIl presente regolamento mira a garantire il buon funzionamento del mercato interno e a fornire un adeguato livello di sicurezza dei mezzi di identificazione elettronica e dei servizi fiduciari utilizzati in tutta l’Unione, al fine di consentire e facilitare l’esercizio, da parte delle persone fisiche e giuridiche, del diritto di partecipare in modo sicuro alla società digitale e di accedere ai servizi pubblici e privati online in tutta l’Unione. A tal fine, il presente regolamento:\na) fissa le condizioni alle quali gli Stati membri riconoscono i mezzi di identificazione elettronica delle persone fisiche e giuridiche, che rientrano in un regime notificato di identificazione elettronica di un altro Stato membro e forniscono e riconoscono i portafogli europei di identità digitale;\nb) stabilisce le norme relative ai servizi fiduciari, in particolare per le transazioni elettroniche;\nc) istituisce un quadro giuridico per le firme elettroniche, i sigilli elettronici, le validazioni temporali elettroniche, i documenti elettronici, i servizi elettronici di recapito certificato, i servizi relativi ai certificati di autenticazione di siti web, l’archiviazione elettronica, gli attestati elettronici di attributi, i dispositivi per la creazione di una firma elettronica, i dispositivi per la creazione di sigilli elettronici e i registri elettronici.",
+      "projection": "Articolo 1OggettoIl presente regolamento mira a garantire il buon funzionamento del mercato interno e a fornire un adeguato livello di sicurezza dei mezzi di identificazione elettronica e dei servizi fiduciari utilizzati in tutta l’Unione, al fine di consentire e facilitare l’esercizio, da parte delle persone fisiche e giuridiche, del diritto di partecipare in modo sicuro alla società digitale e di accedere ai servizi pubblici e privati online in tutta l’Unione. A tal fine, il presente regolamento:a) fissa le condizioni alle quali gli Stati membri riconoscono i mezzi di identificazione elettronica delle persone fisiche e giuridiche, che rientrano in un regime notificato di identificazione elettronica di un altro Stato membro e forniscono e riconoscono i portafogli europei di identità digitale;b) stabilisce le norme relative ai servizi fiduciari, in particolare per le transazioni elettroniche;c) istituisce un quadro giuridico per le firme elettroniche, i sigilli elettronici, le validazioni temporali elettroniche, i documenti elettronici, i servizi elettronici di recapito certificato, i servizi relativi ai certificati di autenticazione di siti web, l’archiviazione elettronica, gli attestati elettronici di attributi, i dispositivi per la creazione di una firma elettronica, i dispositivi per la creazione di sigilli elettronici e i registri elettronici.",
+      "passages": [
+        {
+          "quote": "fiduciari utilizzati in tutta l’Unione, al fine di consentir",
+          "start": 200,
+          "text": "fiduciari utilizzati in tutta l’Unione, al fine di consentir"
+        },
+        {
+          "quote": "persone fisiche e giuridiche, che rientrano in un regime not",
+          "start": 611,
+          "text": "persone fisiche e giuridiche, che rientrano in un regime not"
+        },
+        {
+          "quote": "certificato, i servizi relativi ai certificati di autenticaz",
+          "start": 1087,
+          "text": "certificato, i servizi relativi ai certificati di autenticaz"
+        }
+      ]
+    },
+    {
+      "id": "akn-cost-3",
+      "raw": "### Art. 3.\n\nTutti i cittadini hanno pari dignita' sociale e sono eguali davanti alla legge, senza distinzione di sesso, di razza, di lingua, di religione, di opinioni politiche, di condizioni personali e sociali.\nE' compito della Repubblica rimuovere gli ostacoli di ordine economico e sociale, che, limitando di fatto la liberta' e l'eguaglianza dei cittadini, impediscono il pieno sviluppo della persona umana e l'effettiva partecipazione di tutti i lavoratori all'organizzazione politica, economica e sociale del Paese.",
+      "projection": "### Art. 3.Tutti i cittadini hanno pari dignita' sociale e sono eguali davanti alla legge, senza distinzione di sesso, di razza, di lingua, di religione, di opinioni politiche, di condizioni personali e sociali.E' compito della Repubblica rimuovere gli ostacoli di ordine economico e sociale, che, limitando di fatto la liberta' e l'eguaglianza dei cittadini, impediscono il pieno sviluppo della persona umana e l'effettiva partecipazione di tutti i lavoratori all'organizzazione politica, economica e sociale del Paese.",
+      "passages": [
+        {
+          "quote": "davanti alla legge, senza distinzione di sesso, di razza, di",
+          "start": 71,
+          "text": "davanti alla legge, senza distinzione di sesso, di razza, di"
+        },
+        {
+          "quote": "Repubblica rimuovere gli ostacoli di ordine economico e soci",
+          "start": 228,
+          "text": "Repubblica rimuovere gli ostacoli di ordine economico e soci"
+        },
+        {
+          "quote": "l'effettiva partecipazione di tutti i lavoratori all'organiz",
+          "start": 412,
+          "text": "l'effettiva partecipazione di tutti i lavoratori all'organiz"
+        }
+      ]
+    },
+    {
+      "id": "akn-l241-3",
+      "raw": "### Art. 3. (Motivazione del provvedimento)\n\n1. Ogni provvedimento amministrativo, compresi quelli concernenti l'organizzazione amministrativa, lo svolgimento dei pubblici concorsi ed il personale, deve essere motivato, salvo che nelle ipotesi previste dal comma 2. La motivazione deve indicare i presupposti di fatto e le ragioni giuridiche che hanno determinato la decisione dell'amministrazione, in relazione alle risultanze dell'istruttoria.\n\n2. La motivazione non e' richiesta per gli atti normativi e per quelli a contenuto generale.\n\n3. Se le ragioni della decisione risultano da altro atto dell'amministrazione richiamato dalla decisione stessa, insieme alla comunicazione di quest'ultima deve essere indicato e reso disponibile, a norma della presente legge, anche l'atto cui essa si richiama.\n\n4. In ogni atto notificato al destinatario devono essere indicati il termine e l'autorita' cui e' possibile ricorrere.",
+      "projection": "### Art. 3. (Motivazione del provvedimento)1. Ogni provvedimento amministrativo, compresi quelli concernenti l'organizzazione amministrativa, lo svolgimento dei pubblici concorsi ed il personale, deve essere motivato, salvo che nelle ipotesi previste dal comma 2. La motivazione deve indicare i presupposti di fatto e le ragioni giuridiche che hanno determinato la decisione dell'amministrazione, in relazione alle risultanze dell'istruttoria.2. La motivazione non e' richiesta per gli atti normativi e per quelli a contenuto generale.3. Se le ragioni della decisione risultano da altro atto dell'amministrazione richiamato dalla decisione stessa, insieme alla comunicazione di quest'ultima deve essere indicato e reso disponibile, a norma della presente legge, anche l'atto cui essa si richiama.4. In ogni atto notificato al destinatario devono essere indicati il termine e l'autorita' cui e' possibile ricorrere.",
+      "passages": [
+        {
+          "quote": "amministrativa, lo svolgimento dei pubblici concorsi ed il p",
+          "start": 126,
+          "text": "amministrativa, lo svolgimento dei pubblici concorsi ed il p"
+        },
+        {
+          "quote": "alle risultanze dell'istruttoria.\n\n2. La motivazione non e' ri",
+          "start": 410,
+          "text": "alle risultanze dell'istruttoria.2. La motivazione non e' ri"
+        },
+        {
+          "quote": "disponibile, a norma della presente legge, anche l'atto cui ",
+          "start": 719,
+          "text": "disponibile, a norma della presente legge, anche l'atto cui"
+        }
+      ]
+    },
+    {
+      "id": "akn-dlgs231-5",
+      "raw": "### Art. 5. Responsabilita' dell'ente\n\n1. L'ente e' responsabile per i reati commessi nel suo interesse o a suo vantaggio:\na) da persone che rivestono funzioni di rappresentanza, di amministrazione o di direzione dell'ente o di una sua unita' organizzativa dotata di autonomia finanziaria e funzionale nonche' da persone che esercitano, anche di fatto, la gestione e il controllo dello stesso;\nb) da persone sottoposte alla direzione o alla vigilanza di uno dei soggetti di cui alla lettera a).\n\n2. L'ente non risponde se le persone indicate nel comma 1 hanno agito nell'interesse esclusivo proprio o di terzi.",
+      "projection": "### Art. 5. Responsabilita' dell'ente1. L'ente e' responsabile per i reati commessi nel suo interesse o a suo vantaggio:a) da persone che rivestono funzioni di rappresentanza, di amministrazione o di direzione dell'ente o di una sua unita' organizzativa dotata di autonomia finanziaria e funzionale nonche' da persone che esercitano, anche di fatto, la gestione e il controllo dello stesso;b) da persone sottoposte alla direzione o alla vigilanza di uno dei soggetti di cui alla lettera a).2. L'ente non risponde se le persone indicate nel comma 1 hanno agito nell'interesse esclusivo proprio o di terzi.",
+      "passages": [
+        {
+          "quote": "suo interesse o a suo vantaggio:\na) da persone che rivestono ",
+          "start": 88,
+          "text": "suo interesse o a suo vantaggio:a) da persone che rivestono"
+        },
+        {
+          "quote": "autonomia finanziaria e funzionale nonche' da persone che es",
+          "start": 264,
+          "text": "autonomia finanziaria e funzionale nonche' da persone che es"
+        },
+        {
+          "quote": "lettera a).\n\n2. L'ente non risponde se le persone indicate nel",
+          "start": 479,
+          "text": "lettera a).2. L'ente non risponde se le persone indicate nel"
+        }
+      ]
+    },
+    {
+      "id": "akn-dlgs231-25ter",
+      "raw": "### Art. 25-ter. (Reati societari).\n\n1. In relazione ai reati in materia societaria previsti dal codice civile o da altre leggi speciali, si applicano all'ente le seguenti sanzioni pecuniarie:\na) per il delitto di false comunicazioni sociali previsto dall'articolo 2621 del codice civile, la sanzione pecuniaria da duecento a quattrocento quote;\na-bis) per il delitto di false comunicazioni sociali previsto dall'articolo 2621-bis del codice civile, la sanzione pecuniaria da cento a duecento quote;\nb) per il delitto di false comunicazioni sociali previsto dall'articolo 2622 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote;\nc) LETTERA ABROGATA DALLA L. 27 MAGGIO 2015, N. 69;\nd) per la contravvenzione di falso in prospetto, prevista dall'articolo 2623, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9)\ne) per il delitto di falso in prospetto, previsto dall'articolo 2623, secondo comma, del codice civile, la sanzione pecuniaria da duecento a trecentotrenta quote; (9)\nf) per la contravvenzione di falsita' nelle relazioni o nelle comunicazioni delle societa' di revisione, prevista dall'articolo 2624, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9)\ng) per il delitto di falsita' nelle relazioni o nelle comunicazioni delle societa' di revisione, previsto dall'articolo 2624, secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9)\nh) per il delitto di impedito controllo, previsto dall'articolo 2625, secondo comma, del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)\ni) per il delitto di formazione fittizia del capitale, previsto dall'articolo 2632 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)\nl) per il delitto di indebita restituzione dei conferimenti, previsto dall'articolo 2626 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)\nm) per la contravvenzione di illegale ripartizione degli utili e delle riserve, prevista dall'articolo 2627 del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9)\nn) per il delitto di illecite operazioni sulle azioni o quote sociali o della societa' controllante, previsto dall'articolo 2628 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)\no) per il delitto di operazioni in pregiudizio dei creditori, previsto dall'articolo 2629 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9)\np) per il delitto di indebita ripartizione dei beni sociali da parte dei liquidatori, previsto dall'articolo 2633 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9)\nq) per il delitto di illecita influenza sull'assemblea, previsto dall'articolo 2636 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9)\nr) per il delitto di aggiotaggio, previsto dall'articolo 2637 del codice civile e per il delitto di omessa comunicazione del conflitto d'interessi previsto dall'articolo 2629-bis del codice civile, la sanzione pecuniaria da duecento a cinquecento quote; (9)\ns) per i delitti di ostacolo all'esercizio delle funzioni delle autorita' pubbliche di vigilanza, previsti dall'articolo 2638, primo e secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9)\ns-bis) per il delitto di corruzione tra privati, nei casi previsti dal terzo comma dell'articolo 2635 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote e, nei casi di istigazione di cui al primo comma dell'articolo 2635-bis del codice civile, la sanzione pecuniaria da duecento a quattrocento quote. Si applicano altresi' le sanzioni interdittive previste dall'articolo 9, comma 2;\n\n-------------\nAGGIORNAMENTO (9)\nLa L. 28 dicembre 2005, n. 262, ha disposto (con l'art. 39) che le sanzioni pecuniarie previste dal presente articolo sono raddoppiate.",
+      "projection": "### Art. 25-ter. (Reati societari).1. In relazione ai reati in materia societaria previsti dal codice civile o da altre leggi speciali, si applicano all'ente le seguenti sanzioni pecuniarie:a) per il delitto di false comunicazioni sociali previsto dall'articolo 2621 del codice civile, la sanzione pecuniaria da duecento a quattrocento quote;a-bis) per il delitto di false comunicazioni sociali previsto dall'articolo 2621-bis del codice civile, la sanzione pecuniaria da cento a duecento quote;b) per il delitto di false comunicazioni sociali previsto dall'articolo 2622 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote;c) LETTERA ABROGATA DALLA L. 27 MAGGIO 2015, N. 69;d) per la contravvenzione di falso in prospetto, prevista dall'articolo 2623, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9)e) per il delitto di falso in prospetto, previsto dall'articolo 2623, secondo comma, del codice civile, la sanzione pecuniaria da duecento a trecentotrenta quote; (9)f) per la contravvenzione di falsita' nelle relazioni o nelle comunicazioni delle societa' di revisione, prevista dall'articolo 2624, primo comma, del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9)g) per il delitto di falsita' nelle relazioni o nelle comunicazioni delle societa' di revisione, previsto dall'articolo 2624, secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9)h) per il delitto di impedito controllo, previsto dall'articolo 2625, secondo comma, del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)i) per il delitto di formazione fittizia del capitale, previsto dall'articolo 2632 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)l) per il delitto di indebita restituzione dei conferimenti, previsto dall'articolo 2626 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)m) per la contravvenzione di illegale ripartizione degli utili e delle riserve, prevista dall'articolo 2627 del codice civile, la sanzione pecuniaria da cento a centotrenta quote; (9)n) per il delitto di illecite operazioni sulle azioni o quote sociali o della societa' controllante, previsto dall'articolo 2628 del codice civile, la sanzione pecuniaria da cento a centottanta quote; (9)o) per il delitto di operazioni in pregiudizio dei creditori, previsto dall'articolo 2629 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9)p) per il delitto di indebita ripartizione dei beni sociali da parte dei liquidatori, previsto dall'articolo 2633 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9)q) per il delitto di illecita influenza sull'assemblea, previsto dall'articolo 2636 del codice civile, la sanzione pecuniaria da centocinquanta a trecentotrenta quote; (9)r) per il delitto di aggiotaggio, previsto dall'articolo 2637 del codice civile e per il delitto di omessa comunicazione del conflitto d'interessi previsto dall'articolo 2629-bis del codice civile, la sanzione pecuniaria da duecento a cinquecento quote; (9)s) per i delitti di ostacolo all'esercizio delle funzioni delle autorita' pubbliche di vigilanza, previsti dall'articolo 2638, primo e secondo comma, del codice civile, la sanzione pecuniaria da duecento a quattrocento quote; (9)s-bis) per il delitto di corruzione tra privati, nei casi previsti dal terzo comma dell'articolo 2635 del codice civile, la sanzione pecuniaria da quattrocento a seicento quote e, nei casi di istigazione di cui al primo comma dell'articolo 2635-bis del codice civile, la sanzione pecuniaria da duecento a quattrocento quote. Si applicano altresi' le sanzioni interdittive previste dall'articolo 9, comma 2;-------------AGGIORNAMENTO (9)La L. 28 dicembre 2005, n. 262, ha disposto (con l'art. 39) che le sanzioni pecuniarie previste dal presente articolo sono raddoppiate.",
+      "passages": [
+        {
+          "quote": "la sanzione pecuniaria da quattrocento a seicento quote;\nc) L",
+          "start": 591,
+          "text": "la sanzione pecuniaria da quattrocento a seicento quote;c) L"
+        },
+        {
+          "quote": "centottanta quote; (9)\nl) per il delitto di indebita restituz",
+          "start": 1768,
+          "text": "centottanta quote; (9)l) per il delitto di indebita restituz"
+        },
+        {
+          "quote": "delitti di ostacolo all'esercizio delle funzioni delle autor",
+          "start": 3156,
+          "text": "delitti di ostacolo all'esercizio delle funzioni delle autor"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "synthetic_pdf_with_dispositivo",
+      "testo": {
+        "motivazione": "ORDINANZA\n\nsul ricorso proposto da una societa di costruzioni contro il Ministero competente, avverso la sentenza della Corte di appello, visti gli atti della CORTE DEI CONTI - SEZIONI RIUNITE, depositati il giorno stabilito. Il giudice del rinvio ha deciso la causa. la parte ricorrente nei confronti dell' ASSESSORATO COMPETENTE\n\nUdita la relazione svolta dal consigliere, si osserva che il territorio dell'Emilia-Romagna era compreso nell'appalto.\n\nFATTI DI CAUSA\n\nLa societa ricorrente ha agito in giudizio contro l'amministrazione.\n\nLa Corte di appello ha rigettato la domanda, ritenendo il contratto privo dei requisiti di forma.\n\nCONSIDERATO CHE\n\nil ricorso si articola nei motivi che seguono, esaminati insieme.\n\n7. va premessa la questione di giurisdizione, rilevabile anche d'ufficio in ogni stato e grado del giudizio. 612.000,00 subordinatamente alla prova della somma. Il secondo motivo e' fondato e la sentenza va cassata.\n\nSVOLGIMENTO DEL PROCESSO\n\nLe parti hanno svolto le difese nei termini.",
+        "dispositivo": "P.Q.M.\n\nLa Corte accoglie il ricorso, cassa la sentenza impugnata e rinvia.\n\nCosi deciso in Roma, nella camera di consiglio."
+      },
+      "projection": "ORDINANZAsul ricorso proposto da una societa di costruzioni contro il Ministero competente, avverso la sentenza della Corte di appello, visti gli atti della CORTE DEI CONTI - SEZIONI RIUNITE, depositati il giorno stabilito. Il giudice del rinvio ha deciso la causa. la parte ricorrente nei confronti dell' ASSESSORATO COMPETENTEUdita la relazione svolta dal consigliere, si osserva che il territorio dell'Emilia-Romagna era compreso nell'appalto.FATTI DI CAUSALa societa ricorrente ha agito in giudizio contro l'amministrazione.La Corte di appello ha rigettato la domanda, ritenendo il contratto privo dei requisiti di forma.CONSIDERATO CHEil ricorso si articola nei motivi che seguono, esaminati insieme.7. va premessa la questione di giurisdizione, rilevabile anche d'ufficio in ogni stato e grado del giudizio. 612.000,00 subordinatamente alla prova della somma. Il secondo motivo e' fondato e la sentenza va cassata.SVOLGIMENTO DEL PROCESSOLe parti hanno svolto le difese nei termini.P.Q.M.La Corte accoglie il ricorso, cassa la sentenza impugnata e rinvia.Cosi deciso in Roma, nella camera di consiglio.",
+      "passages": [
+        {
+          "quote": "DEI CONTI - SEZIONI RIUNITE, depositati il giorno stabilito.",
+          "start": 163,
+          "text": "DEI CONTI - SEZIONI RIUNITE, depositati il giorno stabilito."
+        },
+        {
+          "quote": "giudizio contro l'amministrazione.\n\nLa Corte di appello ha rig",
+          "start": 494,
+          "text": "giudizio contro l'amministrazione.La Corte di appello ha rig"
+        },
+        {
+          "quote": "e' fondato e la sentenza va cassata.\n\nSVOLGIMENTO DEL PROCESSO",
+          "start": 884,
+          "text": "e' fondato e la sentenza va cassata.SVOLGIMENTO DEL PROCESSO"
+        }
+      ]
+    },
+    {
+      "id": "synthetic_pdf_without_dispositivo",
+      "testo": {
+        "motivazione": "il ricorso e' inammissibile perche' privo di specificita', e la questione non puo' essere esaminata nel merito.\n\nSegue la condanna alle spese del giudizio di legittimita'."
+      },
+      "projection": "il ricorso e' inammissibile perche' privo di specificita', e la questione non puo' essere esaminata nel merito.Segue la condanna alle spese del giudizio di legittimita'.",
+      "passages": [
+        {
+          "quote": "inammissibile perche' privo di specificita', e la questione ",
+          "start": 14,
+          "text": "inammissibile perche' privo di specificita', e la questione"
+        },
+        {
+          "quote": "non puo' essere esaminata nel merito.\n\nSegue la condanna alle ",
+          "start": 74,
+          "text": "non puo' essere esaminata nel merito.Segue la condanna alle"
+        },
+        {
+          "quote": "spese del giudizio di legittimita'.",
+          "start": 134,
+          "text": "spese del giudizio di legittimita'."
+        }
+      ]
+    },
+    {
+      "id": "synthetic_field_full",
+      "testo": {
+        "motivazione": "CORTE SUPREMA DI CASSAZIONE   \n\nRILEVATO CHE con ricorso il debitore ha impugnato la sentenza. \n\n1. Il primo motivo denuncia la violazione dell'art. 5 c.c. \n\n2. Il secondo motivo e' infondato; Considerato che il ricorso va rigettato. \n\nRITENUTO IN FATTO E CONSIDERATO IN DIRITTO che le spese seguono la soccombenza.",
+        "dispositivo": "P.Q.M. La Corte rigetta il ricorso."
+      },
+      "projection": "CORTE SUPREMA DI CASSAZIONE   RILEVATO CHE con ricorso il debitore ha impugnato la sentenza. 1. Il primo motivo denuncia la violazione dell'art. 5 c.c. 2. Il secondo motivo e' infondato; Considerato che il ricorso va rigettato. RITENUTO IN FATTO E CONSIDERATO IN DIRITTO che le spese seguono la soccombenza.P.Q.M. La Corte rigetta il ricorso.",
+      "passages": [
+        {
+          "quote": "ricorso il debitore ha impugnato la sentenza. \n\n1. Il primo mo",
+          "start": 47,
+          "text": "ricorso il debitore ha impugnato la sentenza. 1. Il primo mo"
+        },
+        {
+          "quote": "2. Il secondo motivo e' infondato; Considerato che il ricors",
+          "start": 152,
+          "text": "2. Il secondo motivo e' infondato; Considerato che il ricors"
+        },
+        {
+          "quote": "che le spese seguono la soccombenza.P.Q.M. La Corte rigetta ",
+          "start": 271,
+          "text": "che le spese seguono la soccombenza.P.Q.M. La Corte rigetta"
+        }
+      ]
+    },
+    {
+      "id": "synthetic_field_without_dispositivo",
+      "testo": {
+        "motivazione": "CORTE SUPREMA DI CASSAZIONE   \n\nRILEVATO CHE con ricorso il debitore ha impugnato la sentenza. \n\n1. Il primo motivo denuncia la violazione dell'art. 5 c.c. \n\n2. Il secondo motivo e' infondato; Considerato che il ricorso va rigettato. \n\nRITENUTO IN FATTO E CONSIDERATO IN DIRITTO che le spese seguono la soccombenza. \n\nP.Q.M. La Corte rigetta il ricorso."
+      },
+      "projection": "CORTE SUPREMA DI CASSAZIONE   RILEVATO CHE con ricorso il debitore ha impugnato la sentenza. 1. Il primo motivo denuncia la violazione dell'art. 5 c.c. 2. Il secondo motivo e' infondato; Considerato che il ricorso va rigettato. RITENUTO IN FATTO E CONSIDERATO IN DIRITTO che le spese seguono la soccombenza. P.Q.M. La Corte rigetta il ricorso.",
+      "passages": [
+        {
+          "quote": "ricorso il debitore ha impugnato la sentenza. \n\n1. Il primo mo",
+          "start": 47,
+          "text": "ricorso il debitore ha impugnato la sentenza. 1. Il primo mo"
+        },
+        {
+          "quote": "2. Il secondo motivo e' infondato; Considerato che il ricors",
+          "start": 152,
+          "text": "2. Il secondo motivo e' infondato; Considerato che il ricors"
+        },
+        {
+          "quote": "che le spese seguono la soccombenza. \n\nP.Q.M. La Corte rigetta",
+          "start": 271,
+          "text": "che le spese seguono la soccombenza. P.Q.M. La Corte rigetta"
+        }
+      ]
+    },
+    {
+      "id": "synthetic_field_multivalued",
+      "testo": {
+        "motivazione": "RILEVATO CHE primo.  \n  \n\nCONSIDERATO CHE secondo."
+      },
+      "projection": "RILEVATO CHE primo.    CONSIDERATO CHE secondo.",
+      "passages": [
+        {
+          "quote": "RILEVATO CHE primo.  \n  \n\nCONSIDERATO CHE secondo.",
+          "start": 0,
+          "text": "RILEVATO CHE primo.    CONSIDERATO CHE secondo."
+        },
+        {
+          "quote": "  \n\nCONSIDERATO CHE secondo.",
+          "start": 23,
+          "text": "CONSIDERATO CHE secondo."
+        }
+      ]
+    },
+    {
+      "id": "synthetic_field_astral",
+      "testo": {
+        "motivazione": "RILEVATO CHE la massima 𝒜 vale per la sezione 𝒝. \n\nP.Q.M. Rigetta."
+      },
+      "projection": "RILEVATO CHE la massima 𝒜 vale per la sezione 𝒝. P.Q.M. Rigetta.",
+      "passages": [
+        {
+          "quote": "CHE la massima 𝒜 vale per la sezione 𝒝. \n\nP.Q.M. Rigetta.",
+          "start": 9,
+          "text": "CHE la massima 𝒜 vale per la sezione 𝒝. P.Q.M. Rigetta."
+        },
+        {
+          "quote": "vale per la sezione 𝒝. \n\nP.Q.M. Rigetta.",
+          "start": 27,
+          "text": "vale per la sezione 𝒝. P.Q.M. Rigetta."
+        }
+      ]
+    },
+    {
+      "id": "synthetic_field_withheld",
+      "testo": {},
+      "projection": "",
+      "passages": []
+    },
+    {
+      "id": "synthetic_corte_cost_full",
+      "testo": {
+        "epigrafe": "LA CORTE COSTITUZIONALE\nha pronunciato la seguente",
+        "motivazione": "Ritenuto in fatto\n\nche il giudice rimettente\ndubita della legittimità dell’art. 1,\ncomma 2, della legge.\n\nConsiderato in diritto",
+        "dispositivo": "per questi motivi\nLA CORTE\n\ndichiara l’illegittimità."
+      },
+      "projection": "LA CORTE COSTITUZIONALEha pronunciato la seguenteRitenuto in fattoche il giudice rimettentedubita della legittimità dell’art. 1,comma 2, della legge.Considerato in dirittoper questi motiviLA CORTEdichiara l’illegittimità.",
+      "passages": [
+        {
+          "quote": "pronunciato la seguenteRitenuto in fatto\n\nche il giudice rimet",
+          "start": 26,
+          "text": "pronunciato la seguenteRitenuto in fattoche il giudice rimet"
+        },
+        {
+          "quote": "della legittimità dell’art. 1,\ncomma 2, della legge.\n\nConsidera",
+          "start": 98,
+          "text": "della legittimità dell’art. 1,comma 2, della legge.Considera"
+        },
+        {
+          "quote": "questi motivi\nLA CORTE\n\ndichiara l’illegittimità.",
+          "start": 175,
+          "text": "questi motiviLA CORTEdichiara l’illegittimità."
+        }
+      ]
+    },
+    {
+      "id": "synthetic_corte_cost_epigrafe_split",
+      "testo": {
+        "epigrafe": "composta dai signori\nha pronunciato la seguente\nORDINANZA\n\nnel giudizio di legittimità costituzionale.",
+        "motivazione": "Ritenuto che il giudice dubita;\nche la questione e' manifestamente inammissibile.\nConsiderato che nulla osta.",
+        "dispositivo": "per questi motivi la Corte dichiara inammissibile."
+      },
+      "projection": "composta dai signoriha pronunciato la seguenteORDINANZAnel giudizio di legittimità costituzionale.Ritenuto che il giudice dubita;che la questione e' manifestamente inammissibile.Considerato che nulla osta.per questi motivi la Corte dichiara inammissibile.",
+      "passages": [
+        {
+          "quote": "seguente\nORDINANZA\n\nnel giudizio di legittimità costituzionale.",
+          "start": 38,
+          "text": "seguenteORDINANZAnel giudizio di legittimità costituzionale."
+        },
+        {
+          "quote": "giudice dubita;\nche la questione e' manifestamente inammissib",
+          "start": 114,
+          "text": "giudice dubita;che la questione e' manifestamente inammissib"
+        },
+        {
+          "quote": "osta.per questi motivi la Corte dichiara inammissibile.",
+          "start": 200,
+          "text": "osta.per questi motivi la Corte dichiara inammissibile."
+        }
+      ]
+    },
+    {
+      "id": "synthetic_corte_cost_epigrafe_whole",
+      "testo": {
+        "epigrafe": "ha pronunciato la seguente ordinanza\nsul ricorso."
+      },
+      "projection": "ha pronunciato la seguente ordinanzasul ricorso.",
+      "passages": [
+        {
+          "quote": "pronunciato la seguente ordinanza\nsul ricorso.",
+          "start": 3,
+          "text": "pronunciato la seguente ordinanzasul ricorso."
+        },
+        {
+          "quote": "seguente ordinanza\nsul ricorso.",
+          "start": 18,
+          "text": "seguente ordinanzasul ricorso."
+        },
+        {
+          "quote": "ordinanza\nsul ricorso.",
+          "start": 27,
+          "text": "ordinanzasul ricorso."
+        }
+      ]
+    }
+  ]
+}
