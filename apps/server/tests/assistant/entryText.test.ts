@@ -29,6 +29,11 @@ const KEYS = normKeys();
 const NORMS = KEYS.norms.map((c) => c.norma);
 
 describe('the ported keys are the shared cases', () => {
+  it('has the cases', () => {
+    expect(KEYS.norms.length).toBeGreaterThan(5);
+    expect(KEYS.read_only.length).toBeGreaterThan(20);
+  });
+
   it.each(KEYS.norms.map((c) => [c.item_key, c] as const))('%s', (_key, c) => {
     expect(buildItemKey(c.norma)).toBe(c.item_key);
     expect(uniqueArticleIdFromNorma(c.norma)).toBe(c.article_id);

@@ -31,9 +31,6 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # file -> (why it still crosses, the pull request that removes it)
 ALLOWLIST: dict[str, tuple[str, str]] = {
-    "apps/server/tests/assistant/entryText.test.ts": ("reads the web's files to check the server's copy of them", "PR-A2"),
-    "apps/server/tests/assistant/ruleTwentyThree.test.ts": ("reads the web's files to check the server's copy of them", "PR-A2"),
-    "apps/server/tests/assistant/passages.routes.test.ts": ("reads the web's files to check the server's copy of them", "PR-A2"),
     "infra/ingress/paths.test.mjs": ("reads the web app's proxy list to check the ingress routes", "PR-B"),
     "apps/web/src/content/novita/releaseNotes.test.ts": ("reads the repository's release notes and changelog", "PR-C"),
     "tools/e2e/docx-roundtrip/run.mjs": ("imports the web app's sources", "PR-C"),

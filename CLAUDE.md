@@ -28,7 +28,7 @@ security risk.
 | `services/merlt/` | MERL-T and RLCF — MPL-2.0, as the rest of the repository | `services/merlt/CLAUDE.md` |
 | `tools/archivio-normativo/` | CLI: a local archive of acts | `tools/archivio-normativo/CLAUDE.md` |
 | `tools/e2e/` | end-to-end and stress harness | `tools/e2e/README.md` |
-| `conventions/` | the convention for legal sources: identity and labels of norms and decisions, as one golden file (read today by the web and API suites, by the others as they adopt it) | `conventions/sources/README.md` |
+| `conventions/` | the convention for legal sources: identity and labels of norms and decisions, as one golden file (read today by the web and API suites, by the others as they adopt it); and the contract the core, the web and the MCP server each assert instead of reading each other's code (`contract/`) | `conventions/sources/README.md`, `conventions/contract/README.md` |
 | `infra/` | the Compose stack: stores and MERL-T, and the production modules (app, scrapers, overlay) | `infra/compose.yml` header |
 | `scripts/` | data backup and restore, smoke tests; `scripts/prod/`: what `./start.sh --prod` runs | `scripts/datakit/README.md` |
 | `vendor/mcp-legal-it/` | git submodule | — |
