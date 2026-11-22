@@ -133,7 +133,10 @@ did not create.
     rendering side: the structured reading surface may wrap characters in
     elements but never add, drop or change one — `articleRender.test.ts`
     checks the rendered text nodes against `article_text` on 27 real texts,
-    with the annotation signs on (a sign has no text node).
+    with the annotation signs on (a sign has no text node). The server and the
+    web meet in `conventions/contract/anchors.json` rather than in each other's
+    code: the server computes there the passages it would store, and the web
+    checks that it draws each one (`conventions/contract/README.md`).
     (Inserting only `\n` would not move any offset — newlines are invisible in
     the projection — but the saved-norm watcher compares `article_text`
     verbatim, so it would still raise false "changed" notifications.)

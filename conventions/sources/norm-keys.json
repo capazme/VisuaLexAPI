@@ -1,0 +1,535 @@
+{
+  "version": 1,
+  "note": "The norm keys the server and the web share: item_key and article_id (normaKeys.ts), the body of /fetch_article_text (articleFetchCache.ts), read_only (describeVersion in versionDisplay.ts). The server's ports and the web's code are each checked against these cases.",
+  "norms": [
+    {
+      "norma": {
+        "tipo_atto": "codice civile",
+        "data": "1942-03-16",
+        "numero_atto": "262",
+        "numero_articolo": "1453"
+      },
+      "item_key": "codice-civile--262--1942-03-16--1453",
+      "article_id": "1453",
+      "fetch_body": {
+        "act_type": "codice civile",
+        "act_number": "262",
+        "date": "1942-03-16",
+        "article": "1453",
+        "version": "vigente",
+        "version_date": ""
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "codice civile",
+        "data": "1942-03-16",
+        "numero_atto": "262",
+        "numero_articolo": "2645-bis",
+        "versione": "vigente"
+      },
+      "item_key": "codice-civile--262--1942-03-16--2645-bis",
+      "article_id": "2645-bis",
+      "fetch_body": {
+        "act_type": "codice civile",
+        "act_number": "262",
+        "date": "1942-03-16",
+        "article": "2645-bis",
+        "version": "vigente",
+        "version_date": ""
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "decreto legislativo",
+        "data": "2010-07-02",
+        "numero_atto": "104",
+        "numero_articolo": "29",
+        "allegato": "2"
+      },
+      "item_key": "decreto-legislativo--104--2010-07-02--all2--29",
+      "article_id": "all2:29",
+      "fetch_body": {
+        "act_type": "decreto legislativo",
+        "act_number": "104",
+        "date": "2010-07-02",
+        "article": "29",
+        "version": "vigente",
+        "version_date": "",
+        "annex": "2"
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "regolamento UE",
+        "data": "2016",
+        "numero_atto": "679",
+        "numero_articolo": "6"
+      },
+      "item_key": "regolamento-ue--679--2016--6",
+      "article_id": "6",
+      "fetch_body": {
+        "act_type": "regolamento UE",
+        "act_number": "679",
+        "date": "2016",
+        "article": "6",
+        "version": "vigente",
+        "version_date": ""
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "Costituzione",
+        "data": "",
+        "numero_atto": "",
+        "numero_articolo": "3"
+      },
+      "item_key": "costituzione--3",
+      "article_id": "3",
+      "fetch_body": {
+        "act_type": "Costituzione",
+        "act_number": "",
+        "date": "",
+        "article": "3",
+        "version": "vigente",
+        "version_date": ""
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "legge",
+        "data": "1990-08-07",
+        "numero_atto": " 241 ",
+        "numero_articolo": "21-octies",
+        "versione": "originale"
+      },
+      "item_key": "legge---241---1990-08-07--21-octies",
+      "article_id": "21-octies",
+      "fetch_body": {
+        "act_type": "legge",
+        "act_number": " 241 ",
+        "date": "1990-08-07",
+        "article": "21-octies",
+        "version": "originale",
+        "version_date": ""
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "decreto del Presidente della Repubblica",
+        "data": "2000-12-28",
+        "numero_atto": "445",
+        "numero_articolo": "47",
+        "data_versione": "2005-01-01"
+      },
+      "item_key": "decreto-del-presidente-della-repubblica--445--2000-12-28--47",
+      "article_id": "47",
+      "fetch_body": {
+        "act_type": "decreto del Presidente della Repubblica",
+        "act_number": "445",
+        "date": "2000-12-28",
+        "article": "47",
+        "version": "vigente",
+        "version_date": "2005-01-01"
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "codice dell'ambiente (à)",
+        "data": "2006-04-03",
+        "numero_atto": "152",
+        "numero_articolo": "3 bis",
+        "allegato": " "
+      },
+      "item_key": "codice-dellambiente---152--2006-04-03--3-bis",
+      "article_id": "all :3 bis",
+      "fetch_body": {
+        "act_type": "codice dell'ambiente (à)",
+        "act_number": "152",
+        "date": "2006-04-03",
+        "article": "3 bis",
+        "version": "vigente",
+        "version_date": "",
+        "annex": " "
+      }
+    },
+    {
+      "norma": {
+        "tipo_atto": "legge",
+        "data": "2006-12-27",
+        "numero_atto": "296",
+        "numero_articolo": "1"
+      },
+      "item_key": "legge--296--2006-12-27--1",
+      "article_id": "1",
+      "fetch_body": {
+        "act_type": "legge",
+        "act_number": "296",
+        "date": "2006-12-27",
+        "article": "1",
+        "version": "vigente",
+        "version_date": ""
+      }
+    }
+  ],
+  "read_only": [
+    {
+      "request": {},
+      "read_only": false
+    },
+    {
+      "request": {
+        "versione": "originale"
+      },
+      "read_only": true
+    },
+    {
+      "request": {
+        "versione": " Originale "
+      },
+      "read_only": true
+    },
+    {
+      "request": {
+        "data_versione": "2005-01-01"
+      },
+      "read_only": true
+    },
+    {
+      "request": {
+        "data_versione": "  "
+      },
+      "read_only": false
+    },
+    {
+      "request": {
+        "versione": "vigente"
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "current"
+      },
+      "request": {},
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "current"
+      },
+      "request": {
+        "versione": "originale"
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "current"
+      },
+      "request": {
+        "versione": " Originale "
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "current"
+      },
+      "request": {
+        "data_versione": "2005-01-01"
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "current"
+      },
+      "request": {
+        "data_versione": "  "
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "current"
+      },
+      "request": {
+        "versione": "vigente"
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "historical"
+      },
+      "request": {},
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "historical"
+      },
+      "request": {
+        "versione": "originale"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "historical"
+      },
+      "request": {
+        "versione": " Originale "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "historical"
+      },
+      "request": {
+        "data_versione": "2005-01-01"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "historical"
+      },
+      "request": {
+        "data_versione": "  "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "historical"
+      },
+      "request": {
+        "versione": "vigente"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "not_yet"
+      },
+      "request": {},
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "not_yet"
+      },
+      "request": {
+        "versione": "originale"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "not_yet"
+      },
+      "request": {
+        "versione": " Originale "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "not_yet"
+      },
+      "request": {
+        "data_versione": "2005-01-01"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "not_yet"
+      },
+      "request": {
+        "data_versione": "  "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "not_yet"
+      },
+      "request": {
+        "versione": "vigente"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated"
+      },
+      "request": {},
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "abrogated"
+      },
+      "request": {
+        "versione": "originale"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated"
+      },
+      "request": {
+        "versione": " Originale "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated"
+      },
+      "request": {
+        "data_versione": "2005-01-01"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated"
+      },
+      "request": {
+        "data_versione": "  "
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "abrogated"
+      },
+      "request": {
+        "versione": "vigente"
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "current",
+        "request_in_window": false
+      },
+      "request": {},
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "current",
+        "request_in_window": false
+      },
+      "request": {
+        "versione": "originale"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "current",
+        "request_in_window": false
+      },
+      "request": {
+        "versione": " Originale "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "current",
+        "request_in_window": false
+      },
+      "request": {
+        "data_versione": "2005-01-01"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "current",
+        "request_in_window": false
+      },
+      "request": {
+        "data_versione": "  "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "current",
+        "request_in_window": false
+      },
+      "request": {
+        "versione": "vigente"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated",
+        "request_in_window": null
+      },
+      "request": {},
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "abrogated",
+        "request_in_window": null
+      },
+      "request": {
+        "versione": "originale"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated",
+        "request_in_window": null
+      },
+      "request": {
+        "versione": " Originale "
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated",
+        "request_in_window": null
+      },
+      "request": {
+        "data_versione": "2005-01-01"
+      },
+      "read_only": true
+    },
+    {
+      "validity": {
+        "state": "abrogated",
+        "request_in_window": null
+      },
+      "request": {
+        "data_versione": "  "
+      },
+      "read_only": false
+    },
+    {
+      "validity": {
+        "state": "abrogated",
+        "request_in_window": null
+      },
+      "request": {
+        "versione": "vigente"
+      },
+      "read_only": false
+    }
+  ]
+}
