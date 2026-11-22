@@ -55,7 +55,9 @@ SKIP_FILES = {
 }
 COMMENT_START = ("//", "/*", "*", "#", "<!--")
 
-QUOTED = re.compile(r"""(["'`])((?:\\.|(?!\1).)*)\1""")
+# One alternative per character: an escape, or any other character but the closing quote; never both
+# (an ambiguous `\\.|.` backtracks exponentially on an unclosed quote full of backslashes).
+QUOTED = re.compile(r"""(["'`])((?:\\.|(?!\1)[^\\])*)\1""")
 # A template literal's interpolations: what follows each is still a path (`${ROOT}/services/…`).
 PLACEHOLDER = re.compile(r"\$\{[^}]*\}")
 # A relative path inside a longer literal: "file:../server", "node ../../scripts/x.mjs".
