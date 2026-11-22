@@ -28,13 +28,12 @@ function anchors(from: string): Anchors {
 }
 const ANCHORS = anchors(__dirname);
 
-const decode = (html: string) =>
-  html.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
-
-/** The characters the renderer wraps in the highlight's marks, in order (a mark split across blocks too). */
+/** The characters the renderer wraps in the highlight's marks, in order (a mark split across blocks too), read by the
+ * browser's own parser: what the reader would see, every entity decoded. */
 function drawn(html: string, id: string): string {
-  const re = new RegExp(`<mark[^>]*data-highlight="${id}"[^>]*>([\\s\\S]*?)</mark>`, 'g');
-  return [...html.matchAll(re)].map((m) => decode(m[1])).join('');
+  const page = document.createElement('template');
+  page.innerHTML = html;
+  return [...page.content.querySelectorAll(`mark[data-highlight="${id}"]`)].map((mark) => mark.textContent ?? '').join('');
 }
 
 const highlight = (id: string, start: number, text: string): Highlight =>
