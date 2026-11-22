@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { app, authHeader, createTestUser, prisma, request, type TestUser } from './helpers';
+import { delegated } from './delegatedHelper';
 
 /**
  * G-595, the owner's words: «Sì: il server riceve tutte le voci in una richiesta, applica i limiti della G-576 in
@@ -35,6 +36,8 @@ describe('the entries of a dossier in one request', () => {
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ entered: 3, total: 3, refused: [] });
     expect(res.body.items.map((i: { title: string }) => i.title)).toEqual(['codice civile', 'Nota 1', 'codice civile']);
+    // Each created entry says which entry of the request it is.
+    expect(res.body.items.map((i: { index: number }) => i.index)).toEqual([0, 1, 2]);
     const stored = await prisma.dossierItem.findMany({ where: { dossierId: id }, orderBy: { position: 'asc' } });
     expect(stored.map((i) => i.position)).toEqual([0, 1, 2, 3, 4]);
     expect(stored.slice(2).map((i) => i.title)).toEqual(['codice civile', 'Nota 1', 'codice civile']);
@@ -70,8 +73,9 @@ describe('the entries of a dossier in one request', () => {
     expect(res.status).toBe(201);
     expect(res.body.entered).toBe(10);
     expect(res.body.refused).toHaveLength(5);
+    // As a single add would read it after the ten went in.
     expect(res.body.refused[0]).toEqual({
-      index: 10, error: 'dossier_items_limit', detail: 'Una pratica può contenere al massimo 2.000 voci. Questa ne ha già 1.990.',
+      index: 10, error: 'dossier_items_limit', detail: 'Una pratica può contenere al massimo 2.000 voci. Questa ne ha già 2.000.',
     });
     expect(await prisma.dossierItem.count({ where: { dossierId: id } })).toBe(2000);
   });
@@ -132,5 +136,55 @@ describe('the entries of a dossier in one request', () => {
     expect(res.status).toBe(201);
     // 200 writes a minute: this request costs 1 + 2 (entries 51-100, 101-120).
     expect(Number(res.headers['ratelimit-remaining'])).toBe(197);
+  });
+
+  it('refuses a position that is no whole number on its own, and lets the others in', async () => {
+    const user = await createTestUser('bulk-position');
+    const id = await dossierWith(user, 0);
+    const half = { ...note(1), position: 1.5 };
+    const single = await request(app).post(`/api/dossiers/${id}/items`).set(authHeader(user)).send(half);
+    expect(single.status).toBe(400);
+    const res = await bulk(user, id, [note(0), half, { ...note(2), position: 3_000_000_000 }, note(3)]);
+    expect(res.status).toBe(201);
+    expect(res.body.entered).toBe(2);
+    expect(res.body.refused.map((r: { index: number }) => r.index)).toEqual([1, 2]);
+    expect(res.body.refused[0]).toEqual({ index: 1, error: 'invalid', detail: single.body.detail });
+  });
+
+  it('places an entry without a position after the last one, the request\'s own included', async () => {
+    const user = await createTestUser('bulk-mixed');
+    const id = await dossierWith(user, 5);
+    const res = await bulk(user, id, [{ ...note(1), position: 100 }, note(2), note(3)]);
+    expect(res.status).toBe(201);
+    const stored = await prisma.dossierItem.findMany({ where: { dossierId: id, title: { startsWith: 'Nota ' } }, orderBy: { position: 'asc' } });
+    expect(stored.map((i) => [i.title, i.position])).toEqual([['Nota 1', 100], ['Nota 2', 101], ['Nota 3', 102]]);
+  });
+
+  it('takes an entry with no content, as a single add does', async () => {
+    const user = await createTestUser('bulk-no-content');
+    const id = await dossierWith(user, 0);
+    const res = await bulk(user, id, [{ itemType: 'section', title: 'Capitolo primo' }]);
+    expect(res.status).toBe(201);
+    expect(res.body.entered).toBe(1);
+  });
+
+  it('is for the user\'s own session: a connected application is refused', async () => {
+    const user = await createTestUser('bulk-delegated');
+    const id = await dossierWith(user, 0);
+    const res = await request(app).post(`/api/dossiers/${id}/items/bulk`).set(await delegated(user, 'dossier:write')).send({ items: [note(1)] });
+    expect(res.status).toBe(403);
+    expect(await prisma.dossierItem.count({ where: { dossierId: id } })).toBe(0);
+  });
+
+  it('gives a refused batch\'s points back: the next single write still goes through', async () => {
+    const user = await createTestUser('bulk-refused-points');
+    const id = await dossierWith(user, 0);
+    const batch = (n: number) => bulk(user, id, Array.from({ length: n }, (_, k) => note(k)));
+    // 200 writes a minute: four full batches cost 4 × 40, one of 500 costs 1 + 9: 170 spent.
+    for (let i = 0; i < 4; i += 1) expect((await batch(2000)).status).not.toBe(429);
+    expect((await batch(500)).status).not.toBe(429);
+    // A fifth full batch passes the request's own write (171) but not its size (+39): refused, and given back.
+    expect((await batch(2000)).status).toBe(429);
+    expect((await request(app).post(`/api/dossiers/${id}/items`).set(authHeader(user)).send(note(9))).status).not.toBe(429);
   });
 });

@@ -69,15 +69,16 @@ export async function itemRoom(
   tx: Prisma.TransactionClient,
   userId: string,
   dossierId: string,
-): Promise<{ room: number; refusal: CapRefusal }> {
+): Promise<{ room: number; refusalAfter: (entered: number) => CapRefusal }> {
   await lockAccount(tx, userId);
   const held = await tx.dossierItem.count({ where: { dossierId, dossier: { userId } } });
   const total = await tx.dossierItem.count({ where: { dossier: { userId } } });
   const inDossier = Math.max(0, MAX_ITEMS_PER_DOSSIER - held);
   const inAccount = Math.max(0, MAX_ITEMS_PER_ACCOUNT - total);
+  // The sentence as a single add would read it once `entered` entries went in.
   return inDossier <= inAccount
-    ? { room: inDossier, refusal: dossierItemsRefusal(held) }
-    : { room: inAccount, refusal: ACCOUNT_ITEMS };
+    ? { room: inDossier, refusalAfter: (entered) => dossierItemsRefusal(held + entered) }
+    : { room: inAccount, refusalAfter: () => ACCOUNT_ITEMS };
 }
 
 export async function assertDossierRoom(tx: Prisma.TransactionClient, userId: string, adding: DossierAddition): Promise<void> {

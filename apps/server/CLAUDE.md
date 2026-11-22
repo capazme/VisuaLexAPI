@@ -166,7 +166,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`prepareItem`), the caps once (`itemRoom`): what fits goes in, in order, the rest is
   listed. The answer is `{ entered, total, items, refused: [{ index, error, detail }] }`
   with the single route's code and sentence per refused entry (`validationDetail` for a
-  schema error). It costs one write plus one per 50 entries past the first 50
+  schema error; `invalid` where the single route answers no code), and each created
+  entry carries its `index` in the request. It costs one write plus one per 50 entries past the first 50
   (`chargeWrites`). Session only.
   A dossier has a `kind`, `lavoro` (a practice: it may hold a client's data; the default, and
   what every dossier older than the column became) or `studio` (a topic studied: a dossier

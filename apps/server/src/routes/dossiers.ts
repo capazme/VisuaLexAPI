@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import * as dossierController from '../controllers/dossierController';
 import { authenticate } from '../middleware/auth';
 
@@ -18,8 +18,10 @@ router.delete('/dossiers/:id', dossierController.deleteDossier);
 
 // Dossier items
 router.post('/dossiers/:id/items', dossierController.addDossierItem);
-// A dossier's entries in one request (G-595): up to 2,000 entries and 8 MB (app.ts), the caps once for the batch.
-router.post('/dossiers/:id/items/bulk', dossierController.addDossierItemsBulk);
+// A dossier's entries in one request (G-595): up to 2,000 entries and 8 MB, the caps once for the batch. The
+// 8 MB parser is this route's own, after `authenticate` (app.ts skips this path); 8 MB stays under the ingress's
+// 10 MB on /api, and beyond it the client sends several requests.
+router.post('/dossiers/:id/items/bulk', express.json({ limit: '8mb' }), dossierController.addDossierItemsBulk);
 // Norms from references in free text, checked for existence (MCP spike).
 router.post('/dossiers/:id/norms', dossierController.addDossierNorms);
 // Court decisions from references in words, confirmed at their source (design 2026-10-12 §2.2).

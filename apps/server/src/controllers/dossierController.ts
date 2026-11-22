@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Prisma, DossierItemType } from '@prisma/client';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { boundedTags, boundedText, parseBody } from '../utils/bodyLimits';
@@ -202,18 +202,21 @@ const updateDossierSchema = z.object({
   kind: dossierKindSchema.optional(),
 });
 
+// An entry's position is a Postgres integer: a fraction or a number past its range is a 400, not a failed write.
+const itemPosition = z.number().int().min(-2_147_483_648).max(2_147_483_647);
+
 const createDossierItemSchema = z.object({
   itemType: z.enum(['norm', 'note', 'section', 'sentenza']),
   title: boundedText(1_000, 'titolo').min(1),
   content: z.any().optional(),
-  position: z.number().optional(),
+  position: itemPosition.optional(),
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
 });
 
 const updateDossierItemSchema = z.object({
   title: boundedText(1_000, 'titolo').min(1).optional(),
   content: z.any().optional(),
-  position: z.number().optional(),
+  position: itemPosition.optional(),
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
   // A note's article (or null to detach it): how the web app reattaches a note
   // to an article it restored with a new id. User session only: this route is
@@ -476,32 +479,48 @@ export const addDossierItemsBulk = async (req: Request, res: Response) => {
     }
   });
 
+  // Each entry's id is set here, so the answer can say which entry of the request each created one is.
+  const indexOf = new Map<string, number>();
   const created = await prisma.$transaction(async (tx) => {
-    const { room, refusal } = await itemRoom(tx, userId, id);
-    for (const over of valid.slice(room)) refused.push({ index: over.index, ...refusal });
+    const { room, refusalAfter } = await itemRoom(tx, userId, id);
     const fits = valid.slice(0, room);
+    // The cap's sentence as a single add would read it after these went in («Questa ne ha già 2.000.»).
+    const refusal = refusalAfter(fits.length);
+    for (const over of valid.slice(room)) refused.push({ index: over.index, ...refusal });
     if (fits.length === 0) return [];
     const last = await tx.dossierItem.aggregate({ where: { dossierId: id }, _max: { position: true } });
+    // As one add after another: an entry without a position goes after the last one, its own or one the
+    // request set.
     let next = (last._max.position ?? -1) + 1;
     const provenance = provenanceFromRequest(req);
     return tx.dossierItem.createManyAndReturn({
-      data: fits.map(({ entry }) => ({
-        dossierId: id,
-        itemType: entry.itemType,
-        title: entry.title,
-        content: entry.content,
-        position: entry.position ?? next++,
-        ...(entry.status !== undefined && { status: entry.status }),
-        ...provenance,
-      })),
+      data: fits.map(({ index, entry }) => {
+        const itemId = randomUUID();
+        indexOf.set(itemId, index);
+        const position = entry.position ?? next;
+        next = Math.max(next, position + 1);
+        return {
+          id: itemId,
+          dossierId: id,
+          itemType: entry.itemType,
+          title: entry.title,
+          content: entry.content,
+          position,
+          ...(entry.status !== undefined && { status: entry.status }),
+          ...provenance,
+        };
+      }),
     });
   }, { maxWait: 10_000, timeout: 60_000 });
 
   refused.sort((a, b) => a.index - b.index);
+  const ordered = created.sort((a, b) => indexOf.get(a.id)! - indexOf.get(b.id)!);
+  const serialized = await serializeItemsFor(req, ordered);
   res.status(created.length > 0 ? 201 : 200).json({
     entered: created.length,
     total: items.length,
-    items: await serializeItemsFor(req, created.sort((a, b) => a.position - b.position)),
+    // In the request's order, each with its index in the request.
+    items: serialized.map((item, i) => ({ index: indexOf.get(ordered[i].id)!, ...item })),
     refused,
   });
 };

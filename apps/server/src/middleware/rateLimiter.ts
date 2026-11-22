@@ -162,6 +162,9 @@ export async function chargeWrites(req: Request, res: Response, extra: number): 
     return true;
   } catch (err) {
     if (err instanceof RateLimiterRes) {
+      // The limiter counts a refused consume too: give these points back, or one refused batch would leave the
+      // caller without a single write for the rest of the minute.
+      await writeLimiter.reward(key, extra).catch(() => undefined);
       sendTooManyRequests(res, err);
       return false;
     }
