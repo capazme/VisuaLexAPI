@@ -1,4 +1,4 @@
-// The server twin of the web's `identityFromKey` (apps/web/src/utils/decisionLinks.ts): the key
+// The server twin of the web's `identityFromKey` (apps/web/app/src/utils/decisionLinks.ts): the key
 // of a court decision read back to its identity. Same shapes, same bounds; keep the two in step
 // (both are pinned to conventions/sources/decision-keys.json).
 

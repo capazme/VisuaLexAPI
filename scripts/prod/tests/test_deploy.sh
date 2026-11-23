@@ -846,11 +846,11 @@ EOF
 mkdev() { # mkdev <name>: a repo as mkrepo makes it, plus what ./start.sh --dev reaches; prints its path
   d="$(mkrepo "$1")"
   cp "$root/start.sh" "$d/start.sh"
-  mkdir -p "$d/apps/web" "$d/apps/mcp" "$d/services/visualex" "$d/stubs"
+  mkdir -p "$d/apps/web/app" "$d/apps/mcp" "$d/services/visualex" "$d/stubs"
   cp "$root/apps/mcp/.env.example" "$d/apps/mcp/.env.example"
   # start.sh wants each app's package.json: a folder without one is an uninitialised submodule, or
-  # what is left of a folder that became one.
-  echo '{}' >"$d/apps/web/package.json"
+  # what is left of a folder that became one. The web's app is in app/ of lexcraft-web (G-599).
+  echo '{}' >"$d/apps/web/app/package.json"
   echo '{}' >"$d/apps/mcp/package.json"
   echo redis >"$d/services/visualex/requirements-dev.txt"
   # the venv that the host python "creates", and the tools inside it
@@ -929,7 +929,7 @@ if grep -qF -- "$mcp_secret" "$work/out" || grep -qF -- "$delegation" "$work/out
 expect_log "$d" "python3.14 -m venv" "it creates the venv"
 expect_log_re "$d" "pip install -q -r .*/services/visualex/requirements-dev.txt" "installs the Python dependencies"
 expect_log_re "$d" "npm ci --prefix .*/apps/server$" "installs the server's packages"
-expect_log_re "$d" "npm ci --prefix .*/apps/web$" "and the web app's"
+expect_log_re "$d" "npm ci --prefix .*/apps/web/app$" "and the web app's, in the pinned lexcraft-web's app/"
 expect_log_re "$d" "npm ci --prefix .*/apps/mcp$" "and the MCP server's"
 expect_log "$d" "playwright install chromium" "installs Chromium"
 expect_log "$d" "up -d --wait postgres redis falkordb qdrant" "and reaches the stores"
@@ -993,10 +993,24 @@ EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_WEB_DIR=$rel"; outcomeb "$d" start.sh; EX
 expect_log "$d" "npm ci --prefix $(cd "$work/rel-web" && pwd)" "a relative LEXCRAFT_WEB_DIR is used as an absolute folder"
 # What the pull that turns apps/web into a submodule leaves behind: ignored files, no package.json.
 d="$(mkdev leftover)"
-rm "$d/apps/web/package.json"; mkdir -p "$d/apps/web/node_modules/x"
+rm -r "$d/apps/web/app"; mkdir -p "$d/apps/web/node_modules/x"
 EXTRA_ENV="STUB_DOCKER_EXIT=1"; outcomeb "$d" start.sh; EXTRA_ENV=""
 expect_status nonzero "a web folder with no package.json stops --dev, node_modules or not"
 expect_out "move them away first" "saying what to do with the leftovers"
+# A clone beside the checkout (../lexcraft-web/app, ../lexcraft-mcp) is taken when the variables are unset.
+d="$(mkdev beside)"
+mkdir -p "$work/lexcraft-web/app" "$work/lexcraft-mcp"
+echo '{}' >"$work/lexcraft-web/app/package.json"; echo '{}' >"$work/lexcraft-mcp/package.json"
+cp "$d/apps/mcp/.env.example" "$work/lexcraft-mcp/.env.example"
+EXTRA_ENV="STUB_DOCKER_EXIT=1"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_log "$d" "npm ci --prefix $(cd "$work/lexcraft-web/app" && pwd)" "a clone of lexcraft-web beside the checkout is used"
+expect_log "$d" "npm ci --prefix $(cd "$work/lexcraft-mcp" && pwd)" "and one of lexcraft-mcp"
+expect_out "Web app: " "saying which folders it uses"
+mkdir -p "$work/env-web"; echo '{}' >"$work/env-web/package.json"
+EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_WEB_DIR=$work/env-web"; outcomeb "$d" start.sh; EXTRA_ENV=""
+expect_log "$d" "npm ci --prefix $(cd "$work/env-web" && pwd)" "LEXCRAFT_WEB_DIR wins over a clone beside the checkout"
+# Gone again, so the cases below see only their own checkout.
+rm -rf "$work/lexcraft-web" "$work/lexcraft-mcp"
 d="$(mkdev nomcpdir)"
 EXTRA_ENV="STUB_DOCKER_EXIT=1 LEXCRAFT_MCP_DIR=$work/no-such-mcp"; outcomeb "$d" start.sh; EXTRA_ENV=""
 expect_status nonzero "and so is a LEXCRAFT_MCP_DIR that is not there"
@@ -1005,15 +1019,15 @@ expect_out "LEXCRAFT_MCP_DIR" "naming it"
 # A submodule that is not initialised is initialised, and one that is is left as it is.
 d="$(mkdev subdev)"
 s="$work/subdev.sub"
-git init -q -b main "$s"; echo '{}' >"$s/package.json"; git -C "$s" add -A; gitc -C "$s" commit -q -m web
+git init -q -b main "$s"; mkdir -p "$s/app"; echo '{}' >"$s/app/package.json"; git -C "$s" add -A; gitc -C "$s" commit -q -m web
 rm -rf "$d/apps/web" "$d/stubs.web"
 git -C "$d" rm -rq --cached apps/web >/dev/null 2>&1 || true
 env $ALLOW_FILE git -C "$d" -c user.name=t -c user.email=t@example.invalid submodule add -q "$s" apps/web >/dev/null 2>&1
 gitc -C "$d" add -A; gitc -C "$d" commit -q -m "the web as a submodule"
 git -C "$d" submodule deinit -q -f apps/web
 EXTRA_ENV="STUB_DOCKER_EXIT=1 $ALLOW_FILE"; outcomeb "$d" start.sh; EXTRA_ENV=""
-[ -f "$d/apps/web/package.json" ] && ok "start.sh initialises a submodule that is not checked out" || { bad "start.sh initialises a submodule that is not checked out"; show "$work/out"; }
-expect_log_re "$d" "npm ci --prefix .*/apps/web$" "and installs its packages"
+[ -f "$d/apps/web/app/package.json" ] && ok "start.sh initialises a submodule that is not checked out" || { bad "start.sh initialises a submodule that is not checked out"; show "$work/out"; }
+expect_log_re "$d" "npm ci --prefix .*/apps/web/app$" "and installs its packages"
 gitc -C "$d/apps/web" commit -q --allow-empty -m "work in progress"
 mine="$(git -C "$d/apps/web" rev-parse HEAD)"
 EXTRA_ENV="STUB_DOCKER_EXIT=1 $ALLOW_FILE"; outcomeb "$d" start.sh; EXTRA_ENV=""

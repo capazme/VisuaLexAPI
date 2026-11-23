@@ -1,7 +1,7 @@
 # MERL-T integration notes — server and web
 
 The MERL-T sections of the former root `CLAUDE.md`. `apps/server/CLAUDE.md`,
-`apps/web/CLAUDE.md` and `services/merlt/CLAUDE.md` point here; read the section
+`apps/web/app/CLAUDE.md` and `services/merlt/CLAUDE.md` point here; read the section
 you need before changing a MERL-T route, gate, guard or surface.
 
 ### MERL-T Integration (on `develop`): where to look
@@ -305,7 +305,7 @@ declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
 | `global` (mounted once in `Layout`) | `GlobalMerltSlot` | `VITE_FEATURE_MERLT` |
 | `article_sidebar` | `ArticleGraphSideRail` | `VITE_FEATURE_MERLT_GRAPH`, and the development mode (`ArticleTabContent` draws the slot only with it) |
 
-- **The development mode** (`apps/web/src/features/devMode/`, spec
+- **The development mode** (`apps/web/app/src/features/devMode/`, spec
   `docs/superpowers/specs/2026-10-12-dev-mode-and-sidebar.md`) hides the MERL-T
   surfaces that are still in testing from everyone but the accounts the
   administrator enabled and that switched it on. Behind it: the Sidebar's

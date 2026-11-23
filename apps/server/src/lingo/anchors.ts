@@ -79,7 +79,7 @@ function fingerprintIn(map: Fingerprints, article: string): string | null {
 /**
  * The AKN part that is this annex: the one sharing most article numbers with
  * it, the closest in size on a tie, and a real majority — the web's own rule
- * (apps/web/src/utils/actRubriche.ts, matchRubrichePart). None when two remain.
+ * (apps/web/app/src/utils/actRubriche.ts, matchRubrichePart). None when two remain.
  */
 export function matchPart(parts: Part[], articleNumbers: string[]): Part | null {
   if (parts.length === 0 || articleNumbers.length === 0) return null;

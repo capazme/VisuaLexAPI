@@ -5,12 +5,15 @@
 #                           Docker (infra/compose.yml): postgres, redis, falkordb, qdrant — always;
 #                             mcp-legal-it, merlt-api, merlt-worker too with MERLT_ENABLED=true.
 #                           Host: Python API (services/visualex, :5000 or VISUALEX_API_PORT), server (apps/server, :3001),
-#                             web (apps/web, :5173), MCP server (apps/mcp, :3002).
-#                           The web app and the MCP server are taken from LEXCRAFT_WEB_DIR and
-#                             LEXCRAFT_MCP_DIR when set (a working clone of their repositories,
-#                             wherever it is), else from the checkout's apps/web and apps/mcp. A
-#                             submodule of the checkout that is not initialised is initialised
-#                             here; one that is, is never updated: someone may be working in it.
+#                             web (lexcraft-web's app, :5173), MCP server (lexcraft-mcp, :3002).
+#                           The web app and the MCP server are taken from LEXCRAFT_WEB_DIR (the
+#                             app/ folder of a clone of lexcraft-web) and LEXCRAFT_MCP_DIR (a
+#                             clone of lexcraft-mcp) when set, else from clones beside this
+#                             checkout (../lexcraft-web/app, ../lexcraft-mcp), else from the
+#                             versions the core pins (the app/ of the submodule apps/web, and
+#                             the submodule apps/mcp: to be read, not changed). A submodule of the checkout that is not initialised is
+#                             initialised here; one that is, is never updated: someone may be
+#                             working in it.
 #                           MERLT_API_IN_DOCKER=false runs the MERL-T api and worker on the host
 #                             (developer mode: a venv with the merlt deps, no mcp-legal-it tools).
 #                           A fresh checkout is prepared here: env files, venv, dependencies, Chromium.
@@ -115,10 +118,18 @@ fi
 
 . "$PROJECT_ROOT/scripts/prod/lib.sh"
 
-# Where the web app and the MCP server live. In a checkout that holds them they are its own
-# folders; a developer working on either from a clone of its repository points these at it.
-WEB_DIR="${LEXCRAFT_WEB_DIR:-$PROJECT_ROOT/apps/web}"
-MCP_DIR="${LEXCRAFT_MCP_DIR:-$PROJECT_ROOT/apps/mcp}"
+# Where the web app and the MCP server live (G-603). The core pins lexcraft-web and lexcraft-mcp
+# as its submodules apps/web (the app in app/) and apps/mcp: those are to read, not to change. A
+# developer works in a clone of the repository: LEXCRAFT_WEB_DIR / LEXCRAFT_MCP_DIR name it, and a
+# clone beside this checkout is taken when they are unset.
+pick_dir() { # pick_dir <variable's value> <beside this checkout> <pinned in this checkout>
+    if [ -n "$1" ]; then echo "$1"
+    elif [ -f "$2/package.json" ]; then echo "$2"
+    else echo "$3"
+    fi
+}
+WEB_DIR="$(pick_dir "${LEXCRAFT_WEB_DIR:-}" "$PROJECT_ROOT/../lexcraft-web/app" "$PROJECT_ROOT/apps/web/app")"
+MCP_DIR="$(pick_dir "${LEXCRAFT_MCP_DIR:-}" "$PROJECT_ROOT/../lexcraft-mcp" "$PROJECT_ROOT/apps/mcp")"
 # A path as the messages show it: relative to the checkout when it is inside it.
 shown() { echo "${1#"$PROJECT_ROOT"/}"; }
 
@@ -146,6 +157,8 @@ require_dir "$MCP_DIR" LEXCRAFT_MCP_DIR "MCP server"
 # Absolute from here on: the dev servers are started after a cd into apps/server.
 WEB_DIR="$(cd "$WEB_DIR" && pwd)"
 MCP_DIR="$(cd "$MCP_DIR" && pwd)"
+version_of() { git -C "$1" describe --tags --always --dirty 2>/dev/null || echo "not a git checkout"; }
+echo -e "${YELLOW}Web app: $(shown "$WEB_DIR") ($(version_of "$WEB_DIR")) · MCP server: $(shown "$MCP_DIR") ($(version_of "$MCP_DIR"))${NC}"
 
 # First run on a fresh checkout: the two env files the stack and the server read, from their
 # examples. Never overwritten. The JWT secret is generated here, not left as the example's.
