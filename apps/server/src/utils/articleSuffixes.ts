@@ -3,7 +3,7 @@
  *
  * The source is the Python API's
  * `services/visualex/visualex_api/tools/article_suffixes.py`; the web app keeps
- * the other mirror (`apps/web/src/utils/articleSuffixes.ts`). Change all three
+ * the other mirror (`apps/web/app/src/utils/articleSuffixes.ts`). Change all three
  * together: `tests/unit/articleSuffixes.test.ts` fails when this list drifts
  * from the source. A copy that stops at "decies" reads "art. 25-terdecies" as
  * art. 25-ter, an article that exists, so nothing looks broken.

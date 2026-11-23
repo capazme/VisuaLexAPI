@@ -91,7 +91,9 @@ logins stay blocked for 15 minutes after the check.
   migration is refused.
 - **Going back to an older version.** Migrations do not walk backwards, so the way back
   for the data is the backup taken before the update:
-  1. Check out the older version (`git switch --detach <tag or commit>`).
+  1. Check out the older version (`git switch --detach <tag or commit>`), then its submodules
+     (`git submodule update --init --recursive`): the web and the MCP server it pins come back
+     with it, and the deploy refuses a submodule left at another commit.
   2. Deploy it with `./start.sh --prod --no-pull --allow-branch`.
   3. If its schema is older than the data, restore the backup taken before the update
      (section 5).

@@ -1,7 +1,7 @@
 /**
  * The tables of the convention for legal sources (spec
  * docs/superpowers/specs/2026-10-04-source-convention-design.md §3.3): the server's copy of the
- * web app's `apps/web/src/utils/sources/actTypes.ts` (less the act headings, which the server
+ * web app's `apps/web/app/src/utils/sources/actTypes.ts` (less the act headings, which the server
  * never writes). The API and MERL-T hold their own; all are pinned to
  * `conventions/sources/golden.json` (`tests/norms/sourcesGolden.test.ts` here). Keys are lower
  * case with single spaces.

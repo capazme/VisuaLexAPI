@@ -3,7 +3,7 @@
  * docs/superpowers/specs/2026-10-12-administrative-courts-design.md, the owner's D1–D6): the
  * Consiglio di Stato and the C.G.A.R.S. keyed by kind, number and year, a TAR by its seat too. The
  * closed values the item schema, the citation and the key read; the web's twin is
- * `apps/web/src/utils/adminCourts.ts`. `SEATS` is a copy of `conventions/sources/tar-seats.json`,
+ * `apps/web/app/src/utils/adminCourts.ts`. `SEATS` is a copy of `conventions/sources/tar-seats.json`,
  * pinned by `tests/norms/adminCourts.test.ts`.
  */
 export const ADMIN_COURTS = ['consiglio_di_stato', 'cgars', 'tar'] as const;

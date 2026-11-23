@@ -11,7 +11,6 @@
 /apps/server/src/routes/oauth*.ts              @capazme @LP-legal
 /apps/server/src/utils/jwt.ts                  @capazme @LP-legal
 /apps/server/src/utils/password.ts             @capazme @LP-legal
-/apps/mcp/src/auth.ts                          @capazme @LP-legal
 
 # The Prisma schema and migrations
 /apps/server/prisma/                           @capazme @LP-legal
@@ -19,6 +18,11 @@
 # Licences
 /LICENSE                                       @capazme @LP-legal
 /services/merlt/LICENSE                        @capazme @LP-legal
+
+# What the core pins: the web, the MCP server and the contract (G-603); their own files are reviewed
+# in their repositories (lexcraft-mcp's CODEOWNERS names src/auth.ts).
+/.gitmodules                                   @capazme @LP-legal
+/conventions                                   @capazme @LP-legal
 
 # CI, the stack, the data scripts, the shared Claude Code rules
 /.github/                                      @capazme @LP-legal

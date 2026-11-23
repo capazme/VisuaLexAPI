@@ -1,3 +1,12 @@
 [submodule "vendor/mcp-legal-it"]
 	path = vendor/mcp-legal-it
 	url = https://github.com/capazme/mcp-legal-it.git
+[submodule "apps/web"]
+	path = apps/web
+	url = https://github.com/LexCraft-IT/lexcraft-web.git
+[submodule "apps/mcp"]
+	path = apps/mcp
+	url = https://github.com/LexCraft-IT/lexcraft-mcp.git
+[submodule "conventions"]
+	path = conventions
+	url = https://github.com/LexCraft-IT/lexcraft-contracts.git

@@ -2,7 +2,7 @@
 # the scrapers.
 #
 # Build from the REPOSITORY ROOT (the web app and the Caddyfile live in different
-# folders):
+# folders; the web is the submodule apps/web, lexcraft-web, whose app is in app/):
 #   docker build -f infra/ingress/Dockerfile -t visualex-ingress .
 #
 # MERL-T's front-end flags are decided HERE, at build time, and default to on:
@@ -14,9 +14,9 @@
 
 FROM node:24-bookworm-slim AS web
 WORKDIR /app
-COPY apps/web/package.json apps/web/package-lock.json ./
+COPY apps/web/app/package.json apps/web/app/package-lock.json ./
 RUN npm ci
-COPY apps/web/ ./
+COPY apps/web/app/ ./
 # Same origin: the app calls /api and the scraping paths on the origin that served it.
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL

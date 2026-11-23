@@ -12,12 +12,15 @@ For a Mac (Apple Silicon, 16 GB or more). Commands run from the repository root.
 ## 2. Clone
 
 ```bash
-git clone --recurse-submodules https://github.com/capazme/VisuaLexAPI.git
-cd VisuaLexAPI
+git clone --recurse-submodules https://github.com/LexCraft-IT/lexcraft-core.git
+cd lexcraft-core
 git switch develop
 ```
 
-`--recurse-submodules` fetches `vendor/mcp-legal-it`. Forgot it?
+`--recurse-submodules` fetches the submodules: `apps/web` (lexcraft-web), `apps/mcp`
+(lexcraft-mcp), `conventions` (lexcraft-contracts) and `vendor/mcp-legal-it`. They are the versions
+this checkout pins, to read; to work on the web or the MCP server, clone its repository beside this
+one (`../lexcraft-web`, `../lexcraft-mcp`), which `./start.sh --dev` takes. Forgot it?
 `git submodule update --init --recursive`.
 
 ## 3. The `.env` files
@@ -166,7 +169,7 @@ stack, with an active user: `E2E_EMAIL=… E2E_PASSWORD=… node apps/mcp/script
 | `prisma migrate deploy failed` | `DATABASE_URL` in `apps/server/.env` must point at `localhost:5436`, or the stack is down: `docker compose -f infra/compose.yml ps`. |
 | `Docker is not running` | Start Docker Desktop, wait until it says it is running, `./start.sh` again. |
 | An install step fails (venv, pip, `npm ci`, Chromium) | Run that command by hand (section 4), fix what it says, `./start.sh` again: a step whose result exists is skipped. |
-| `vendor/mcp-legal-it` is empty | `git submodule update --init --recursive` |
+| `vendor/mcp-legal-it`, `apps/web`, `apps/mcp` or `conventions` is empty | `git submodule update --init --recursive` |
 | MERL-T not healthy after 60 s | Its first build may still be running: `docker compose -f infra/compose.yml --profile merlt logs -f merlt-api` |
 | Claude Code says the MCP server needs authentication and nothing opens | Run `/mcp` in Claude Code and choose the `visualex` server to sign in; check that `:3002` and `:3001` are up. |
 | An MCP tool answers that the connection was revoked or expired | Connect again from `/mcp` in Claude Code; revoked connections are not revived. |

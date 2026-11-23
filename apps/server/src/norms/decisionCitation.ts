@@ -3,7 +3,7 @@
  * docs/superpowers/specs/2026-10-04-source-convention-design.md §4, decided by the owner, Q1-Q2):
  * the citation «Cass. civ., sez. un., sent. 6 dicembre 2024, n. 31310» and the short label
  * «Cass. civ., sez. un., n. 31310/2024». The server's copy of the web app's
- * `formatDecisionCitation` and `formatDecisionShort` (`apps/web/src/utils/decisionLinks.ts`);
+ * `formatDecisionCitation` and `formatDecisionShort` (`apps/web/app/src/utils/decisionLinks.ts`);
  * both are pinned to `conventions/sources/golden.json`. The dossier stores the citation as a copy
  * (`etichetta`, D9): every write recomputes it from the identity and the attributes.
  */

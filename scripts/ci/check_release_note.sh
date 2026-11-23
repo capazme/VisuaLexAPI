@@ -5,11 +5,11 @@
 #   check_release_note.sh [web app folder]
 #
 # The note is a file of the web app: <web app folder>/src/content/novita/<version>.md. The folder
-# is read from the repository root when it is relative. The default is apps/web; it becomes
-# apps/web/app, the folder of the pinned lexcraft-web submodule, when the web leaves the repository.
+# is read from the repository root when it is relative. The default is apps/web/app, the app
+# folder of the pinned lexcraft-web submodule (G-603, G-604).
 set -eu
 root="$(cd "$(dirname "$0")/../.." && pwd)"
-web="${1:-apps/web}"
+web="${1:-apps/web/app}"
 case "$web" in /*) ;; *) web="$root/$web" ;; esac
 
 [ -f "$root/version.txt" ] || { echo "version.txt is missing at the repository root." >&2; exit 1; }

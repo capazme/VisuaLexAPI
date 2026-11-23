@@ -84,17 +84,26 @@ whoever merges first.
 - **Z**, the patch number, goes up with a hotfix (1.8.1).
 - **X** moves only by the owners' decision.
 
+This is the **product's** version, the one `/version` serves. Since the split (G-596, G-597) the web
+app, the MCP server and the contract live in repositories of their own, LexCraft-IT/lexcraft-web,
+lexcraft-mcp and lexcraft-contracts, each with its own `version.txt` and tags, released on its own.
+A release of the core pins the components it ships: the submodules `apps/web` and `apps/mcp` at
+release tags of their repositories, `conventions` at a commit of lexcraft-contracts. The check
+«Contract» (`scripts/ci/check_pins.sh`) refuses another pin, and a pinned component whose own
+`conventions/` is not the core's commit (G-603).
+
 Each release has a section in `CHANGELOG.md`, in English, written from the
 merge titles (`sh scripts/release-notes.sh vPREVIOUS origin/develop` lists
 them, after a `git fetch`),
 and a short note in Italian for the people who use VisuaLex: what changed in
 the parts they use, by area, without technical terms, never naming a doctrine
 source («una fonte esterna di dottrina»). The note is a file of the web app,
-`apps/web/src/content/novita/X.Y.Z.md` (a bold line per area, `- ` per item,
-no `#` heading): the window «Novità» shows it after an update, and the GitHub
-release carries the same text.
-The check «Repository tooling» fails on a `version.txt` with no note
-(`scripts/ci/check_release_note.sh`).
+`app/src/content/novita/X.Y.Z.md` in lexcraft-web (`apps/web/app/src/content/novita/` here), named
+after the product's version (a bold line per area, `- ` per item, no `#` heading): the window
+«Novità» shows it after an update, and the GitHub release carries the same text.
+The check «Repository tooling» fails on a `version.txt` with no note in the pinned web
+(`scripts/ci/check_release_note.sh`). So a release of the core alone needs a release of the web
+that carries its note (G-604).
 
 ## Release
 
@@ -110,9 +119,15 @@ A release is cut when the owners say so. The checklist, in order:
 3. **Changelog.** On `chore/release-X.Y.Z` from `develop`: bring
    `[Unreleased]` in `CHANGELOG.md` up to date from `release-notes.sh` (pull
    requests do not edit it, so they never conflict on it), rename it to
-   `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`; write the
-   Italian note in `apps/web/src/content/novita/X.Y.Z.md`, in the same pull request (the check
-   «Repository tooling» fails on a `version.txt` with no note). Pull request into `develop`, merge.
+   `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`.
+   **The components first:** each one that changed is released in its own repository before this
+   pull request: lexcraft-contracts; lexcraft-web, whose release carries the Italian note
+   `app/src/content/novita/X.Y.Z.md` (always, as the note is the web's); lexcraft-mcp. Each ends
+   with its tag on its `main`. Then, in this pull request, move the submodules to those tags
+   (`git -C apps/web fetch --tags && git -C apps/web checkout vA.B.C`, then `git add apps/web`; the
+   same for `apps/mcp` and `conventions`) and name their versions in the changelog section. The
+   checks «Repository tooling» (the note) and «Contract» (the pins) fail on anything missing.
+   Pull request into `develop`, merge.
    **The reviews' store:** if `SCHEMA_VERSION` in
    `services/visualex/visualex_api/services/massimario/store.py` changed since the last release, the
    host needs a store of the new schema before the deploy (build it there, or copy one built from the
@@ -124,7 +139,7 @@ A release is cut when the owners say so. The checklist, in order:
 5. **Tag**, on `main`:
    `git tag -a vX.Y.Z -m "Release X.Y.Z" && git push origin vX.Y.Z`, then the
    GitHub release from the tag, with the changelog section and the Italian
-   note (`apps/web/src/content/novita/X.Y.Z.md`, then the changelog section):
+   note (`apps/web/app/src/content/novita/X.Y.Z.md`, then the changelog section):
    `gh release create vX.Y.Z --title "VisuaLex X.Y.Z" --notes-file <note>`.
 6. **Deploy** (below), and record it in the coordination register.
 
@@ -141,9 +156,11 @@ preview could not go back to the release.
 
 ## Hotfix
 
-1. `git switch -c hotfix/thing origin/main`, fix, raise the patch number in
-   `version.txt`, add its section to `CHANGELOG.md` and its Italian note in
-   `apps/web/src/content/novita/X.Y.Z.md`; pull request into `main`.
+1. The fix lands first in the repository that holds the code, as a hotfix there (from its `main`,
+   back to its `main` and `develop`, tagged); the web's hotfix always carries the Italian note
+   `app/src/content/novita/X.Y.Z.md` of the product's new version. Then here:
+   `git switch -c hotfix/thing origin/main`, move the submodule to that tag, raise the patch number
+   in `version.txt`, add its section to `CHANGELOG.md`; pull request into `main`.
 2. Merge it, then tag and release on `main` as in "Release", steps 5 and 6.
 3. Right after, a pull request `main → develop`.
 

@@ -46,4 +46,25 @@ expect 1 "a hotfix missing from develop fails" check
 g switch -q develop
 g merge -q --no-ff main -m "merge: main — the hotfix back"
 expect 0 "after main is merged back, it passes" check
+# What the core pins (check_pins.sh), on throwaway repositories: a contract, a web, and a core that
+# holds both as submodules. The script runs from a copy of scripts/ci inside the core.
+pins="$(mktemp -d)"
+trap 'rm -rf "$repo" "$web" "$pins"' EXIT
+gp() { d="$1"; shift; git -C "$d" -c user.name=t -c user.email=t@example.invalid -c protocol.file.allow=always "$@"; }
+mkrepo() { git init -q -b develop "$1" && gp "$1" commit -q --allow-empty -m base; }
+mkrepo "$pins/contracts"; mkdir -p "$pins/contracts/sources"; echo '{}' >"$pins/contracts/sources/golden.json"
+gp "$pins/contracts" add -A; gp "$pins/contracts" commit -q -m contract
+mkrepo "$pins/web"; gp "$pins/web" submodule add -q "$pins/contracts" conventions; gp "$pins/web" commit -q -m "the contract"; gp "$pins/web" tag v1.0.0
+mkrepo "$pins/core"; mkdir -p "$pins/core/scripts"; cp -R "$here" "$pins/core/scripts/ci"
+gp "$pins/core" submodule add -q "$pins/contracts" conventions
+gp "$pins/core" submodule add -q "$pins/web" apps/web
+gp "$pins/core" submodule update -q --init --recursive
+gp "$pins/core" add -A; gp "$pins/core" commit -q -m pins
+check_pins() { sh "$pins/core/scripts/ci/check_pins.sh" apps/web; }
+expect 0 "a web pinned at a tag, with the core's contract, passes" check_pins
+gp "$pins/core/apps/web" commit -q --allow-empty -m "not a release"; gp "$pins/core" add apps/web
+expect 1 "a web pinned at a commit that is no release tag fails" check_pins
+gp "$pins/core/apps/web" checkout -q v1.0.0; gp "$pins/core" add apps/web
+gp "$pins/core/conventions" commit -q --allow-empty -m "a newer contract"; gp "$pins/core" add conventions
+expect 1 "a web whose contract is not the core's fails" check_pins
 exit $fail

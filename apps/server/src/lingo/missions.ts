@@ -67,7 +67,7 @@ interface MissionDef {
 const REVIEW_EVENTS = ['revisione', 'lettura'] as const;
 
 /**
- * The catalogue of the first cut, in the web's order (`apps/web/.../missions/missions.ts`). Values are the draft's
+ * The catalogue of the first cut, in the web's order (`apps/web/app/.../missions/missions.ts`). Values are the draft's
  * (L-27 choice 1, «Consolida 50 schede» at 100), to be reviewed after a month of use. Italian titles stay in the web.
  */
 export const MISSIONS: readonly MissionDef[] = [
