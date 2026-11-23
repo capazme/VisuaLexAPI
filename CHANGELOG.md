@@ -12,6 +12,19 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.71.0] - 2026-11-23
+
+The first release after the repository split (G-596): the web app, the MCP server and the contract live in
+repositories of their own and the core pins them. Nothing changes for the user. No migration. MERL-T stays off.
+
+Pins: lexcraft-web v1.71.0, lexcraft-mcp v1.70.0, lexcraft-contracts 5fb3c15.
+
+### Work
+
+- The core drops `apps/web`, `apps/mcp` and `conventions` and mounts them as submodules of LexCraft-IT/lexcraft-web,
+  lexcraft-mcp and lexcraft-contracts (#751).
+- `vendor/mcp-legal-it` is fetched from LexCraft-IT; the pinned commit is unchanged (#752).
+
 ## [1.70.0] - 2026-11-22
 
 Trial release before the repository split (G-600): the contracts between core, web and mcp, and a deploy ready for
