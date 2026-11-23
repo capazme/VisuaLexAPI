@@ -1,7 +1,7 @@
 """A court decision as a lawyer writes it, read into the reference `/fetch_decision` takes
 (design 2026-10-12 §2.1).
 
-The web palette reads the same words in the browser (`apps/web/src/utils/decisionCitationParser.ts`)
+The web palette reads the same words in the browser (`apps/web/app/src/utils/decisionCitationParser.ts`)
 and both are pinned to `conventions/sources/golden.json` (`decision_citations`): change the two
 together. Unlike the palette, this reader also names a court it recognises and VisuaLex has no
 reader for, so that an answer can say which court it read instead of "not recognised".

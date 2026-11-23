@@ -112,7 +112,7 @@ docker start visualex-merlt-api
 ```
 
 ### 6. Feature flag FE
-In `apps/web/.env` metti `VITE_FEATURE_MERLT=false` e riavvia il frontend. L'app funziona normalmente e il browser non fa nessuna chiamata a `/api/merlt/*`. Poi ripristina.
+In `apps/web/app/.env` metti `VITE_FEATURE_MERLT=false` e riavvia il frontend. L'app funziona normalmente e il browser non fa nessuna chiamata a `/api/merlt/*`. Poi ripristina.
 
 ---
 

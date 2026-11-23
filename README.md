@@ -32,8 +32,8 @@ VisuaLex is an advanced web application designed to research, visualize, and stu
 ## Quick Start
 
 ```bash
-git clone --recurse-submodules https://github.com/capazme/VisuaLexAPI.git
-cd VisuaLexAPI && git switch develop
+git clone --recurse-submodules https://github.com/LexCraft-IT/lexcraft-core.git
+cd lexcraft-core && git switch develop
 ./start.sh
 ```
 
@@ -55,7 +55,9 @@ The one-time setup (Docker, Node, Python, the `.env` files) is in
 
 | Path | What |
 |---|---|
-| `apps/web/` | React + Vite web app |
+| `apps/web/` | submodule [lexcraft-web](https://github.com/LexCraft-IT/lexcraft-web): the React + Vite web app (`app/`) |
+| `apps/mcp/` | submodule [lexcraft-mcp](https://github.com/LexCraft-IT/lexcraft-mcp): the MCP server |
+| `conventions/` | submodule [lexcraft-contracts](https://github.com/LexCraft-IT/lexcraft-contracts): the convention for legal sources and the shared contract |
 | `apps/server/` | Express + Prisma: accounts, dossiers, community |
 | `services/visualex/` | Python API (Quart): Normattiva, EUR-Lex, Brocardi |
 | `services/merlt/` | MERL-T knowledge graph and RLCF (MPL-2.0) |
@@ -93,5 +95,5 @@ open data are licensed CC BY-SA 3.0 and are credited wherever they appear.
 
 Portions of the act-resolution tables, the Akoma Ntoso parser and the Corte
 costituzionale open-data reader derive from
-[mcp-legal-it](https://github.com/capazme/mcp-legal-it), by the same author,
+[mcp-legal-it](https://github.com/LexCraft-IT/mcp-legal-it), by the same author,
 relicensed MIT by the copyright holder; those portions keep the MIT terms.

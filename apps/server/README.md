@@ -252,10 +252,10 @@ refuses it (`apps/server/CLAUDE.md`).
 
 ## Frontend Integration
 
-The React frontend is configured to call this backend via axios client at `apps/web/src/services/api.ts`.
+The React frontend is configured to call this backend via axios client at `apps/web/app/src/services/api.ts`.
 
 **Frontend setup:**
-1. Ensure `apps/web/.env` has `VITE_API_URL=http://localhost:3001/api`
+1. Ensure `apps/web/app/.env` has `VITE_API_URL=http://localhost:3001/api`
 2. Frontend automatically adds `Authorization: Bearer <token>` header
 3. Auto-refresh on 401 errors using refresh token
 

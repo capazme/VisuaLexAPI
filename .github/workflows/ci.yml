@@ -18,6 +18,9 @@ jobs:
         python-version: ['3.12', '3.14']
     steps:
       - uses: actions/checkout@v4
+        with:
+          # conventions/, apps/web and apps/mcp are submodules (G-598, G-603).
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -27,97 +30,6 @@ jobs:
         working-directory: services/visualex
       - run: python -m pytest tests/ -q
         working-directory: tools/archivio-normativo
-
-  # The web tests run in three shards, each on a runner of its own, and build and
-  # lint on a fourth, all at once. "Web build, test, lint" is a check the ruleset
-  # on main and develop requires by name: that job waits for the four above and
-  # passes only when every one of them passed.
-  web-tests:
-    name: Web tests (${{ matrix.shard }}/${{ strategy.job-total }})
-    runs-on: ubuntu-latest
-    strategy:
-      # Every shard runs to the end, so one shard's failure does not hide another's.
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    defaults:
-      run:
-        working-directory: apps/web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          # npm 11 writes the lockfiles; npm 10 (Node 20) rejects them.
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - run: npm ci
-      # Vitest sorts the test files by a hash of their path and gives each shard
-      # one slice of that list: every file runs once, in exactly one shard.
-      - run: npm run test -- --run --shard=${{ matrix.shard }}/${{ strategy.job-total }}
-
-  web-build:
-    name: Web build and lint
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - run: npm ci
-      # tsc -b is the real type-check: a bare tsc --noEmit reports a false green.
-      - run: npm run build
-      - run: npm run lint
-
-  web:
-    name: Web build, test, lint
-    needs: [web-tests, web-build]
-    # Always, so that a failed or cancelled job above turns this check red: a
-    # skipped check would count as passed.
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-    steps:
-      # needs.web-tests.result folds the shards into one result, and GitHub has
-      # been seen to report success for a shard cancelled before any runner took
-      # it. So the run's own list of jobs is asked too: the four jobs above must
-      # all be there, each a success. A job renamed or added there turns this red
-      # until the count here follows.
-      - name: Every web job passed
-        run: |
-          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' > /dev/null
-          jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?filter=latest&per_page=100" \
-            --jq '[.jobs[] | select((.name | startswith("Web tests (")) or .name == "Web build and lint") | {name, conclusion}]')
-          echo "$jobs" | jq -r '.[] | "\(.name): \(.conclusion)"'
-          echo "$jobs" | jq -e 'length == 4 and all(.[]; .conclusion == "success")' > /dev/null
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-          GH_TOKEN: ${{ github.token }}
-
-  mcp:
-    name: MCP server build and test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/mcp
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: apps/mcp/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      # Against stub servers: no database, no other service.
-      - run: npm test
 
   server:
     name: Server tests
@@ -146,6 +58,9 @@ jobs:
         working-directory: apps/server
     steps:
       - uses: actions/checkout@v4
+        with:
+          # conventions/, apps/web and apps/mcp are submodules (G-598, G-603).
+          submodules: recursive
       # The database is thrown away with the job, so the writes fsync makes durable
       # are not worth waiting for. A service takes no server options, hence ALTER
       # SYSTEM: all three settings take effect on a reload, checked from a new session.
@@ -216,8 +131,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # test_brocardi_off.py reads the vendored mcp-legal-it's source bindings.
-          submodules: true
+          # test_brocardi_off.py reads the vendored mcp-legal-it's source bindings; the golden test, conventions/.
+          submodules: recursive
       # As in "Server tests": a disposable database, written without fsync.
       - name: Postgres without fsync
         run: |
@@ -266,6 +181,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # conventions/, apps/web and apps/mcp are submodules (G-598, G-603).
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -280,19 +198,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # conventions/, apps/web and apps/mcp are submodules (G-598, G-603).
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       # A directory argument fails on Node 26: the glob names the test files.
       - run: node --test '.claude/hooks/*.test.mjs'
       - run: sh scripts/ci/tests/test_checks.sh
+      # The version in version.txt has its Italian note in the web the core pins (G-604).
+      - run: sh scripts/ci/check_release_note.sh apps/web/app
       - run: sh scripts/tests/test_release_notes.sh
+      # The values the web copies from the core, pinned in conventions/contract: generated files fresh.
+      - run: node --test 'scripts/contract/*.test.mjs'
+      # The core reads nothing inside the web's and the MCP server's submodules.
+      - run: python3 scripts/ci/check_boundaries.py
 
   deploy:
     name: Production deploy scripts and stack
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # conventions/, apps/web and apps/mcp are submodules (G-598, G-603).
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -300,10 +230,21 @@ jobs:
       - run: sh scripts/prod/tests/test_deploy.sh
       # The Compose files rendered and checked for what the design promises (no container runs).
       - run: sh scripts/prod/tests/test_compose.sh
-      # The ingress: its routes against the web app's proxy list, then the real Caddyfile in
+      # The ingress: its routes against the contract's list (conventions/contract/legal-paths.json), then the real Caddyfile in
       # front of stand-in upstreams (the login gate, the OAuth routes, the forwarded address).
       - run: node --test infra/ingress/paths.test.mjs
       - run: sh infra/ingress/checks/gate.sh
+
+  # The repositories the core pins (G-603): apps/web and apps/mcp at a release tag of their own, and,
+  # where the pinned one carries the contract itself, at the core's commit of lexcraft-contracts.
+  contract:
+    name: Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: sh scripts/ci/check_pins.sh
 
   release-source:
     name: Release source
