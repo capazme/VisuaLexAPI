@@ -15,7 +15,7 @@ import pytest
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.normattiva_validity import extract_validity, starts_after_today, upcoming_change
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
-    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller, requested,
+    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, no_network, controller, requested,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "normattiva"

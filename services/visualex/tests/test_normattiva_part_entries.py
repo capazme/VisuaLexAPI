@@ -28,7 +28,7 @@ from visualex_api.tools.exceptions import (
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.tools.treextractor import _parse_normattiva_tree
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
-    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller,
+    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, no_network, controller,
 )
 from tests.validity_pages import page
 

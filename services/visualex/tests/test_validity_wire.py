@@ -48,9 +48,14 @@ def requested(version=None, version_date=None, tipo_atto="legge", article="3"):
 
 
 def normattiva_serving(page=PAGE):
-    scraper = NormattivaScraper.__new__(NormattivaScraper)  # no __init__: no cache, no network
+    """A Normattiva scraper that never touches the network: the text from `get_document`, the page
+    from a fake cache. Without a page the handlers ask the portal for it again
+    (`_page_left_the_cache`), and the portal cannot serve it: `request_document` answers nothing."""
+    scraper = NormattivaScraper.__new__(NormattivaScraper)  # no __init__: no real cache, no session
     scraper.get_document = AsyncMock(return_value=(TEXT, URN))
     scraper.cache = FakeCache({URN: page} if page is not None else {})
+    scraper.request_document = AsyncMock(return_value=None)
+    scraper.read_part_page = AsyncMock(return_value=None)
     return scraper
 
 
@@ -61,6 +66,35 @@ async def controller():
     await ctrl.fetch_queue.start()
     yield ctrl
     await ctrl.fetch_queue.stop()
+
+
+@pytest.fixture(autouse=True)
+def no_network():
+    """No test here reaches Normattiva: a scraper built for a test answers from its fake cache and stubs.
+
+    The handlers read a page again when the cache does not hold it (`_page_left_the_cache`). A test
+    scraper that left `request_document` real went to the portal there: on CI that request hung past
+    the article stream's 60-second budget, and the article came back as the budget's error line, with
+    no `article_text` (the KeyError of 18 and 19 November, on whichever Python ran it).
+
+    Watched: the scrapers' `request_document`, Normattiva's `read_part_page`, and the throttled HTTP
+    client itself (`http_client.request`, which the AKN export and a part's page call directly). A
+    test that stubs them on its instance, or replaces the module's client, is not watched. Any call
+    that reaches the real ones answers nothing at once, and the test fails at teardown naming it,
+    instead of waiting on the network.
+    """
+    from visualex_api.services.http_client import ThrottledHttpClient
+    from visualex_api.tools.sys_op import BaseScraper
+
+    asked = AsyncMock(return_value=None)
+    parts = AsyncMock(return_value=None)
+    http = AsyncMock(return_value=None)
+    with patch.object(BaseScraper, "request_document", asked), \
+            patch.object(NormattivaScraper, "read_part_page", parts), \
+            patch.object(ThrottledHttpClient, "request", http):
+        yield
+    reached = asked.await_args_list + parts.await_args_list + http.await_args_list
+    assert not reached, f"a test reached the network: {reached}"
 
 
 @pytest.fixture(autouse=True)
