@@ -117,7 +117,12 @@ app.use(globalRateLimiter);
 // full text (art. 1 of a legge di bilancio is close to 1 MB), and dossier
 // items carry article content too. Bounded again per field by the Zod
 // schemas, and per client by the rate limiter above.
-app.use(express.json({ limit: '2mb' }));
+// One route takes more: a dossier's entries in one request (G-595), up to 8 MB. Its own parser runs in the route,
+// after the session check (routes/dossiers.ts), so no anonymous body that size is ever read. Any other spelling
+// of the path is parsed here at 2 MB.
+const BULK_ITEMS_PATH = /^\/api\/dossiers\/[^/]+\/items\/bulk$/;
+const jsonBody = express.json({ limit: '2mb' });
+app.use((req, res, next) => (BULK_ITEMS_PATH.test(req.path) ? next() : jsonBody(req, res, next)));
 app.use(express.urlencoded({ extended: true }));
 
 // Additional write rate limit on mutation endpoints (POST/PUT/PATCH/DELETE)

@@ -3,6 +3,16 @@ import { citeDecision, citeStoredDecision, citeStoredItem, shortDecision } from 
 import { changeMessage } from '../../src/utils/normaWatcher';
 
 // The golden file pins the decided forms (sourcesGolden.test.ts); these are the details around them.
+describe('a section\'s trailing dots', () => {
+  it('are dropped, and a long run of them costs a single pass', () => {
+    expect(citeDecision({ corte: 'cassazione', archivio: 'civile', numero: 1, anno: 2020, sezione: '3...' })).toBe('Cass. civ., sez. III, n. 1/2020');
+    const hostile = '.'.repeat(100_000) + 'x';
+    const started = performance.now();
+    citeDecision({ corte: 'cassazione', archivio: 'civile', numero: 1, anno: 2020, sezione: hostile });
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+});
+
 describe('citeDecision and shortDecision', () => {
   it('write every section code as the courts print it, as the web app and MERL-T do', () => {
     const at = (sezione: string) => shortDecision({ corte: 'cassazione', archivio: 'civile', numero: 5, anno: 2020, sezione });

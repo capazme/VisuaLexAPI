@@ -149,6 +149,31 @@ export const sessionCheckRateLimiter = async (
 };
 
 /**
+ * Charges `extra` more write points to the caller, on top of the one `writeRateLimiter` took for the request: a
+ * write that carries many entries counts by its size (G-595). False when the caller is over the limit: the 429
+ * is answered here, as the limiter answers it. Fails open like the limiter.
+ */
+export async function chargeWrites(req: Request, res: Response, extra: number): Promise<boolean> {
+  if (extra <= 0) return true;
+  const key = identifyUser(req) || getClientIp(req);
+  try {
+    const result = await writeLimiter.consume(key, extra);
+    setRateLimitHeaders(res, result, WRITE_POINTS);
+    return true;
+  } catch (err) {
+    if (err instanceof RateLimiterRes) {
+      // The limiter counts a refused consume too: give these points back, or one refused batch would leave the
+      // caller without a single write for the rest of the minute.
+      await writeLimiter.reward(key, extra).catch(() => undefined);
+      sendTooManyRequests(res, err);
+      return false;
+    }
+    console.error('Write rate limiter internal error (fail-open):', err);
+    return true;
+  }
+}
+
+/**
  * Write endpoint rate limiter middleware.
  * Applied on top of globalRateLimiter for POST/PUT/PATCH/DELETE: `WRITE_POINTS` (200) req/min.
  */
