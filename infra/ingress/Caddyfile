@@ -92,8 +92,9 @@
 		respond 404
 	}
 
-	# The scrapers. The list below is the one Vite proxies to port 5000 in development,
-	# prefix for prefix; infra/ingress/paths.test.mjs keeps the two in step.
+	# The scrapers. The list below is the contract's (conventions/contract/legal-paths.json), the one
+	# Vite proxies to port 5000 in development, prefix for prefix; infra/ingress/paths.test.mjs keeps
+	# the two in step.
 	#
 	# Two of them stay open: /version and /health, exactly. Everything else asks the server
 	# first (forward_auth to GET /api/auth/verify, which answers 2xx for a signed-in user

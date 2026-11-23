@@ -31,7 +31,7 @@ jobs:
   # What ships blocks; development tools are shown and never block (G-552). The runtime images
   # install with `npm ci --omit=dev` and the web ships as built files. The Prisma CLI, which the
   # one-shot `migrate` container runs against the database, is a production dependency of the
-  # server (G-555), so this job covers it. Development tools still run on the deployment host only
+  # server (G-555), so this job covers it. The web and the MCP server are audited in their own repositories. Development tools still run on the deployment host only
   # while the images are built: the build tools of the web, the server and the MCP, on our own
   # sources. The cost: a future high advisory in a development tool, these included, no longer blocks.
   npm-audit:
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        workspace: [apps/web, apps/server, apps/mcp]
+        workspace: [apps/server]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        workspace: [apps/web, apps/server, apps/mcp]
+        workspace: [apps/server]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

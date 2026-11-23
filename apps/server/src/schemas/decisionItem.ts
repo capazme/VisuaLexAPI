@@ -1,7 +1,7 @@
 /**
  * The content of a dossier item of type `sentenza` (design 2026-10-01 §6): a decision's identity
  * and what the row shows, never its text. Mirrored on the client by `parseSentenzaContent`
- * (apps/web/src/components/features/dossier/dossierUtils.ts): change both together. Imported
+ * (apps/web/app/src/components/features/dossier/dossierUtils.ts): change both together. Imported
  * items and Forum suggestions are untrusted, so unknown keys are refused.
  *
  * `etichetta` is a convenience copy of the decision's citation (source convention §8.3, D9, «A

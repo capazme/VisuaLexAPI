@@ -1,9 +1,10 @@
+import { readFileSync } from 'node:fs';
 import nock from 'nock';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from '../helpers';
 import { delegatedToken } from '../oauth/oauthHelpers';
 import { delegatedQuotaStatus } from '../../src/middleware/delegated';
-import { ARTICLE_FIXTURES } from '../../../web/src/utils/__fixtures__/articleTexts';
+import { anchorsPath, type Anchors } from './anchorsContract';
 
 // D7b and D8, the connected application's side (spec §8.4, §8.7): an entry's text, and glosses proposed on its
 // passages, found in the text the reader reads, stored as the assistant's notes with no colour. Coloured passages
@@ -11,7 +12,8 @@ import { ARTICLE_FIXTURES } from '../../../web/src/utils/__fixtures__/articleTex
 
 const API = 'http://legal-api.test';
 const originalLegalApiUrl = process.env.LEGAL_API_URL;
-const RAW = ARTICLE_FIXTURES.find((f) => f.id === 'nrm-cc-1453')!.text;
+// A real article text, from the anchors contract the web also reads (conventions/contract/anchors.json, rule 23).
+const RAW = (JSON.parse(readFileSync(anchorsPath(), 'utf8')) as Anchors).articles.find((a) => a.id === 'nrm-cc-1453')!.raw;
 const NORM = { tipo_atto: 'codice civile', numero_articolo: '1453', data: '1942-03-16', numero_atto: '262', urn: 'urn:x~art1453' };
 const KEY = 'codice-civile--262--1942-03-16--1453::art::1453';
 const SENTENZA = {

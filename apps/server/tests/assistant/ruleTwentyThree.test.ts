@@ -1,80 +1,46 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { articleProjection, decisionProjection, stripEdges } from '../../src/assistant/entryText';
-import { locateQuote } from '../../src/assistant/locateQuote';
-// The web's own renderer and fixtures (root rule 23): what the server stores must be what the reader draws.
-import { ARTICLE_FIXTURES } from '../../../web/src/utils/__fixtures__/articleTexts';
-import { READER_TEXTS } from '../../../web/src/utils/__fixtures__/decisionTexts';
-import { renderArticleHtml } from '../../../web/src/utils/articleRender';
-import { parseArticleStructure } from '../../../web/src/utils/articleStructure';
-import { decisionProjection as webDecisionProjection, renderDecisionHtml } from '../../../web/src/utils/decisionRender';
-import type { Highlight } from '../../../web/src/types';
+import { anchorsPath, computeAnchors, serializeAnchors, type Anchors, type Passage } from './anchorsContract';
 
-// D7b (spec §8.5, §8.10): a passage proposed on a real text is stored at an offset in the renderer's
-// projection, with the projection's slice; the web's renderer then draws exactly those characters.
+// D7b (spec §8.5, §8.10) and root rule 23: a passage proposed on a real text is stored at an offset in the renderer's
+// projection, with the projection's slice; the web's renderer then draws exactly those characters. The two halves meet
+// in conventions/contract/anchors.json: here, the server computes each text's projection and passages from the file's
+// frozen texts; the web's anchorsContract.test.ts checks that it draws each passage there. A difference here means the
+// server moved: rewrite the file (conventions/contract/README.md) and let the web's suite judge the new passages.
 
-const decode = (html: string) =>
-  html.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+const file = anchorsPath();
+const written = readFileSync(file, 'utf8');
+const stored = JSON.parse(written) as Anchors;
+const computed = computeAnchors(stored);
 
-/** The characters the renderer wraps in the highlight's marks, in order (a mark split across blocks too). */
-function drawn(html: string, id: string): string {
-  const re = new RegExp(`<mark[^>]*data-highlight="${id}"[^>]*>([\\s\\S]*?)</mark>`, 'g');
-  return [...html.matchAll(re)].map((m) => decode(m[1])).join('');
-}
+const found = (passages: Passage[]) => passages.filter((p) => p.refused === undefined);
 
-/** Quotes taken from the text the model reads (with its line breaks and spacing), at a few places. */
-function quotesFrom(display: string, projection: string): string[] {
-  const out: string[] = [];
-  for (const fraction of [0.15, 0.45, 0.8]) {
-    // Start at a word in the projection, take about 60 characters, and quote them from the display text.
-    let start = Math.floor(projection.length * fraction);
-    while (start > 0 && !/\s/.test(projection[start - 1])) start--;
-    const end = Math.min(projection.length, start + 60);
-    if (end - start < 20) continue;
-    // Map projection offsets back to the display text (which only has extra \n).
-    const at: number[] = [];
-    for (let i = 0; i < display.length; i++) if (display[i] !== '\n') at.push(i);
-    out.push(display.slice(at[start], at[end - 1] + 1));
-  }
-  return out;
-}
-
-const highlight = (id: string, start: number, text: string): Highlight =>
-  ({ id, normaKey: 'k', articleId: '1', text, color: 'yellow', rangeSerialized: '', startOffset: start }) as Highlight;
-
-describe('rule 23: a proposed passage lands where the web draws it', () => {
-  it.each(ARTICLE_FIXTURES.map((f) => [f.id, f.text] as const))('article %s', (_id, raw) => {
-    const projection = articleProjection(raw);
-    let checked = 0;
-    for (const quote of quotesFrom(raw, projection)) {
-      const got = locateQuote(projection, { testo: quote });
-      if (!got.found) {
-        // A quote that repeats in the text is refused, never stored somewhere else.
-        expect(got.reason).toBe('ambiguous');
-        continue;
-      }
-      expect(projection.slice(got.start, got.start + got.text.length)).toBe(got.text);
-      const html = renderArticleHtml({ raw, structure: parseArticleStructure(raw), highlights: [highlight('p1', got.start, got.text)], annotations: [], signs: true });
-      expect(drawn(html, 'p1')).toBe(got.text);
-      checked++;
-    }
-    expect(checked).toBeGreaterThan(0);
+describe('rule 23: the anchors contract is what the server computes', () => {
+  it('has the texts', () => {
+    expect(stored.articles.length).toBeGreaterThan(20);
+    expect(stored.decisions.length).toBeGreaterThan(5);
   });
 
-  it.each(Object.entries(READER_TEXTS))('decision %s', (_id, testo) => {
-    const projection = decisionProjection(testo);
-    // The server's projection is the web's, character for character.
-    expect(projection).toBe(webDecisionProjection(testo));
-    // The blocks as the projection counts them, with their line breaks: what the model reads, block by block.
-    const display = (['epigrafe', 'motivazione', 'dispositivo'] as const).map((k) => stripEdges(testo[k] ?? '')).join('');
-    let checked = 0;
-    for (const quote of quotesFrom(display, projection)) {
-      const got = locateQuote(projection, { testo: quote.replace(/\s+/g, ' ') });
-      if (!got.found) continue;
-      const html = renderDecisionHtml({ testo, highlights: [highlight('p1', got.start, got.text)], annotations: [] });
-      expect(drawn(html, 'p1')).toBe(got.text);
-      checked++;
+  it.each(stored.articles.map((a, i) => [a.id, i] as const))('article %s', (_id, i) => {
+    const article = stored.articles[i];
+    expect(computed.articles[i]).toEqual(article);
+    for (const p of article.passages) {
+      // A quote that repeats in the text is refused, never stored somewhere else.
+      if (p.refused !== undefined) expect(p.refused).toBe('ambiguous');
+      else expect(article.projection.slice(p.start, p.start! + p.text!.length)).toBe(p.text);
     }
+    expect(found(article.passages).length).toBeGreaterThan(0);
+  });
+
+  it.each(stored.decisions.map((d, i) => [d.id, i] as const))('decision %s', (_id, i) => {
+    const decision = stored.decisions[i];
+    expect(computed.decisions[i]).toEqual(decision);
+    for (const p of found(decision.passages)) expect(decision.projection.slice(p.start, p.start! + p.text!.length)).toBe(p.text);
     // A decision withheld has no text: the server refuses to propose on it (`readEntryText`).
-    expect(checked > 0 || projection === '').toBe(true);
+    expect(found(decision.passages).length > 0 || decision.projection === '').toBe(true);
+  });
+
+  it('is written as the server writes it', () => {
+    expect(written).toBe(serializeAnchors(computed));
   });
 });

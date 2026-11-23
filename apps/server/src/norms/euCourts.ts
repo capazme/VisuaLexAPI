@@ -3,7 +3,7 @@
  * docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §3, decided by the
  * owner, Q10–Q13): the Court of Justice and the General Court, each named by its case — a number
  * of at most four digits and the year the case was registered. The closed values the item schema,
- * the citation and the key read; the web's twin is in `apps/web/src/utils/decisionLinks.ts`.
+ * the citation and the key read; the web's twin is in `apps/web/app/src/utils/decisionLinks.ts`.
  */
 export const EU_COURTS = ['corte_giustizia_ue', 'tribunale_ue'] as const;
 export type EuCourt = (typeof EU_COURTS)[number];

@@ -424,7 +424,7 @@ cd services/visualex && source .venv/bin/activate && python app.py
 cd apps/server && npm run dev
 
 # Terminal 3: Frontend
-cd apps/web && npm run dev
+cd apps/web/app && npm run dev
 ```
 
 ### Development Proxies
@@ -446,7 +446,7 @@ Vite proxies API requests during development:
 
 ```bash
 # Frontend
-cd apps/web && npm run build  # Creates dist/
+cd apps/web/app && npm run build  # Creates dist/
 
 # Node.js Backend
 cd apps/server && npm run build   # Compiles to dist/

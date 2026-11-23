@@ -5,7 +5,15 @@
 #                           Docker (infra/compose.yml): postgres, redis, falkordb, qdrant — always;
 #                             mcp-legal-it, merlt-api, merlt-worker too with MERLT_ENABLED=true.
 #                           Host: Python API (services/visualex, :5000 or VISUALEX_API_PORT), server (apps/server, :3001),
-#                             web (apps/web, :5173).
+#                             web (lexcraft-web's app, :5173), MCP server (lexcraft-mcp, :3002).
+#                           The web app and the MCP server are taken from LEXCRAFT_WEB_DIR (the
+#                             app/ folder of a clone of lexcraft-web) and LEXCRAFT_MCP_DIR (a
+#                             clone of lexcraft-mcp) when set, else from clones beside this
+#                             checkout (../lexcraft-web/app, ../lexcraft-mcp), else from the
+#                             versions the core pins (the app/ of the submodule apps/web, and
+#                             the submodule apps/mcp: to be read, not changed). A submodule of the checkout that is not initialised is
+#                             initialised here; one that is, is never updated: someone may be
+#                             working in it.
 #                           MERLT_API_IN_DOCKER=false runs the MERL-T api and worker on the host
 #                             (developer mode: a venv with the merlt deps, no mcp-legal-it tools).
 #                           A fresh checkout is prepared here: env files, venv, dependencies, Chromium.
@@ -108,9 +116,52 @@ if [ "$MODE" = prod ]; then
     exec sh "$PROJECT_ROOT/scripts/prod/deploy.sh" ${DEPLOY_ARGS[@]+"${DEPLOY_ARGS[@]}"}
 fi
 
+. "$PROJECT_ROOT/scripts/prod/lib.sh"
+
+# Where the web app and the MCP server live (G-603). The core pins lexcraft-web and lexcraft-mcp
+# as its submodules apps/web (the app in app/) and apps/mcp: those are to read, not to change. A
+# developer works in a clone of the repository: LEXCRAFT_WEB_DIR / LEXCRAFT_MCP_DIR name it, and a
+# clone beside this checkout is taken when they are unset.
+pick_dir() { # pick_dir <variable's value> <beside this checkout> <pinned in this checkout>
+    if [ -n "$1" ]; then echo "$1"
+    elif [ -f "$2/package.json" ]; then echo "$2"
+    else echo "$3"
+    fi
+}
+WEB_DIR="$(pick_dir "${LEXCRAFT_WEB_DIR:-}" "$PROJECT_ROOT/../lexcraft-web/app" "$PROJECT_ROOT/apps/web/app")"
+MCP_DIR="$(pick_dir "${LEXCRAFT_MCP_DIR:-}" "$PROJECT_ROOT/../lexcraft-mcp" "$PROJECT_ROOT/apps/mcp")"
+# A path as the messages show it: relative to the checkout when it is inside it.
+shown() { echo "${1#"$PROJECT_ROOT"/}"; }
+
+# A submodule that is not checked out (`-` in `git submodule status`) is initialised, with its
+# own submodules, and only that one: an initialised one may hold work in progress, so it is
+# never updated here. Offline, a failure is only a warning: what is needed and still missing is
+# reported just below, with the folder it was looked for in.
+if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    for sub in $(git -C "$PROJECT_ROOT" submodule status | sed -n 's/^-[0-9a-f]* \([^ ]*\).*/\1/p'); do
+        echo -e "${YELLOW}Initialising the $sub submodule...${NC}"
+        git -C "$PROJECT_ROOT" submodule update --init --recursive -- "$sub" \
+            || echo -e "${YELLOW}The $sub submodule could not be initialised (the network?)${NC}"
+    done
+fi
+require_dir() { # require_dir <folder> <variable that names it> <what it holds>
+    # Its package.json, not just a folder: an uninitialised submodule leaves an empty one, and the
+    # pull that turns a folder into a submodule leaves the ignored files (node_modules, .env) behind,
+    # which also stops the submodule from being checked out there.
+    [ -f "$1/package.json" ] && return 0
+    echo -e "${RED}The $3 is not at $1${NC} (no package.json) - $2 points there, or the submodule that holds it is not initialised: run 'git submodule update --init --recursive'. If the folder still holds files from before it became a submodule (node_modules, .env), move them away first."
+    exit 1
+}
+require_dir "$WEB_DIR" LEXCRAFT_WEB_DIR "web app"
+require_dir "$MCP_DIR" LEXCRAFT_MCP_DIR "MCP server"
+# Absolute from here on: the dev servers are started after a cd into apps/server.
+WEB_DIR="$(cd "$WEB_DIR" && pwd)"
+MCP_DIR="$(cd "$MCP_DIR" && pwd)"
+version_of() { git -C "$1" describe --tags --always --dirty 2>/dev/null || echo "not a git checkout"; }
+echo -e "${YELLOW}Web app: $(shown "$WEB_DIR") ($(version_of "$WEB_DIR")) · MCP server: $(shown "$MCP_DIR") ($(version_of "$MCP_DIR"))${NC}"
+
 # First run on a fresh checkout: the two env files the stack and the server read, from their
 # examples. Never overwritten. The JWT secret is generated here, not left as the example's.
-. "$PROJECT_ROOT/scripts/prod/lib.sh"
 if [ ! -f "$PROJECT_ROOT/infra/.env" ]; then
     cp "$PROJECT_ROOT/infra/.env.example" "$PROJECT_ROOT/infra/.env"
     echo -e "${YELLOW}Created infra/.env from the example (development passwords)${NC}"
@@ -126,11 +177,11 @@ if [ ! -f "$PROJECT_ROOT/apps/server/.env" ]; then
     echo -e "${YELLOW}Created apps/server/.env from the example, with a fresh JWT secret${NC}"
 fi
 # The MCP server's two secrets: its credential at the authorization server (shared by
-# apps/server and apps/mcp) and the key exchanged tokens are signed with. Added when
+# apps/server and the MCP server) and the key exchanged tokens are signed with. Added when
 # missing, also to an existing apps/server/.env; never replaced.
 (
     umask 077
-    S="$PROJECT_ROOT/apps/server/.env"; M="$PROJECT_ROOT/apps/mcp/.env"
+    S="$PROJECT_ROOT/apps/server/.env"; M="$MCP_DIR/.env"
     if [ -z "$(env_get "$S" OAUTH_MCP_CLIENT_SECRET)" ]; then
         env_set "$S" OAUTH_MCP_CLIENT_SECRET "$(random_secret 48)" '"'
         echo -e "${YELLOW}Added OAUTH_MCP_CLIENT_SECRET to apps/server/.env${NC}"
@@ -139,10 +190,10 @@ fi
         env_set "$S" OAUTH_DELEGATION_SECRET "$(random_secret 48)" '"'
         echo -e "${YELLOW}Added OAUTH_DELEGATION_SECRET to apps/server/.env${NC}"
     fi
-    if [ ! -f "$M" ] && [ -f "$PROJECT_ROOT/apps/mcp/.env.example" ]; then
-        cp "$PROJECT_ROOT/apps/mcp/.env.example" "$M"
+    if [ ! -f "$M" ] && [ -f "$MCP_DIR/.env.example" ]; then
+        cp "$MCP_DIR/.env.example" "$M"
         env_set "$M" MCP_CLIENT_SECRET "$(env_get "$S" OAUTH_MCP_CLIENT_SECRET)" '"'
-        echo -e "${YELLOW}Created apps/mcp/.env, with the server's MCP credential${NC}"
+        echo -e "${YELLOW}Created $(shown "$M"), with the server's MCP credential${NC}"
     fi
 )
 # Same values as Compose reads: ports, stack name, passwords.
@@ -240,10 +291,10 @@ if ! "$VENV/bin/python" -c "import redis, playwright" 2>/dev/null; then
     echo -e "${YELLOW}Installing the Python dependencies...${NC}"
     "$VENV/bin/pip" install -q -r "$PROJECT_ROOT/services/visualex/requirements-dev.txt"
 fi
-for app in apps/server apps/web apps/mcp; do
-    if [ ! -d "$PROJECT_ROOT/$app/node_modules" ]; then
-        echo -e "${YELLOW}Installing the $app dependencies...${NC}"
-        npm ci --prefix "$PROJECT_ROOT/$app"
+for app in "$PROJECT_ROOT/apps/server" "$WEB_DIR" "$MCP_DIR"; do
+    if [ ! -d "$app/node_modules" ]; then
+        echo -e "${YELLOW}Installing the $(shown "$app") dependencies...${NC}"
+        npm ci --prefix "$app"
     fi
 done
 PW_CACHE="${PLAYWRIGHT_BROWSERS_PATH:-}"
@@ -293,13 +344,13 @@ LEGAL_API_URL="${LEGAL_API_URL:-http://localhost:$VISUALEX_API_PORT}" npm run de
 SERVER_PID=$!
 
 echo -e "\n${YELLOW}[4/5] Web (:5173)...${NC}"
-cd "$PROJECT_ROOT/apps/web"
+cd "$WEB_DIR"
 npm run dev &
 WEB_PID=$!
 
-# The MCP server for Claude Code and LibreLex (apps/mcp/CLAUDE.md): it reads apps/mcp/.env.
+# The MCP server for Claude Code and LibreLex (its CLAUDE.md): it reads the .env in its folder.
 echo -e "\n${YELLOW}[5/5] MCP server (:3002)...${NC}"
-cd "$PROJECT_ROOT/apps/mcp"
+cd "$MCP_DIR"
 npm run dev &
 MCP_PID=$!
 cd "$PROJECT_ROOT"

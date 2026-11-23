@@ -539,7 +539,7 @@ On #376's synthetic corpus and on DOCX fixtures built for this spec, **synthetic
   7. the corpus as DOCX: the links inserted equal the rows «con link», and **zero wrong** (a link whose article or
      act differs from the corpus's mark);
   8. every changed `w:rPr` has its children in the schema's order, and no two styles share an id (§6.3, §6.4).
-- **Opens in the programs:** a script (`tools/e2e/docx-roundtrip/`, run by hand and in the browser pass, not in CI,
+- **Opens in the programs:** a script (`apps/web/scripts/docx-roundtrip/`, run by hand and in the browser pass, not in CI,
   which has no LibreOffice) converts every output with `soffice --headless --convert-to html` and `pdf`, fails on a
   conversion error, counts the `<a href>` per address against the report, and compares the text to the input's
   conversion. Word: an owner opens the corpus outputs on a Mac once per writer PR and says so in the PR; Word reports
