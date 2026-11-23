@@ -65,7 +65,7 @@ describe('a password set by the administrator', () => {
   });
 
   it('says what the rule is, in the words the web already translates for the sign-up form', async () => {
-    // Exactly the string `SERVER_WORDS` in apps/web/src/services/api.ts turns into Italian.
+    // Exactly the string `SERVER_WORDS` in apps/web/app/src/services/api.ts turns into Italian.
     const response = await create('abc');
     expect(response.body.detail).toBe(
       'Invalid request: password (Too small: expected string to have >=8 characters; ' +

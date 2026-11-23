@@ -10,7 +10,7 @@ import { ARTICLE_ORDINAL_SUFFIXES } from '../../src/utils/articleSuffixes';
  * "art. 25-terdecies" as 25-ter, an article that exists: nothing looks wrong.
  * This file checks the server's mirror against the source; the web's is
  * checked against conventions/contract/pins.json, which holds a copy of the
- * source's table (apps/web/src/utils/__tests__/articleSuffixes.pins.test.ts).
+ * source's table (apps/web/app/src/utils/__tests__/articleSuffixes.pins.test.ts).
  */
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 

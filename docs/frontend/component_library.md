@@ -1,6 +1,6 @@
 # Component Library
 
-Reusable UI components located in `apps/web/src/components/ui/`. These components provide consistent styling and behavior across the application.
+Reusable UI components located in `apps/web/app/src/components/ui/`. These components provide consistent styling and behavior across the application.
 
 ---
 

@@ -12,7 +12,7 @@ Nine regexes across the Python API and the frontend each carried their own copy
 of the alternation, and all nine stopped at "decies": "art. 25-terdecies" was
 read as art. 25-ter — an article that exists, so the truncation produced a
 plausible link to the wrong text rather than an error. Mirrored by
-``apps/web/src/utils/articleSuffixes.ts`` and
+``apps/web/app/src/utils/articleSuffixes.ts`` and
 ``apps/server/src/utils/articleSuffixes.ts``; change all three together (the
 server's ``tests/unit/articleSuffixes.test.ts`` fails when its mirror drifts; the
 web's is held to ``conventions/contract/pins.json``, which

@@ -25,7 +25,7 @@ server). Commands run in the checkout on the host unless they say otherwise. Nev
 ## 2. The first deploy
 
 ```sh
-git clone <repository> && cd VisuaLexAPI
+git clone --recurse-submodules https://github.com/LexCraft-IT/lexcraft-core.git && cd lexcraft-core
 ./start.sh --prod --branch develop      # or main, once a release carries --prod
 ```
 
@@ -89,9 +89,23 @@ logins stay blocked for 15 minutes after the check.
   a `preview/…` branch only when the owner asks (`docs/git-workflow.md`, "Deploy"). Switch
   to `main` right after a release, while it equals `develop`: a host ahead of `main` by a
   migration is refused.
+- **The first update after the split, once.** From 1.70.0 or older to the first release where
+  `apps/web`, `apps/mcp` and `conventions` are submodules: before `./start.sh --prod --branch main`,
+  `git status --short --ignored apps/web apps/mcp conventions` must print nothing. Files a past
+  `--dev` or build left there (`node_modules`, `dist`, an `apps/mcp/.env`) stop the submodules from
+  being checked out into those folders; move them away first. The update script that runs that
+  time is the old one, which fails on them with a message about the network.
 - **Going back to an older version.** Migrations do not walk backwards, so the way back
   for the data is the backup taken before the update:
-  1. Check out the older version (`git switch --detach <tag or commit>`).
+  1. Check out the older version (`git switch --detach <tag or commit>`), then its submodules
+     (`git submodule update --init --recursive`): the web and the MCP server it pins come back
+     with it, and the deploy refuses a submodule left at another commit.
+     **Back to a version from before the split** (1.70.0 or older, where `apps/web`, `apps/mcp`
+     and `conventions` were folders): first `git submodule deinit -f apps/web apps/mcp
+     conventions`, then move away what is left in those three folders (a submodule's `.git` file,
+     ignored files), then the switch. Otherwise the switch leaves them behind, the preflight
+     refuses the untidy tree, and a stray `.git` in a tracked folder misleads every git command
+     run there.
   2. Deploy it with `./start.sh --prod --no-pull --allow-branch`.
   3. If its schema is older than the data, restore the backup taken before the update
      (section 5).
