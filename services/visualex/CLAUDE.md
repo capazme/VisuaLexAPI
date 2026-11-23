@@ -192,7 +192,7 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     article-number regex reads, longest-first so a short entry cannot claim the
     head of a longer one. A leaf module, imported by `nl_parser`,
     `citation_linker`, `alias_resolver` and `services/akn_parser`; mirrored by
-    `apps/web/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
+    `apps/web/app/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
     `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
     exists, which is why nothing looked broken. `ORDINAL_SPELLINGS` pairs the two
     spellings of 9, 15, 16, 18, 19 and 20 (`other_ordinal_spelling`): Normattiva uses one
@@ -712,7 +712,7 @@ Two complementary paths, chosen by whether you need speed or truth.
   date and sends it back, which skips the lookup; the date is also part of
   `buildItemKey`, so correcting it would orphan the notes made on it.
 
-**Frontend** (`apps/web/src/utils/dateUtils.ts`):
+**Frontend** (`apps/web/app/src/utils/dateUtils.ts`):
 - `parseItalianDate(dateStr)` — parses while preserving the original precision.
 - `formatDateItalianLong(date)` — "7 agosto 1990". Use this for every displayed
   date; never `toLocaleDateString()`.
@@ -1054,5 +1054,5 @@ Breaking one of these breaks the product. Read before editing.
     The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a
     reader that moves the projection's hash is a bug in the reader, never a reason to re-record the
     golden. The web app reads the same projection (`decisionProjection` in
-    `apps/web/src/utils/decisionRender.ts`) and its `decisionRender.test.ts` checks the rendered
+    `apps/web/app/src/utils/decisionRender.ts`) and its `decisionRender.test.ts` checks the rendered
     text against it.

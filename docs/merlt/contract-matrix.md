@@ -145,7 +145,7 @@ Questi endpoint esistono in MERL-T ma nessuna route BFF li inoltra:
 
 `GET /api/v1/features` non è mai esistito: il frontend deriva le capability in `useMerltFeatures.ts`.
 
-`apps/web/src/services/merltService.ts` contiene ancora funzioni legacy che chiamano route BFF mai montate e che nessun modulo importa fuori dai test:
+`apps/web/app/src/services/merltService.ts` contiene ancora funzioni legacy che chiamano route BFF mai montate e che nessun modulo importa fuori dai test:
 
 - enrichment: `checkMerltArticle`, `runMerltLiveEnrichment`, `getMerltPendingQueue`, `validateMerltEntity`, `validateMerltRelation`, `proposeMerltEntity`, `proposeMerltRelation`;
 - grafo: `graphSearchMerlt`, `getMerltArticleRelations`, `getMerltArticleEntities`, `getMerltSubgraph`;
