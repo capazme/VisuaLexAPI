@@ -1,6 +1,9 @@
 """
 OpenRouter AI Service for RLCF Framework
 
+Every call carries the provider rule (G-456): only providers that neither train on the text
+nor keep it. See OPENROUTER_PROVIDER_RULE.
+
 Provides realistic AI response generation for legal tasks using OpenRouter API.
 Replaces dummy placeholder responses with actual AI-generated content for
 meaningful evaluation in the RLCF framework.
@@ -9,6 +12,7 @@ References:
     RLCF.md Section 3.6 - Dynamic Task Handler System
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import os
 import aiohttp
 import asyncio
@@ -34,6 +38,43 @@ _DEFAULT_MAX_TOKENS = int(os.getenv("MERLT_LLM_MAX_TOKENS", "4096"))
 # analysis finishes with a clean HTTP timeout as the floor rather than a hard
 # task cancellation.
 _LLM_HTTP_TIMEOUT_S = int(os.getenv("MERLT_LLM_HTTP_TIMEOUT", "85"))
+
+# The owner's rule for every call to a language model (G-456): only providers that neither train
+# on the text nor keep it, asked on each request. OpenRouter routes a request to one of the
+# model's providers: `data_collection: "deny"` leaves out the endpoints that train on the data,
+# `zdr: true` the ones that keep it (zero data retention). When no endpoint of the model
+# qualifies, OpenRouter refuses the request instead of falling back to one that would keep it.
+# The model is chosen at run time (the admin's configuration, the parsing model, the experts'
+# own), so the rule rides on every request, not on a list of models.
+OPENROUTER_PROVIDER_RULE: Dict[str, Any] = {"data_collection": "deny", "zdr": True}
+
+
+def _with_provider_rule(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """The request body with the provider rule, a fresh copy for each request."""
+    return {**payload, "provider": dict(OPENROUTER_PROVIDER_RULE)}
+
+
+def _openrouter_headers(api_key: str) -> Dict[str, str]:
+    """The headers of a call to OpenRouter; the referer and title say the call is VisuaLex's."""
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://visualex.org",
+        "X-OpenRouter-Title": "VisuaLex",
+    }
+
+
+def _provider_error(status: int, body: str) -> str:
+    """What may be logged of a failed call: the status, OpenRouter's error code and its own short
+    message, never the error's metadata, where the provider's raw text sits (it may echo the
+    request, the person's question included)."""
+    code, message = None, ""
+    try:
+        error = json.loads(body).get("error") or {}
+        code, message = error.get("code"), str(error.get("message") or "")
+    except (ValueError, AttributeError):
+        pass
+    return f"{status} (code {code}): {message[:200]}" if message else f"{status} (code {code})"
 
 
 @dataclass
@@ -210,30 +251,26 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 "top_p": model_config.top_p,
             }
             
-            headers = {
-                "Authorization": f"Bearer {model_config.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://rlcf-framework.com",  # Replace with your domain
-                "X-Title": "RLCF Framework"
-            }
+            headers = _openrouter_headers(model_config.api_key)
             
             log.info(f"Generating AI response for task_type: {task_type}, model: {model_config.name}")
             
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
-                json=payload,
+                json=_with_provider_rule(payload),
                 headers=headers
             ) as response:
                 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
                 
                 data = await response.json()
                 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
                 
                 ai_content = data["choices"][0]["message"]["content"]
@@ -353,7 +390,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        model: str = "google/gemini-2.5-flash",
+        model: str = DEFAULT_FAST_MODEL,
         temperature: float = 0.1,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
         api_key: Optional[str] = None,
@@ -406,30 +443,26 @@ Please provide a concise legal summary highlighting key points, obligations, and
             if response_format:
                 payload["response_format"] = response_format
 
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://rlcf-framework.com",
-                "X-Title": "RLCF Framework"
-            }
+            headers = _openrouter_headers(api_key)
 
             log.info(f"Generating completion with model: {model}")
 
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
-                json=payload,
+                json=_with_provider_rule(payload),
                 headers=headers
             ) as response:
 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
@@ -460,7 +493,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
     async def generate_response_async(
         self,
         prompt: str,
-        model: str = "google/gemini-2.5-flash",
+        model: str = DEFAULT_FAST_MODEL,
         temperature: float = 0.7,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
         system_prompt: Optional[str] = None,
@@ -513,7 +546,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
             prompt: Prompt utente
             json_schema: Schema JSON (usato nel prompt per guidare il modello)
             system_prompt: Prompt di sistema opzionale
-            model: ID modello OpenRouter (default: gemini-2.0-flash-001)
+            model: ID modello OpenRouter (default: LLM_PARSING_MODEL, poi DEFAULT_FAST_MODEL)
             temperature: Temperatura sampling (0.0-1.0)
             max_tokens: Max tokens da generare
             api_key: API key opzionale (default: env OPENROUTER_API_KEY)
@@ -538,7 +571,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
                 raise ValueError("OpenRouter API key not provided")
 
             # Usa modello da env se non specificato
-            model = model or os.getenv("LLM_PARSING_MODEL", "google/gemini-2.5-flash")
+            model = model or os.getenv("LLM_PARSING_MODEL", DEFAULT_FAST_MODEL)
 
             # Genera esempio JSON dallo schema
             schema_example = self._generate_json_example(json_schema)
@@ -565,12 +598,7 @@ JSON:"""
                 "response_format": {"type": "json_object"}
             }
 
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://rlcf-framework.com",
-                "X-Title": "RLCF Framework"
-            }
+            headers = _openrouter_headers(api_key)
 
             log.info(f"Generating JSON completion with model: {model}")
 
@@ -579,24 +607,25 @@ JSON:"""
 
             async with session.post(
                 f"{self.OPENROUTER_BASE_URL}/chat/completions",
-                json=payload,
+                json=_with_provider_rule(payload),
                 headers=headers,
                 timeout=request_timeout
             ) as response:
 
                 if response.status != 200:
-                    error_text = await response.text()
-                    log.error(f"OpenRouter API error {response.status}: {error_text}")
-                    raise Exception(f"OpenRouter API error: {response.status} - {error_text}")
+                    reason = _provider_error(response.status, await response.text())
+                    log.error("OpenRouter API error", reason=reason)
+                    raise Exception(f"OpenRouter API error: {reason}")
 
                 data = await response.json()
 
                 if "choices" not in data or not data["choices"]:
-                    log.error(f"Invalid OpenRouter response: {data}")
+                    log.error("Invalid OpenRouter response",
+                              keys=sorted(map(str, data))[:10] if isinstance(data, dict) else type(data).__name__)
                     raise Exception("Invalid response from OpenRouter API")
 
                 completion = data["choices"][0]["message"]["content"]
-                log.info(f"Raw completion: {completion[:200]}...")
+                log.info("JSON completion received", chars=len(completion))
 
                 # Prova a parsare direttamente
                 try:
@@ -656,7 +685,8 @@ JSON:"""
                 return result
 
         except json.JSONDecodeError as e:
-            log.error(f"Failed to parse JSON response: {e}. Raw: {completion[:500] if 'completion' in dir() else 'N/A'}")
+            # The model's text stays out of the log: only where the parse failed.
+            log.error("Failed to parse JSON response", error=type(e).__name__, position=e.pos)
             raise
         except Exception as e:
             log.error(f"Error generating JSON completion: {str(e)}")

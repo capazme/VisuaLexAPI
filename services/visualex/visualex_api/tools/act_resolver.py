@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import difflib
 import re
+from datetime import date
+from typing import Optional
 
+from .dated_names import DATED_NAMES, act_at, spans_of
 from .map import (
     ATTI_DENOMINATI,
     ATTI_NOTI,
@@ -18,6 +21,7 @@ from .map import (
     NORMATTIVA_URN_CODICI,
     extract_codice_details,
 )
+from .regional_law import cites_regional_law
 
 # Leading articles and prepositions: "art. 111 *della* Costituzione".
 # The trailing \s+ is load-bearing: without it "le" would be stripped from "legge".
@@ -31,6 +35,21 @@ _LEADING_WORDS = re.compile(
 # down the citation-pattern path instead of being mangled into a lookup key.
 _DOTTED_ACRONYM = re.compile(r"^[a-zà-ù]+(?:\.[a-zà-ù]*)+$", re.IGNORECASE)
 
+
+# Spellings that name two acts. Refused rather than read as one of them, so the search asks
+# instead of guessing (design 2026-10-29-document-analysis §4.8, Q9). Kept by hand and short:
+# an entry is a spelling lawyers really write for two acts, with a name of each that the tables
+# resolve, so the search can offer them (`ambiguous_act`).
+# «T.U.E.» is the testo unico edilizia (d.P.R. 380/2001) in a brief, and the dotted acronym of
+# «TUE», the Treaty on European Union, to the tables; «TUE» without dots stays the Treaty.
+# «TUA» is the codice dell'ambiente («testo unico ambientale») and the testo unico accise, «TUA»
+# in the Agenzia delle dogane's practice, at the same date: the date cannot split them (G-577;
+# mcp-legal-it found no new testo unico accise on 18 November 2026).
+AMBIGUOUS_NAMES: dict[str, tuple[str, ...]] = {
+    "t.u.e": ("testo unico edilizia", "tue"),
+    "tua": ("codice dell'ambiente", "testo unico accise"),
+    "t.u.a": ("codice dell'ambiente", "testo unico accise"),
+}
 
 def _normalize_search_type(input_type: str) -> str:
     """Act-type abbreviation -> canonical full name, via NORMATTIVA_SEARCH.
@@ -84,12 +103,16 @@ def _candidate_keys(name: str):
             yield candidate
 
 
-def _lookup_key(key: str) -> dict | None:
+def _lookup_key(key: str, day: Optional[date] = None) -> dict | None:
     """Resolve one exact key against the tables, in order of trustworthiness.
 
-    ATTI_NOTI and the codici URN table are hand-verified and take precedence
-    over ATTI_DENOMINATI, whose base was generated from Brocardi labels.
+    A dated name («tuir») first, at `day` (`dated_names`). ATTI_NOTI and the codici URN
+    table are hand-verified and take precedence over ATTI_DENOMINATI, whose base was
+    generated from Brocardi labels.
     """
+    dated = act_at(key, day)
+    if dated is not None:
+        return dated
     if key in ATTI_NOTI:
         return dict(ATTI_NOTI[key])
 
@@ -117,17 +140,58 @@ def _lookup_key(key: str) -> dict | None:
     return None
 
 
-def resolve_atto(name: str) -> dict | None:
-    """Resolve a common act name to scraper parameters.
-
-    Returns {"tipo_atto", "data", "numero_atto"} or None. Never guesses.
-    """
+def ambiguous_act(name: str) -> tuple[str, ...] | None:
+    """A name of each act an ambiguous spelling names («T.U.E.», «del t. u. e.», «TUA»), each
+    one the tables resolve; or None."""
     if not name:
         return None
+    normalized = _normalize_key(name)
+    for key in (normalized, _strip_leading_words(normalized)):
+        acts = AMBIGUOUS_NAMES.get(re.sub(r"\s+", "", key).rstrip("."))
+        if acts:
+            return acts
+    return None
+
+def resolve_atto(name: str, day: Optional[date] = None) -> dict | None:
+    """Resolve a common act name to scraper parameters.
+
+    Returns {"tipo_atto", "data", "numero_atto"}, or None. Never guesses: an ambiguous
+    spelling and a regional law (`regional_law`) are None. A dated name («tuir»,
+    `dated_names`) is read at `day`, today in Rome when None; its act carries `notice`, and
+    `allegato` when its text is an annex.
+    """
+    if not name or ambiguous_act(name) or cites_regional_law(name):
+        return None
     for key in _candidate_keys(name):
-        result = _lookup_key(key)
+        result = _lookup_key(key, day)
         if result:
             return result
+    return None
+
+
+def act_typed_with(name: str, number: str | None, act_date: str | None,
+                   day: Optional[date] = None) -> dict | None:
+    """The act a name and the number or year typed beside it name together, or None.
+
+    «TUIR 917/1986» is the d.p.r. 917/1986 on any day, never a «d.lgs. 917/1986, allegato 1»;
+    «TUA 152/2006» is the codice dell'ambiente. For a dated name, the span whose act has the
+    number and the year (with that span's notice); for an ambiguous one, the act among its own
+    that has them; for any other name, its act when it has them. None when no act of the name
+    has them: reading the name's act with another act's number would name an act that does not
+    exist (review of G-577).
+    """
+    year = (act_date or "")[:4]
+    names = ambiguous_act(name)
+    if names:
+        acts = [resolve_atto(each, day) for each in names]
+    else:
+        spans = next((spans_of(key) for key in _candidate_keys(name) if key in DATED_NAMES), None)
+        acts = ([{**span.act, "notice": span.notice} for span in spans] if spans
+                else [resolve_atto(name, day)])
+    for act in acts:
+        if act and (not number or act.get("numero_atto") == number) \
+                and (not year or str(act.get("data") or "")[:4] == year):
+            return act
     return None
 
 
@@ -143,6 +207,7 @@ def known_act_names() -> list[str]:
         | set(ATTI_DENOMINATI)
         | set(NORMATTIVA_SEARCH)
         | set(NORMATTIVA_URN_CODICI)
+        | set(DATED_NAMES)
     )
 
 

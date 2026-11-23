@@ -21,20 +21,42 @@ security risk.
 
 | Path | What | Read first |
 | --- | --- | --- |
-| `apps/web/` | React 19 + Vite + TypeScript: reader, workspace, dossier, forum, graph | `apps/web/CLAUDE.md` |
+| `apps/web/` | **submodule: LexCraft-IT/lexcraft-web**, pinned at a tag; its `app/` is the React 19 + Vite + TypeScript app: reader, workspace, dossier, forum, graph | `apps/web/app/CLAUDE.md` (in lexcraft-web) |
 | `apps/server/` | Express + Prisma: accounts, dossier, community, the MERL-T gateway, the OAuth authorization server for MCP clients | `apps/server/CLAUDE.md` |
-| `apps/mcp/` | the MCP server (Streamable HTTP, :3002): dossier and LingoLex card tools for Claude Code and LibreLex, deletions confirmed by the user into the trash, no database | `apps/mcp/CLAUDE.md` |
+| `apps/mcp/` | **submodule: LexCraft-IT/lexcraft-mcp**, pinned at a tag: the MCP server (Streamable HTTP, :3002), dossier and LingoLex card tools for Claude Code and LibreLex, deletions confirmed by the user into the trash, no database | `apps/mcp/CLAUDE.md` (in lexcraft-mcp) |
 | `services/visualex/` | Quart: sources, reading text, URNs, citations, AKN | `services/visualex/CLAUDE.md` |
 | `services/merlt/` | MERL-T and RLCF — MPL-2.0, as the rest of the repository | `services/merlt/CLAUDE.md` |
 | `tools/archivio-normativo/` | CLI: a local archive of acts | `tools/archivio-normativo/CLAUDE.md` |
 | `tools/e2e/` | end-to-end and stress harness | `tools/e2e/README.md` |
-| `conventions/` | the convention for legal sources: identity and labels of norms and decisions, as one golden file (read today by the web and API suites, by the others as they adopt it) | `conventions/sources/README.md` |
+| `conventions/` | **submodule: LexCraft-IT/lexcraft-contracts**. The convention for legal sources: identity and labels of norms and decisions, as one golden file (read today by the web and API suites, by the others as they adopt it); and the contract the core, the web and the MCP server each assert instead of reading each other's code (`contract/`) | `conventions/sources/README.md`, `conventions/contract/README.md` |
 | `infra/` | the Compose stack: stores and MERL-T, and the production modules (app, scrapers, overlay) | `infra/compose.yml` header |
 | `scripts/` | data backup and restore, smoke tests; `scripts/prod/`: what `./start.sh --prod` runs | `scripts/datakit/README.md` |
 | `vendor/mcp-legal-it/` | git submodule | — |
 | `docs/` | git workflow, setup, MERL-T, specs and plans, archive | `docs/README.md` |
 
 MERL-T work that spans the server and the web app: `docs/merlt/claude-notes.md`.
+
+## The repositories the core pins (G-596, G-603)
+
+The web app, the MCP server and the contract live in repositories of their own, with their history:
+LexCraft-IT/lexcraft-web (the app in `app/`, the site of lexcraft.it in `landing/`),
+lexcraft-mcp and lexcraft-contracts. The core holds them as submodules, `apps/web` and `apps/mcp`
+each at a release tag of its own repository and `conventions` at a commit of lexcraft-contracts;
+`scripts/ci/check_pins.sh` (job «Contract») refuses another pin, and a pinned repository whose
+own `conventions/` is not the core's commit.
+
+- **Here they are read, never changed.** Work on the web or the MCP server happens in a clone of its
+  repository, beside this checkout (`../lexcraft-web`, `../lexcraft-mcp`, which `start.sh --dev`
+  takes) or wherever `LEXCRAFT_WEB_DIR` and `LEXCRAFT_MCP_DIR` say. A change of the convention is a
+  pull request in lexcraft-contracts first, then the submodule moved here with the fixes of the
+  server, the API and MERL-T in one pull request (`conventions/contract/README.md`).
+- **Clone with `--recurse-submodules`**, or run `git submodule update --init --recursive`. A test
+  that cannot find `conventions/` fails; it never skips.
+- **Versions** (G-597, G-604). Each repository has its own `version.txt` and tags; the product's
+  version is this one, which `/version` serves. A release moves the submodules to the components'
+  new tags; the users' note is the web's `app/src/content/novita/X.Y.Z.md`, named after the
+  product's version and required here by `scripts/ci/check_release_note.sh`, so a release of the
+  core alone needs a release of the web for its note (`docs/git-workflow.md`).
 
 ## Commands
 
@@ -44,18 +66,17 @@ MERL-T work that spans the server and the web app: `docs/merlt/claude-notes.md`.
 ./start.sh --prod --no-pull [--allow-branch] # the same, with what is checked out; bare --prod asks which
 ./start.sh --prod --stop                     # stop that stack (containers and volumes stay)
 sh scripts/prod/tests/test_deploy.sh         # start.sh and scripts/prod, against a stub docker
-npm --prefix apps/web run test -- --run      # web tests
-npm --prefix apps/web run build              # tsc -b + vite: the real type-check
-npm --prefix apps/web run lint
+git submodule update --init --recursive      # apps/web, apps/mcp, conventions, vendor/mcp-legal-it
 npm --prefix apps/server run build
 npm --prefix apps/server test                # only this way: the setup refuses a non-test database
-npm --prefix apps/mcp run build && npm --prefix apps/mcp test   # stub servers, no database
 (cd services/visualex && .venv/bin/python -m pytest tests/ -q)
 (cd tools/archivio-normativo && ../../services/visualex/.venv/bin/python -m pytest tests/ -q)
 node --test '.claude/hooks/*.test.mjs'
+sh scripts/ci/tests/test_checks.sh           # the release source, main in develop, the note, the pins
 scripts/backup.sh / scripts/restore.sh <folder>
 ```
 
+The web's and the MCP server's suites run in their repositories (their `CLAUDE.md`).
 A bare `tsc --noEmit` does not walk the project references and reports a false
 green. The MERL-T suite runs in CI or against a disposable database
 (`services/merlt/CLAUDE.md`), never against the development stack's.
@@ -133,7 +154,10 @@ did not create.
     rendering side: the structured reading surface may wrap characters in
     elements but never add, drop or change one — `articleRender.test.ts`
     checks the rendered text nodes against `article_text` on 27 real texts,
-    with the annotation signs on (a sign has no text node).
+    with the annotation signs on (a sign has no text node). The server and the
+    web meet in `conventions/contract/anchors.json` rather than in each other's
+    code: the server computes there the passages it would store, and the web
+    checks that it draws each one (`conventions/contract/README.md`).
     (Inserting only `\n` would not move any offset — newlines are invisible in
     the projection — but the saved-norm watcher compares `article_text`
     verbatim, so it would still raise false "changed" notifications.)
@@ -154,3 +178,8 @@ did not create.
     `decisionRender.test.ts` checks that the rendered text nodes spell
     `decisionProjection`; the anchors that no longer land are listed on the
     decision's tab (`UnmatchedAnchors`), so none is dropped silently.
+    EU texts are held to the same contract. An EU article's `article_text` read from the Official
+    Journal's markup is guarded by `test_eurlex_article_text_frozen.py`, binding now (the
+    consolidated markup has no such guard yet). A recital's text (`/fetch_recitals`), whose
+    projection is the text with every `\n` removed, is guarded by `test_recitals_text_frozen.py`; it
+    binds from the pull request that first stores marks on a recital (PR 4a of the recitals plan).

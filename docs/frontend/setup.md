@@ -94,7 +94,7 @@ See `vite.config.ts` for the complete proxy configuration.
 ## Project Structure
 
 ```
-apps/web/src/
+apps/web/app/src/
 ├── App.tsx                    # Main app with routing
 ├── main.tsx                   # Entry point
 │

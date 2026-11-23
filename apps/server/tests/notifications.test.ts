@@ -23,7 +23,7 @@ describe('forum notifications', () => {
       .set(authHeader(alice));
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ pendingSuggestions: 1, newLikes: 0, total: 1 });
+    expect(res.body).toEqual({ pendingSuggestions: 1, newLikes: 0, community: 0, total: 1 });
   });
 
   it('counts likes received since last seen', async () => {

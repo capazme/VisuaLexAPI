@@ -641,3 +641,44 @@ class TestConventionShortForms:
         c = {x.article: x for x in extract_citations("art. 2043 c.c. e art. 5 l. cost. e art. 6")}
         assert c["5"].act_type == "legge costituzionale"
         assert c["6"].act_type == "codice civile"
+
+
+class TestClausesOfTheDocumentAnalysis:
+    """The clause the search reads is the linker's (article_clause.py): «par.» and a «n.»
+    right after the article keep the act (design 2026-10-29-document-analysis §4.8)."""
+
+    @pytest.mark.parametrize("cited", [
+        "art. 6, par. 1, lett. a), del regolamento (UE) 2016/679",
+        "articolo 6, paragrafo 1, del regolamento (UE) 2016/679",
+    ])
+    def test_a_paragraph_of_an_eu_act(self, cited):
+        c = extract_citations(f"Si veda l'{cited}.", context_act_type="codice civile")
+        assert [(x.article, x.act_type, x.act_number, x.date) for x in c] == [("6", "regolamento ue", "679", "2016")]
+
+    def test_a_number_right_after_the_article(self):
+        c = extract_citations("ai sensi dell'art. 360, n. 3, c.p.c.", context_act_type="codice civile")
+        assert [(x.article, x.act_type) for x in c] == [("360", "codice di procedura civile")]
+
+    @pytest.mark.parametrize("cited, act", [
+        ("articolo 2, comma 1, n. 4 del codice penale", ("codice penale", None)),
+        ("art. 1, comma 1, n. 3 del d.P.R. 380/2001", ("decreto del presidente della repubblica", "380")),
+    ])
+    def test_a_number_then_the_act_keeps_the_act(self, cited, act):
+        c = extract_citations(f"Si veda l'{cited}.", context_act_type="codice civile")
+        assert [(x.act_type, x.act_number) for x in c] == [act]
+
+    def test_a_list_of_letters_ends_where_the_letters_end(self):
+        text = "ai sensi dell'articolo 6, paragrafo 1, lettera a), o all'articolo 9 del regolamento (UE) 2016/679"
+        c = extract_citations(text, context_act_type="codice civile")
+        assert text[c[0].start:c[0].end].endswith("lettera a)")
+
+    def test_letters_after_the_first_do_not_eat_a_decree(self):
+        c = extract_citations("art. 2, lett. a) e d.lgs. 196/2003")
+        assert ("decreto legislativo", "196") in [(x.act_type, x.act_number) for x in c]
+
+    def test_hostile_clauses_stay_fast(self):
+        import time
+        text = ("art. 5, comma 1 e 2 e, n. 1 e 2 e, lettere a) e b) e " + "e " * 50 + "x ") * 2_000
+        started = time.process_time()
+        extract_citations(text)
+        assert time.process_time() - started < 2.0

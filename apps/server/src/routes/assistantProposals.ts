@@ -16,9 +16,9 @@ import {
 import { serializeItemFor } from '../controllers/dossierController';
 
 /**
- * The web app's side of D7b (first cut): an entry's proposals (the assistant's highlights on it), the
- * state and the text of the assistant's notes (on a passage, or a note entry), the boundaries of a mark,
- * and its removal. The user's session only: none of these routes is in the delegated table, so a
+ * The web app's side of D7b (first cut) and of D8's glosses: an entry's proposals (the assistant's highlights on
+ * it: the coloured passages saved before D8, and the glosses), the state and the text of the assistant's notes (on
+ * a passage, or a note entry), the boundaries of a mark or a gloss, and its removal. The user's session only: none of these routes is in the delegated table, so a
  * connected application can never read or change a state, a comment or an edit. Behind the
  * `assistant_passages` switch: off, every route answers 404.
  */
@@ -36,7 +36,7 @@ async function requireSwitch(_req: Request, _res: Response, next: NextFunction) 
 async function entryOf(req: Request) {
   const { id, itemId } = req.params;
   const dossier = await prisma.dossier.findFirst({ where: { id, userId: req.user!.id }, select: { id: true } });
-  if (!dossier) throw new AppError(404, 'Dossier non trovato');
+  if (!dossier) throw new AppError(404, 'Pratica non trovata');
   const item = await prisma.dossierItem.findFirst({ where: { id: itemId, dossierId: dossier.id } });
   if (!item) throw new AppError(404, 'Voce non trovata');
   return item;
@@ -86,6 +86,8 @@ router.put('/dossiers/:id/items/:itemId/proposals/:proposalId/note', requireSwit
   const row = await prisma.$transaction(async (tx) => {
     const current = await lockedProposal(tx, req);
     if (current.noteState === null) throw new AppError(409, 'Questo segno dell’IA non ha una nota da modificare.');
+    // A gloss is its note: emptied, it would be nothing (the migration's CHECK refuses it too).
+    if (current.kind === 'gloss' && text === '') throw new AppError(400, 'Una glossa non può restare vuota: per toglierla, eliminala.');
     const edit = noteEdit(current.note, text, req.user!.id, new Date());
     return edit ? tx.highlight.update({ where: { id: current.id }, data: { ...edit, note: text } }) : current;
   });

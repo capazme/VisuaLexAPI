@@ -262,7 +262,7 @@ class SemanticSearchTool(BaseTool):
         expert_type = expert_type or self.default_expert_type
 
         log.debug(
-            f"semantic_search - query='{query[:50]}...', "
+            f"semantic_search - query_chars={len(query)}, "
             f"top_k={top_k}, expert={expert_type}, source_types={source_types}"
         )
 
@@ -319,7 +319,7 @@ class SemanticSearchTool(BaseTool):
 
             log.info(
                 f"semantic_search completed - "
-                f"query='{query[:30]}...', "
+                f"query_chars={len(query)}, "
                 f"results={len(results)}, "
                 f"top_score={results[0]['final_score']:.3f}" if results else "no results"
             )
@@ -855,9 +855,18 @@ class ArticleFetchTool(BaseTool):
                 numero_articolo=numero_articolo
             )
 
-            # Recupera documento
+            # Recupera documento. The update notes (G-386) come as their own labelled
+            # block, never inside the text: a scraper that cannot give them gives none.
             scraper = await self._get_scraper()
-            text, urn = await scraper.get_document(norma_visitata)
+            notes = ""
+            if hasattr(scraper, "get_article"):
+                from merlt.clients.visualex_client import partial_text_notice, update_notes_block
+
+                article = await scraper.get_article(norma_visitata)
+                text, urn = article.text, article.url
+                notes = "\n\n".join(b for b in (partial_text_notice(article), update_notes_block(article)) if b)
+            else:
+                text, urn = await scraper.get_document(norma_visitata)
 
             log.info(
                 f"article_fetch completed - "
@@ -870,7 +879,9 @@ class ArticleFetchTool(BaseTool):
                     "urn": urn,
                     "tipo_atto": tipo_atto,
                     "numero_articolo": numero_articolo,
-                    "source": "normattiva"
+                    "source": "normattiva",
+                    # What VisuaLex says beside the text: a partial text, the update notes.
+                    "oltre_il_testo": notes,
                 },
                 tool_name=self.name,
                 tipo_atto=tipo_atto,

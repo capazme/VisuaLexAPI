@@ -1,37 +1,47 @@
+import { randomUUID } from 'node:crypto';
 import { Request, Response } from 'express';
-import type { User } from '@prisma/client';
+import { Prisma, type User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
-import { atLeastUnits } from '../utils/utf16Length';
-import { hashPassword, verifyPassword } from '../utils/password';
+import { boundedText, parseBody } from '../utils/bodyLimits';
+import { MAX_PASSWORD_LENGTH, hashPassword, passwordSchema, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
+import { WEB_CLIENT_HEADER } from '../middleware/csrfGuard';
+import {
+  clearSessionCookie,
+  createWebSession,
+  deleteWebSessionBySecret,
+  readSessionCookie,
+  revokeUserWebSessions,
+  sessionIdleMs,
+  setSessionCookie,
+  sweepWebSessionsAtMostDaily,
+} from '../auth/webSession';
+import { exportUserCourses } from '../lingo/courses';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
+import { removeAllOwnContributions } from '../account/removeAllContributions';
 import { dateToDay } from '../lingo/studyDays';
-
-// Password validation regex: min 8 chars, at least 1 uppercase, 1 lowercase, 1 number
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const passwordErrorMessage = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
 
 // Validation schemas
 const registerSchema = z.object({
-  email: z.string().email(),
-  username: z.string().min(3).max(50),
-  password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
+  email: boundedText(254, 'email').email(),
+  username: boundedText(50, 'nome utente').min(3),
+  password: passwordSchema(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+  email: boundedText(254, 'email').email(),
+  password: boundedText(MAX_PASSWORD_LENGTH, 'password'),
 });
 
 const refreshSchema = z.object({
-  refresh_token: z.string(),
+  refresh_token: boundedText(4_096, 'token'),
 });
 
 const changePasswordSchema = z.object({
-  current_password: z.string(),
-  new_password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
+  current_password: boundedText(MAX_PASSWORD_LENGTH, 'password attuale'),
+  new_password: passwordSchema(),
 });
 
 // Strict on purpose: an extra key (`devModeAllowed` above all) is refused, not stripped.
@@ -39,8 +49,12 @@ const setDevModeSchema = z.object({
   enabled: z.boolean(),
 }).strict();
 
+const removeContributionsSchema = z.object({
+  password: z.string().min(1).max(1_024),
+});
+
 const deleteAccountSchema = z.object({
-  password: z.string().min(1),
+  password: boundedText(MAX_PASSWORD_LENGTH, 'password').min(1),
   confirmation: z.literal('ELIMINA ACCOUNT'),
 });
 
@@ -61,33 +75,47 @@ const toMeResponse = (user: User) => ({
   last_login_at: user.lastLoginAt,
 });
 
-// Register - creates inactive user pending admin approval
+const REGISTRATION_REFUSED = 'Registrazione non riuscita con questi dati.';
+
+const isUniqueClash = (error: unknown): error is Prisma.PrismaClientKnownRequestError =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
+/**
+ * Register - creates inactive user pending admin approval.
+ *
+ * Which emails have an account is nobody's business (item 9 of the security inventory). The owner chose one refusal
+ * for an email or a username already in use (G-520), in Italian so the web shows it as it comes: it never says which
+ * of the two.
+ *
+ * Accepted limit of that choice, until the e-mail is confirmed (self-service sign-up, parked): a refusal still says
+ * that one of the two is in use, so with a username nobody has it points to the email. The failed attempts limit on
+ * this route slows that down; it does not close it.
+ */
 export const register = async (req: Request, res: Response) => {
-  const { email, username, password } = registerSchema.parse(req.body);
+  const { email, username, password } = parseBody(registerSchema, req.body);
 
-  // Check if user already exists
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ email }, { username }],
-    },
-  });
-
-  if (existingUser) {
-    throw new AppError(400, 'User with this email or username already exists');
+  const inUse = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] }, select: { id: true } });
+  if (inUse) {
+    throw new AppError(400, REGISTRATION_REFUSED);
   }
 
-  // Hash password
   const hashedPassword = await hashPassword(password);
-
-  // Create user with isActive: false (requires admin approval)
-  await prisma.user.create({
-    data: {
-      email,
-      username,
-      password: hashedPassword,
-      isActive: false, // User must be approved by admin
-    },
-  });
+  try {
+    // Create user with isActive: false (requires admin approval)
+    await prisma.user.create({
+      data: {
+        email,
+        username,
+        password: hashedPassword,
+        isActive: false, // User must be approved by admin
+      },
+    });
+  } catch (error) {
+    // Two registrations at once with the same email or username: the second meets the unique index, and gets the
+    // refusal the check above would have given it.
+    if (isUniqueClash(error)) throw new AppError(400, REGISTRATION_REFUSED);
+    throw error;
+  }
 
   // Don't generate tokens - user cannot login until approved
   res.status(201).json({
@@ -96,9 +124,19 @@ export const register = async (req: Request, res: Response) => {
   });
 };
 
+/**
+ * A bcrypt hash of nothing anyone knows, at the cost `hashPassword` uses: a sign-in with an unknown email compares
+ * against it, so it takes as long as a wrong password and the time of the answer does not tell which emails exist.
+ */
+// Computed when the module loads, not on the first unknown email: that first sign-in would otherwise take twice as long.
+const decoyHash = hashPassword(randomUUID());
+const spendAPasswordCheck = async (password: string): Promise<void> => {
+  await verifyPassword(password, await decoyHash);
+};
+
 // Login
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = loginSchema.parse(req.body);
+  const { email, password } = parseBody(loginSchema, req.body);
 
   // Find user
   const user = await prisma.user.findUnique({
@@ -106,6 +144,7 @@ export const login = async (req: Request, res: Response) => {
   });
 
   if (!user) {
+    await spendAPasswordCheck(password);
     throw new AppError(401, 'Invalid credentials');
   }
 
@@ -129,7 +168,20 @@ export const login = async (req: Request, res: Response) => {
     },
   });
 
-  // Generate tokens
+  // The web, once it says so with its header (A.1): a new session in a cookie scripts cannot read, and no tokens.
+  // A new row every time, so a session cannot be fixed in advance; the one the browser presented, if any, ends.
+  if (req.get(WEB_CLIENT_HEADER) === 'web') {
+    const presented = readSessionCookie(req);
+    if (presented) await deleteWebSessionBySecret(presented);
+    const secret = await createWebSession(updatedUser.id, req.get('user-agent'));
+    setSessionCookie(res, secret);
+    void sweepWebSessionsAtMostDaily();
+    res.json({ user: toMeResponse(updatedUser) });
+    return;
+  }
+
+  // Without the header, the tokens as before, and no cookie: the current web keeps working until it moves (step 2),
+  // and another site's form gets nothing it could use.
   const accessToken = generateAccessToken(updatedUser.id, updatedUser.email);
   const refreshToken = generateRefreshToken(updatedUser.id, updatedUser.email);
 
@@ -141,9 +193,66 @@ export const login = async (req: Request, res: Response) => {
   });
 };
 
+/** Sign-out (A.1): this browser's session ends, whatever state it is in, and its cookie is cleared. Always 204. */
+export const logout = async (req: Request, res: Response) => {
+  const secret = readSessionCookie(req);
+  if (secret) await deleteWebSessionBySecret(secret);
+  clearSessionCookie(res);
+  res.status(204).end();
+};
+
+/** «Esci da tutti i dispositivi» (A.1, D3): every web session of the user ends, this one included. */
+export const logoutAll = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+  await revokeUserWebSessions(req.user.id);
+  clearSessionCookie(res);
+  res.status(204).end();
+};
+
+/** The user's open web sessions, the most recently used first; `current` marks the one this request came with. */
+export const listSessions = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+  const now = new Date();
+  const sessions = await prisma.webSession.findMany({
+    where: {
+      userId: req.user.id,
+      expiresAt: { gt: now },
+      lastUsedAt: { gt: new Date(now.getTime() - sessionIdleMs()) },
+    },
+    orderBy: { lastUsedAt: 'desc' },
+    select: { id: true, label: true, createdAt: true, lastUsedAt: true },
+  });
+  res.json(
+    sessions.map((session) => ({
+      id: session.id,
+      label: session.label,
+      created_at: session.createdAt,
+      last_used_at: session.lastUsedAt,
+      current: session.id === req.webSessionId,
+    })),
+  );
+};
+
+/** Ends one of the user's own sessions; another user's id, or an unknown one, is 404. */
+export const deleteSession = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+  const { count } = await prisma.webSession.deleteMany({ where: { id: req.params.id, userId: req.user.id } });
+  if (count === 0) {
+    throw new AppError(404, 'Sessione non trovata');
+  }
+  if (req.params.id === req.webSessionId) clearSessionCookie(res);
+  res.status(204).end();
+};
+
 // Refresh token
 export const refresh = async (req: Request, res: Response) => {
-  const { refresh_token } = refreshSchema.parse(req.body);
+  const { refresh_token } = parseBody(refreshSchema, req.body);
 
   const payload = verifyToken(refresh_token);
 
@@ -210,7 +319,7 @@ export const changePassword = async (req: Request, res: Response) => {
     throw new AppError(401, 'Not authenticated');
   }
 
-  const { current_password, new_password } = changePasswordSchema.parse(req.body);
+  const { current_password, new_password } = parseBody(changePasswordSchema, req.body);
 
   // Verify current password
   const isPasswordValid = await verifyPassword(current_password, req.user.password);
@@ -222,10 +331,15 @@ export const changePassword = async (req: Request, res: Response) => {
   // Hash new password
   const hashedPassword = await hashPassword(new_password);
 
-  // Update password
-  await prisma.user.update({
-    where: { id: req.user.id },
-    data: { password: hashedPassword },
+  // Update password, and end every other web session of the user (A.1, D3): whoever held one with the old password
+  // is out. The session in use stays. The connected applications are not touched: their page lists them.
+  const userId = req.user.id;
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+    await revokeUserWebSessions(userId, req.webSessionId, tx);
   });
 
   res.json({ message: 'Password changed successfully' });
@@ -438,7 +552,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi, threadVotes, commentVotes, threadReports, commentReports, forumNotifications, atti, lingoLezioni, forumProfile, forumProfileReports, forumSubjectRoles, forumValidations, forumAppeals] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -449,14 +563,21 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.environment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.quickNorm.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.customAlias.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-    // The user's own replies are in `comments`; the others' are counted, never read.
+    // The user's own replies are in `comments`; the others' are counted, never read. A reply whose
+    // author deleted their account (user_id null) is someone else's too.
     prisma.articleThread.findMany({
       where: { userId },
-      include: { _count: { select: { comments: { where: { userId: { not: userId } } } } } },
+      include: { _count: { select: { comments: { where: { OR: [{ userId: { not: userId } }, { userId: null }] } } } } },
       orderBy: { createdAt: 'asc' },
     }),
-    prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-    prisma.lingoCard.findMany({ where: { autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } }),
+    // Whether a reply was accepted lives on the glossa, someone else's: it travels as a mark, not as that row.
+    prisma.articleComment.findMany({ where: { userId }, include: { acceptedIn: { select: { id: true } } }, orderBy: { createdAt: 'asc' } }),
+    // A course's card carries its module and the codes of its competences (Percorsi, A1).
+    prisma.lingoCard.findMany({
+      where: { autoreId: userId },
+      include: { ancore: true, competenze: { select: { competenza: { select: { codice: true } } } } },
+      orderBy: { createdAt: 'asc' },
+    }),
     prisma.lingoValidazioneCard.findMany({
       where: { utenteId: userId },
       select: { cardId: true, giudizio: true, motivazione: true, createdAt: true },
@@ -506,6 +627,62 @@ export const exportAccountData = async (req: Request, res: Response) => {
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }),
+    // Gymnasium's courses the user wrote, whole but for the keys of an exam not yet handed in, with the user's own
+    // enrolment (spec 2026-10-23 §10.9): never another learner's.
+    exportUserCourses(userId),
+    // The Community (spec 2026-10-20-forum-community-glosse-design §7.4): what the user voted, reported and
+    // was told. A report's copy of the reported text and its closing (who, why) are the moderators' record.
+    prisma.articleThreadVote.findMany({ where: { userId }, select: { threadId: true, value: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleCommentVote.findMany({ where: { userId }, select: { commentId: true, value: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleThreadReport.findMany({
+      where: { userId },
+      select: { threadId: true, reason: true, details: true, status: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.articleCommentReport.findMany({
+      where: { userId },
+      select: { commentId: true, threadId: true, reason: true, details: true, status: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.forumNotification.findMany({
+      where: { userId },
+      select: { kind: true, threadId: true, commentId: true, createdAt: true, readAt: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    // The acts the user drafts (Atti), whole with their text: the user's own writing. Not the MCP provenance's client id.
+    prisma.atto.findMany({
+      where: { userId },
+      select: { id: true, dossierId: true, titolo: true, tipo: true, testo: true, stato: true, createdAt: true, updatedAt: true, createdByClientName: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    }),
+    // Learn's short lessons (LC63): when, the subject, the kinds and the person's outcomes. Not the exercises' words,
+    // which are cards' texts, often other people's.
+    prisma.lingoLezione.findMany({
+      where: { utenteId: userId },
+      select: { id: true, giorno: true, materia: true, esercizi: true, esiti: true, finitaIl: true, createdAt: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    }),
+    // The Forum's profile (spec 2026-11-14 §B), and the reports «non è chi dice di essere» the user made:
+    // never who closed them, why, or what the owners decided about someone else.
+    prisma.forumProfile.findUnique({
+      where: { userId },
+      select: { id: true, identity: true, realName: true, pseudonym: true, qualification: true, materie: true,
+        nameWithdrawnAt: true, nameWithdrawnReason: true, createdAt: true, updatedAt: true },
+    }),
+    prisma.forumProfileReport.findMany({
+      where: { userId }, select: { profileId: true, details: true, status: true, createdAt: true }, orderBy: { createdAt: 'asc' },
+    }),
+    // The communities (spec 2026-11-14 §C): the person's roles, the validations they gave, their appeals;
+    // never who appointed them or who decided an appeal.
+    prisma.forumSubjectRole.findMany({ where: { userId }, select: { materia: true, role: true, createdAt: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.forumValidation.findMany({
+      where: { validatorId: userId }, select: { threadId: true, commentId: true, materia: true, createdAt: true }, orderBy: { createdAt: 'asc' },
+    }),
+    prisma.forumAppeal.findMany({
+      where: { userId },
+      select: { targetKind: true, targetId: true, text: true, status: true, createdAt: true, decidedAt: true, decisionNote: true },
+      orderBy: { createdAt: 'asc' },
+    }),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
   const others = await othersIn([
@@ -543,9 +720,13 @@ export const exportAccountData = async (req: Request, res: Response) => {
       // an alias's expansion and description) travel as they are, like a taken note's text.
       quickNorms: quickNorms.map((norm) => withoutOriginalAuthor({ ...norm, searchParams: withoutAuthors(norm.searchParams, own, false) })),
       customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own, false) })),
-      // The release time is the author's; the releasing admin's id is another person's identifier.
-      threads: threads.map(({ passageReleasedById: _releasedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
-      comments, lingoCards, lingoValidazioni,
+      // The release and lock times are the author's; the admin's and the moderator's ids are other people's identifiers.
+      threads: threads.map(({ passageReleasedById: _releasedBy, lockedById: _lockedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
+      comments: comments.map(({ acceptedIn, ...comment }) => ({ ...comment, accepted: acceptedIn.length > 0 })),
+      threadVotes, commentVotes, threadReports, commentReports, forumNotifications, forumProfile, forumProfileReports,
+      forumSubjectRoles, forumValidations, forumAppeals,
+      lingoCards: lingoCards.map(({ competenze, ...card }) => ({ ...card, competenze: competenze.map((c) => c.competenza.codice) })),
+      lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
       // The review log (the scheduling state is derived from it and not exported), the daily goals, and the
       // stored study days ('YYYY-MM-DD', Rome days: a DATE travels as UTC midnight).
@@ -553,6 +734,11 @@ export const exportAccountData = async (req: Request, res: Response) => {
       lingoGiornate: lingoGiornate.map(({ giorno, ...day }) => ({ giorno: dateToDay(giorno), ...day })),
       lingoCreditiXp: lingoCreditiXp.map(({ giorno, ...credit }) => ({ ...credit, giorno: dateToDay(giorno) })),
       merltConsenso, merltConsensoStorico,
+      lingoCorsi,
+      lingoLezioni: lingoLezioni.map(({ giorno, esercizi, ...lesson }) => ({
+        ...lesson, giorno: dateToDay(giorno), tipi: (esercizi as { tipo: string }[]).map((e) => e.tipo),
+      })),
+      atti,
       // Rome civil days as 'YYYY-MM-DD' and times as 'HH:MM' (a DATE or a TIME travels as a UTC instant).
       tasks: tasks.map(({ plannedDate, plannedTime, dueDate, dueTime, ...task }) => ({
         ...task,
@@ -566,13 +752,27 @@ export const exportAccountData = async (req: Request, res: Response) => {
 };
 
 /**
+ * «Togli i miei contributi» (G-502, G-558): everything the person wrote for others, removed at once, each kind by the
+ * rule it already has (`account/removeAllContributions.ts`); the answer says what was done, kind by kind. It cannot be
+ * undone, so it asks for the password, as deleting the account does. The user's own session only.
+ */
+export const removeOwnContributions = async (req: Request, res: Response) => {
+  const { password } = removeContributionsSchema.parse(req.body);
+  const user = req.user!;
+  if (!(await verifyPassword(password, user.password))) {
+    throw new AppError(400, 'La password non è corretta');
+  }
+  res.json(await removeAllOwnContributions(user.id));
+};
+
+/**
  * Permanently delete the authenticated account after explicit confirmation.
- * Prisma relations are configured with cascading ownership deletes, with one
- * exception: the study cards the community has taken up stay, without their
- * author (see `deleteUserAccount`).
+ * Prisma relations are configured with cascading ownership deletes, with two
+ * exceptions: the study cards the community has taken up, and the Community's
+ * glosse, replies and comments, stay without their author (see `deleteUserAccount`).
  */
 export const deleteAccount = async (req: Request, res: Response) => {
-  const { password, confirmation } = deleteAccountSchema.parse(req.body);
+  const { password, confirmation } = parseBody(deleteAccountSchema, req.body);
   if (confirmation !== 'ELIMINA ACCOUNT') {
     throw new AppError(400, 'Conferma non valida');
   }
@@ -582,5 +782,7 @@ export const deleteAccount = async (req: Request, res: Response) => {
   }
 
   await deleteUserAccount(user.id);
+  // Its sessions went with the account (cascade); the browser's cookie goes too.
+  clearSessionCookie(res);
   res.status(204).send();
 };

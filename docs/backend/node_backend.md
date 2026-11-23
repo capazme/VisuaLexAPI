@@ -470,7 +470,7 @@ sequenceDiagram
 ### Password Security
 
 - **Hashing:** bcryptjs with 10 salt rounds
-- **Minimum length:** 3 characters (configurable)
+- **Rule:** at least 8 characters, with a lowercase letter, an uppercase letter and a digit, on every path that sets a password: sign-up, change, the administrator's create and reset, and `npm run db:reset-admin` (`PASSWORD_RULE` in `src/utils/password.ts`). The first administrator's seed is the exception: its password is generated on the host.
 
 ---
 
@@ -559,8 +559,8 @@ apps/server/
 - `dotenv` - Environment variables
 - `zod` - Schema validation
 - `express-async-errors` - Async error handling
+- `prisma` - Prisma CLI: it applies the migrations to the production database (the `migrate` one-shot), so it is a production dependency and the blocking `npm audit` covers it (G-555)
 
 **Development:**
 - `typescript` - TypeScript compiler
 - `tsx` - TypeScript executor
-- `prisma` - Prisma CLI

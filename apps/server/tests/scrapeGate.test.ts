@@ -25,6 +25,9 @@ describe('scrapeCost', () => {
     expect(scrapeCost('/fetch_all_data')).toBe(5);
     expect(scrapeCost('/health/detailed')).toBe(5);
     expect(scrapeCost('/fetch_decision')).toBe(2);
+    expect(scrapeCost('/parse_query_batch')).toBe(3);
+    expect(scrapeCost('/fetch_norm_links')).toBe(5);
+    expect(scrapeCost('/parse_query')).toBe(1);
     expect(scrapeCost('/fetch_article_text')).toBe(1);
   });
 
@@ -124,10 +127,11 @@ describe('GET /api/auth/verify on the real app', () => {
       expect(verify.status).toBe(204);
       expect(verify.headers['ratelimit-limit']).toBeUndefined(); // the general limiter never saw it
     }
-    const me = await request(app).get('/api/auth/me').set(authHeader(user));
+    // Any route under the general limiter (not /auth/me, which has its own since G-484).
+    const folders = await request(app).get('/api/folders').set(authHeader(user));
 
-    expect(me.status).toBe(200);
+    expect(folders.status).toBe(200);
     // 300 a minute for a signed-in user, and this is the first call the general limiter counts.
-    expect(me.headers['ratelimit-remaining']).toBe('299');
+    expect(folders.headers['ratelimit-remaining']).toBe('299');
   });
 });

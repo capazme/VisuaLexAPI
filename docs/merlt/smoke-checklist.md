@@ -112,7 +112,7 @@ docker start visualex-merlt-api
 ```
 
 ### 6. Feature flag FE
-In `apps/web/.env` metti `VITE_FEATURE_MERLT=false` e riavvia il frontend. L'app funziona normalmente e il browser non fa nessuna chiamata a `/api/merlt/*`. Poi ripristina.
+In `apps/web/app/.env` metti `VITE_FEATURE_MERLT=false` e riavvia il frontend. L'app funziona normalmente e il browser non fa nessuna chiamata a `/api/merlt/*`. Poi ripristina.
 
 ---
 
@@ -244,7 +244,7 @@ Prerequisiti: stack Docker attivo, BFF (3001), consenso **Completo**, `OPENROUTE
 
 ## Contributo (upload → estrazione → revisione → promozione)
 - [ ] `/merlt/contribuisci` con consenso sotto Completo → messaggio che serve il consenso Completo.
-- [ ] Carica un `.txt`, `.pdf` o `.docx` (≤50 MB) → `POST /api/merlt/contrib/documents` 201 `{documentId}`.
+- [ ] Carica un `.txt`, `.pdf` o `.docx` (≤10 MB) → `POST /api/merlt/contrib/documents` 201 `{documentId}`.
 - [ ] L'estrazione asincrona parte: spinner, poi polling di `/contrib/jobs/:id/status` fino a `completed`. Un fallimento (file già eliminato, estrattori tutti in errore) arriva come `failed` con un motivo, non come «0 candidati».
 - [ ] Compaiono i candidati (`/contrib/documents/:id/candidates`): entità con il tipo come badge e relazioni con i nomi grezzi (`source_text`/`target_text`) e lo stato di risoluzione degli estremi. Se `potential_duplicate_of` è valorizzato compare l'hint di duplicato.
 - [ ] Promozione: il pulsante resta disabilitato finché non ci sono **Norma di riferimento** (`NormaPicker`), **Fonte**, una **riformulazione diversa dal verbatim** e l'**attestazione**. Poi `POST /contrib/candidates/:id/promote` → 200 con `created:true` e `pendingId`. Se il gate fallisce, 422.
@@ -312,7 +312,7 @@ La Q&A vive su `/grafo`; `/merlt/chiedi` e `/merlt/qa` reindirizzano lì. **Per 
 
 ### Rete
 - Tutte le route passano da `authenticate`. Le domande (query, query/async, history, trace, refine) vogliono `consentGuard`, cioè Base o Completo. Gli insegnamenti (`feedback/*`, confirm-source) vogliono `contributionGuard`, cioè Completo.
-- MERL-T giù → 503 `merlt_unavailable`; i 4xx passano invariati.
+- MERL-T giù → 503 `merlt_unavailable`; chiave del server rifiutata (401/403) → 503 `merlt_auth_misconfigured`; gli altri 4xx passano invariati.
 - Timeout: `MERLT_EXPERTS_TIMEOUT_MS` (sync, 120 s) e `MERLT_EXPERTS_ASYNC_TIMEOUT_MS` (submit, 10 s). Il watchdog chiude come `timeout` un job Q&A rimasto senza callback per 20 minuti.
 
 ---

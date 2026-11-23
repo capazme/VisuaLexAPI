@@ -1117,7 +1117,7 @@ async def pipeline_progress_websocket(websocket: WebSocket, run_id: str):
                     log.debug("WebSocket ping/pong", run_id=run_id)
                 else:
                     # Ignora altri messaggi (non gestiti)
-                    log.debug("Received unknown message", run_id=run_id, message=data)
+                    log.debug("Received unknown message", run_id=run_id, message_chars=len(str(data)))
 
             except WebSocketDisconnect:
                 log.info("WebSocket disconnected normally", run_id=run_id)

@@ -18,6 +18,7 @@
 import { AppError } from '../middleware/errorHandler';
 import { sourceUrl } from '../schemas/normEntry';
 import { rebuildEntry } from './environmentDossiers';
+import { MAX_ITEMS_PER_DOSSIER } from './dossierCaps';
 
 export type ContentMode = 'publish' | 'update' | 'restore' | 'read';
 
@@ -30,7 +31,8 @@ const ACTION: Record<Exclude<ContentMode, 'read'>, string> = {
 // Bounds: generous for real work, small enough that one item cannot fill the table.
 export const LIMITS = {
   dossiers: 100,
-  entries: 2000,
+  // The cap on a dossier's entries everywhere (G-576), so a published dossier always fits back in one.
+  entries: MAX_ITEMS_PER_DOSSIER,
   annotations: 5000,
   highlights: 5000,
   quickNorms: 500,
@@ -137,6 +139,11 @@ function searchParams(value: unknown, keys: readonly string[]): Check<Json> {
       if (t === null) return { ok: false, reason: `parametro «${key}» non valido` };
       out[key] = t;
     }
+  }
+  // A date asks for the text in force that day (G-353): with «originale» the search asks for two
+  // texts, which the API refuses (400).
+  if (out.version === 'originale' && out.version_date) {
+    return { ok: false, reason: 'versione originale con una data della versione' };
   }
   return { ok: true, value: out };
 }

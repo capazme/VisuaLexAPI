@@ -74,7 +74,9 @@ describe('citeAct', () => {
       const norma = c.input;
       const article = citeArticle(norma).replace(/ \(Allegato [^)]*\)$/, '');
       const act = citeAct(norma);
-      expect([`art. ${norma.numero_articolo} ${act}`, `art. ${norma.numero_articolo}, ${act}`]).toContain(article);
+      // A part of a split article names its commas after the article (G-389, Q2).
+      const head = `art. ${norma.numero_articolo}${norma.parte ? `, commi ${norma.parte}` : ''}`;
+      expect([`${head} ${act}`, `${head}, ${act}`]).toContain(article);
     }
   });
 
@@ -161,5 +163,39 @@ describe('an act whose text is its annex', () => {
   it('names no annex, and names another', () => {
     expect(citeArticle(tulps)).toBe('art. 86, r.d. 18 giugno 1931, n. 773');
     expect(citeArticle({ ...tulps, allegato: '2' })).toBe('art. 86, r.d. 18 giugno 1931, n. 773 (Allegato 2)');
+  });
+});
+
+
+describe('a part of a split article (G-389, Q2)', () => {
+  const ART_1 = { tipo_atto: 'legge', data: '2006-12-27', numero_atto: '296', numero_articolo: '1' };
+
+  it('names its commas after the article', () => {
+    expect(citeArticle({ ...ART_1, parte: '701-800' })).toBe('art. 1, commi 701-800, l. 27 dicembre 2006, n. 296');
+    expect(shortNorm({ ...ART_1, parte: '701-800' })).toBe('art. 1 (commi 701-800) l. 296/2006');
+    expect(citeStoredNorm('norm', { ...ART_1, parte: '701-800' })).toBe('art. 1, commi 701-800, l. 27 dicembre 2006, n. 296');
+  });
+
+  it('the first part is the article', () => {
+    expect(citeArticle(ART_1)).toBe('art. 1, l. 27 dicembre 2006, n. 296');
+  });
+});
+
+// EU acts before 2015 (G-540): the Community and the number as the Official Journal wrote them.
+describe('an EU act before 2015 is cited as the Official Journal numbered it (G-540)', () => {
+  it.each([
+    ['direttiva ue', '104', '1993-11-23', 'dir. 93/104/CE'],
+    ['direttiva ue', '13', '1993-04-05', 'dir. 93/13/CEE'],
+    ['regolamento ue', '1007', '2009-09-16', 'reg. (CE) n. 1007/2009'],
+    ['regolamento ue', '1259', '2010-12-20', 'reg. (UE) n. 1259/2010'],
+    ['regolamento ue', '1286', '2009-12-22', 'reg. (UE) n. 1286/2009'],
+    ['direttiva ue', '44', '1999', 'dir. 1999/44/CE'],
+    ['direttiva ue', '34', '1998', 'dir. 98/34/CE'],
+    ['direttiva ue', '13', '1993', 'dir. 93/13/CEE'],
+    ['regolamento ue', '1007', '2009', 'reg. (CE) n. 1007/2009'],
+    ['regolamento ue', '1', '2015', 'reg. (UE) 2015/1'],
+    ['regolamento ue', '679', '', 'reg. (UE)'],
+  ])('%s %s of %s is «%s»', (tipo_atto, numero_atto, data, act) => {
+    expect(citeAct({ tipo_atto, numero_atto, data })).toBe(act);
   });
 });

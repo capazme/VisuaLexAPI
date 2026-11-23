@@ -1,14 +1,17 @@
 import { LingoMateria, Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
+import { isSwitchOn } from '../assistant/switches';
 import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { checkCardIds, courseScope } from '../lingo/coursePage';
+import { evaluatePassed, masteryFor } from '../lingo/courseProgress';
 import { hasNoNul } from '../lingo/noNul';
 import { settleMissions } from '../lingo/missions';
 import { readProgress } from '../lingo/progress';
 import { readPercorso } from '../lingo/percorso';
-import { previewIntervals, reviewScope } from '../lingo/reviewQueue';
+import { courseDayFor, previewIntervals, reviewScope } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
 import { computeStreak } from '../lingo/streak';
 import { countedDays, markQueueFinished, recordGradeDay, recountToday } from '../lingo/studyDays';
@@ -46,10 +49,18 @@ const sessionSchema = z
       .max(200, 'L’istituto è troppo lungo (al massimo 200 caratteri).')
       .refine(hasNoNul, { message: 'L’istituto contiene un carattere non valido.' })
       .optional(),
+    // One course's cards and its check cards (Percorsi, spec 2026-10-23 §10.5, §10.7); alone, never with a subject.
+    corso: z.string().min(1).max(64).refine(hasNoNul, { message: 'Percorso non trovato.' }).optional(),
   })
+  // Strict: a parameter it does not know is a 400, so no client takes the whole queue for a narrowed one.
+  .strict()
   .refine((query) => query.istituto === undefined || query.materia !== undefined, {
     message: 'L’istituto richiede la materia.',
     path: ['istituto'],
+  })
+  .refine((query) => query.corso === undefined || query.materia === undefined, {
+    message: 'Il ripasso di un percorso non si restringe a una materia.',
+    path: ['corso'],
   });
 const gradeSchema = z
   .object({
@@ -69,14 +80,24 @@ const preferencesSchema = z
 const cardNotFound = () => new AppError(404, 'Scheda non trovata.');
 
 // `?materia=` narrows the session to a subject; `?istituto=` (only with `materia`) to one institute of it, matched
-// exactly as `/percorso` lists it. Either way the day's queue is not marked finished.
+// exactly as `/percorso` lists it; `?corso=` to one course's cards, with its check cards after the due and new ones
+// (`verifica: true`; behind the switch `lingo_courses`, 404 when off or not the caller's). Either way the day's
+// queue is not marked finished.
 router.get('/sessione', async (req, res) => {
   const userId = req.user!.id;
-  const { materia, istituto } = sessionSchema.parse(req.query);
+  const { materia, istituto, corso } = sessionSchema.parse(req.query);
   const today = romeDay(new Date());
 
   const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
-  const scope = reviewScope(userId, materieComunita, materia, istituto);
+  let enrolment: { id: string; corsoId: string } | null = null;
+  if (corso !== undefined) {
+    if (!(await isSwitchOn('lingo_courses'))) throw new AppError(404, 'Percorso non trovato.');
+    enrolment = await prisma.lingoCorsoIscrizione.findFirst({ where: { corsoId: corso, utenteId: userId, corso: { autoreId: userId } }, select: { id: true, corsoId: true } });
+    if (!enrolment) throw new AppError(404, 'Percorso non trovato.');
+  }
+  const scope = enrolment
+    ? courseScope(userId, materieComunita, today, enrolment.corsoId)
+    : reviewScope(userId, materieComunita, await courseDayFor(prisma, today), materia, istituto);
 
   const due = dueWhere(userId, scope, today);
   const [dovute, dueStates, introduced] = await Promise.all([
@@ -109,7 +130,7 @@ router.get('/sessione', async (req, res) => {
   // In one transaction with the missions it may complete («obiettivo», «settimana»: a settle only credits today and
   // this week, so left to a later read they could be lost at midnight). The user row first, in key share: the same
   // lock order as the progress read, so an account deletion and this read never deadlock (Gymnasium XP spec §5.1).
-  if (!materia && dovute === 0 && newCards.length === 0 && (await queueFinished(prisma, userId, today))) {
+  if (!materia && !enrolment && dovute === 0 && newCards.length === 0 && (await queueFinished(prisma, userId, today))) {
     await prisma.$transaction(async (tx) => {
       const user = await tx.$queryRaw<unknown[]>`SELECT 1 FROM users WHERE id = ${userId} FOR KEY SHARE`;
       if (user.length !== 1 || !(await queueFinished(tx, userId, today))) return;
@@ -126,7 +147,27 @@ router.get('/sessione', async (req, res) => {
     }),
     ...newCards.map((card) => ({ ...serialize(card), nuova: true, comunita: card.autoreId !== userId, anteprima: previewIntervals(null, 0) })),
   ];
-  res.json({ conteggi: { dovute, nuove: newCards.length }, cards });
+  if (!enrolment) {
+    res.json({ conteggi: { dovute, nuove: newCards.length }, cards });
+    return;
+  }
+  // The check cards: already reviewed, not graded today, gathered for the competences whose session counts today.
+  const mastery = (await masteryFor(prisma, userId, [enrolment], today)).get(enrolment.corsoId)!;
+  const checkIds = await checkCardIds(prisma, userId, scope, mastery, dueStates.map((state) => state.cardId), today);
+  const checkCards = new Map(
+    (await prisma.lingoCard.findMany({ where: { id: { in: checkIds } }, include: { ancore: true, statiRipasso: { where: { utenteId: userId } } } })).map((card) => [card.id, card]),
+  );
+  const checks = checkIds.flatMap((id) => {
+    const card = checkCards.get(id);
+    const state = card?.statiRipasso[0];
+    if (!card || !state) return [];
+    const elapsed = Math.max(0, daysBetween(romeDay(state.lastReviewAt), today));
+    return [{ ...serialize(card), nuova: false, comunita: false, anteprima: previewIntervals(state, elapsed), verifica: true }];
+  });
+  res.json({
+    conteggi: { dovute, nuove: newCards.length, verifica: checks.length },
+    cards: [...cards.map((card) => ({ ...card, verifica: false })), ...checks],
+  });
 });
 
 // Today's counts and nothing else (G-356): the cards due by the end of today in Rome and the new ones today still
@@ -141,7 +182,7 @@ router.get('/conteggi', async (req, res) => {
   const today = romeDay(new Date());
 
   const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
-  const scope = reviewScope(userId, materieComunita);
+  const scope = reviewScope(userId, materieComunita, await courseDayFor(prisma, today));
   const [dovute, introduced, available] = await Promise.all([
     prisma.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) }),
     introducedToday(prisma, userId, today),
@@ -169,7 +210,12 @@ router.post('/revisioni', async (req, res) => {
 
     // The scope is read with the user's current preferences: a card that left the pool since the session was fetched is refused.
     const { materieComunita } = await readPreferences(tx, userId);
-    const inScope = await tx.lingoCard.findFirst({ where: { AND: [{ id: cardId }, reviewScope(userId, materieComunita)] }, select: { id: true, materia: true } });
+    // Off, no course card is in scope (so none is graded, and nothing of a course is credited).
+    const courseDay = await courseDayFor(tx, today);
+    const inScope = await tx.lingoCard.findFirst({
+      where: { AND: [{ id: cardId }, reviewScope(userId, materieComunita, courseDay)] },
+      select: { id: true, materia: true, modulo: { select: { corsoId: true } } },
+    });
     if (!inScope) throw cardNotFound();
 
     const previous = await tx.lingoStatoRipasso.findUnique({ where: { utenteId_cardId: { utenteId: userId, cardId } } });
@@ -204,9 +250,20 @@ router.post('/revisioni', async (req, res) => {
     // Due by the end of today, as `dueWhere` reads it: only these grades count toward «dovute» (G-334).
     const wasDue = previous !== null && previous.dueAt < startOfRomeDay(today, 1);
     const day = await recordGradeDay(tx, userId, today, { isNew: !previous, wrong: rating === 1, wasDue });
+    // A course card's grade counts for mastery (Percorsi §10.4): «superato» is checked under the enrolment's lock,
+    // after the cards and today's day row, before the XP lock — the study writes' order.
+    let iscrizioneId: string | undefined;
+    if (inScope.modulo && courseDay !== null) {
+      const enrolment = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM lingo_corsi_iscrizioni WHERE corso_id = ${inScope.modulo.corsoId} AND utente_id = ${userId} FOR NO KEY UPDATE`;
+      if (enrolment.length === 1) {
+        iscrizioneId = enrolment[0].id;
+        await evaluatePassed(tx, userId, { id: iscrizioneId, corsoId: inScope.modulo.corsoId }, today);
+      }
+    }
     // Last, after today's day row: the missions this grade completes (Gymnasium XP spec §5.1). Never fails the grade.
     const xp = await settleMissions(tx, userId, today, {
-      tipo: 'revisione', logId: log.id, cardId, materia: inScope.materia, isNew: !previous, intervallo: result.scheduledDays,
+      tipo: 'revisione', logId: log.id, cardId, materia: inScope.materia, isNew: !previous, intervallo: result.scheduledDays, iscrizioneId,
     });
     return { registrata: true, prossimoRipasso: romeDay(dueAt), scheduledDays: result.scheduledDays, day, xp };
   }).catch((error: unknown) => {

@@ -99,11 +99,8 @@ Two risks remain, stated so nobody finds them by accident:
   reach the databases, but on an ordinary Docker install it could still reach the other
   devices on the home network through the host. Hardening H1 closes that with a host
   firewall rule; the smoke test checks it.
-- **R2 — MERL-T's own API.** From `app` a compromised scraper can reach `merlt-api`, whose
-  `/admin/*` and `/ner/*` routes have no gate of their own (only the server's
-  `requireAdmin` protects them today). Closing it means requiring the admin key on those
-  routes inside `services/merlt` — a separate change, recorded here as a follow-up for
-  the owner's approval, not folded into this round.
+- **R2 — MERL-T's own API.** Closed by the security line's A.2 (18 November 2026): every
+  route of `merlt-api` needs its key, except `/health` and `/`.
 
 ### 4.3 What is published
 
@@ -319,8 +316,8 @@ phone backup; (7) verification and the CI job that builds the images.
 web-app refactor; the verify endpoint and `forward_auth`; the address updater, the
 certificate and the router; the real client address; the MERL-T visibility switch.
 
-**Later:** scrapers on another Linux machine (shared secret, firewall); the admin key on
-MERL-T's own routes (R2).
+**Later:** scrapers on another Linux machine (shared secret, firewall). The key on
+MERL-T's own routes (R2) was done in A.2.
 
 Changes to `infra/`, `.github/`, the data scripts, authentication and the Prisma schema
 need the other developer's approval (`CLAUDE.md`, git flow), so tasks 4, 5 and 7 — and, in

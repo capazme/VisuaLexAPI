@@ -29,6 +29,7 @@ Esempio:
     ...         return await self._analyze_with_llm(context, sources)
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import re
 import structlog
 import json
@@ -268,7 +269,7 @@ class ReActMixin:
         "max_iterations": 5,
         "novelty_threshold": 0.1,  # Stop se < 10% nuove fonti
         "temperature": 0.1,
-        "model": "google/gemini-2.5-flash"
+        "model": DEFAULT_FAST_MODEL
     }
 
     def _repair_norm_tool_params(
@@ -605,7 +606,7 @@ class ReActMixin:
                 log.info(
                     f"ReAct loop finished at iteration {iteration + 1}",
                     reason="LLM decided to finish",
-                    thought=decision.get("thought", "")[:100]
+                    thought_chars=len(decision.get("thought") or "")
                 )
                 history.append(ThoughtActionObservation(
                     iteration=iteration + 1,
@@ -633,7 +634,7 @@ class ReActMixin:
 
             log.debug(
                 f"ReAct iteration {iteration + 1}",
-                thought=decision.get("thought", "")[:100],
+                thought_chars=len(decision.get("thought") or ""),
                 tool=tool_name,
                 params=list(tool_params.keys())
             )
@@ -815,7 +816,7 @@ class ReActMixin:
         try:
             from merlt.config.runtime_config import get_runtime_config
             fallback_model = self.react_config.get(
-                "model", self.model if hasattr(self, 'model') else "google/gemini-2.5-flash"
+                "model", self.model if hasattr(self, 'model') else DEFAULT_FAST_MODEL
             )
             response = await self._traced_llm_call(
                 prompt=prompt,
@@ -1150,10 +1151,16 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
                 })
 
         elif "text" in data and "urn" in data:
-            # ArticleFetchTool / ExternalSourceTool format - single article payload
+            # ArticleFetchTool / ExternalSourceTool format - single article payload.
+            # What VisuaLex says beside the text (a partial text, G-387; Normattiva's
+            # update notes, G-386) follows it as its own block, never mixed into it.
+            notes = data.get("oltre_il_testo")
+            text = data.get("text", "")
+            if text and isinstance(notes, str) and notes:
+                text = f"{text}\n\n{notes}"
             sources.append({
                 "urn": data.get("urn", ""),
-                "text": data.get("text", ""),
+                "text": text,
                 "type": data.get("tipo_atto", ""),
                 "source": data.get("source", "article_fetch")
             })

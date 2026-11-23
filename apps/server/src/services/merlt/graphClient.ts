@@ -16,7 +16,8 @@
  * Errors:
  *  - MerltTimeoutError    → BFF responds 503 (network/timeout)
  *  - MerltServerError     → BFF responds 503 (5xx from MERL-T)
- *  - MerltBadRequestError → BFF passes status through (4xx from MERL-T)
+ *  - MerltAuthError       → 401/403 from MERL-T: the server's key was refused (503)
+ *  - MerltBadRequestError → BFF passes status through (other 4xx from MERL-T)
  */
 
 import {
@@ -24,12 +25,13 @@ import {
   MerltNetworkError,
   MerltServerError,
   MerltBadRequestError,
+  MerltAuthError,
+  isKeyRefusal,
 } from './merltClient';
 import type {
   SubgraphResponse,
   EntitySearchResponse,
 } from '../../schemas/merlt/graph';
-import type { RassegneQuery, RassegneResponse } from './rassegneTypes';
 
 export interface GraphClientConfig {
   baseUrl: string;
@@ -169,15 +171,6 @@ export class GraphClient {
     );
   }
 
-  /** GET /api/v1/rassegne/by-norma — review paragraphs citing a norm; version markers stripped. */
-  async rassegneByNorma(query: RassegneQuery): Promise<RassegneResponse> {
-    const params = new URLSearchParams({ urn: normalizeGraphUrn(query.urn) });
-    if (query.anno !== undefined) params.set('anno', String(query.anno));
-    if (query.archivio) params.set('archivio', query.archivio);
-    if (query.cursor) params.set('cursor', query.cursor);
-    return this.request<RassegneResponse>('GET', `/api/v1/rassegne/by-norma?${params.toString()}`);
-  }
-
   private async request<T>(
     method: 'GET' | 'POST',
     path: string,
@@ -217,6 +210,10 @@ export class GraphClient {
         `MERL-T ${response.status} on ${path}: ${text.slice(0, 200)}`,
         response.status
       );
+    }
+
+    if (isKeyRefusal(response.status)) {
+      throw new MerltAuthError(path, response.status);
     }
 
     if (response.status >= 400) {

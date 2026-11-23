@@ -7,9 +7,28 @@ import { prisma } from '../lib/prisma';
  * reset empties the table. Read at each request that needs it: one row by its key.
  */
 export const APP_SWITCHES = {
-  // D7b: passages and notes an assistant proposes, validated by hand. Off: the web's proposal routes
-  // answer 404, dossier answers carry no state, the MCP lists neither tool, the delegated routes 404.
-  assistant_passages: 'Passaggi e note proposti dall’IA, da validare a mano (D7b).',
+  // D7b: the web app's side of what an assistant proposed (its saved passages, its glosses, its notes), validated
+  // by hand. Off: the web's proposal routes answer 404 and dossier answers carry no state. Since D8 no application
+  // proposes coloured passages any more: the saved ones stay, readable here.
+  assistant_passages: 'Proposte e note dell’IA nella pratica, da validare a mano (D7b).',
+  // D8: the connected application's side of glosses. Off: the delegated route that proposes them answers 404 and
+  // the MCP does not list `omnilex_glossa_voce` (an entry's text is behind no switch). The route also needs
+  // `assistant_passages`, the web app's side where the user validates them. Switch this on only once the web shows
+  // glosses: today's web draws a gloss's missing colour as yellow.
+  assistant_glosses: 'Glosse dell’IA sui passaggi, proposte dalle applicazioni collegate (D8).',
+  // Gymnasium's courses («Percorsi», A1, spec 2026-10-23 §10.10). Off: every /api/lingo/corsi route and the
+  // declaration's accept route answer 404, the card route refuses a module, the trash hides a course and a module
+  // (`trash/trash.ts`), the MCP lists none of the tools. Switching off hides, never deletes.
+  lingo_courses: 'Percorsi di studio creati dall’assistente (A1).',
+  // G-387 (a): a part of an article Normattiva splits («art. 1 (commi 701-800)») as an entry of its own. Off: a
+  // reference's comma is not sent on and the article is stored, as before (`norms/resolveReference.ts`); an entry
+  // already stored as a part is still read as that part. Switch this on only once the web opens parts (3c).
+  article_parts: 'Parti di un articolo diviso da Normattiva come voci a sé (G-387).',
+  // The Forum's profile (spec 2026-11-14-forum-community-server-design §B, D-246). Off: writing needs no profile,
+  // as before (a pseudonym never signs a glossa, and a withdrawn name writes nothing, either way). On: a glossa
+  // needs a profile under the real name, a reply or a comment any profile. Switch this on once the web shows the
+  // profile page: the reader's panel cannot make one.
+  forum_identity: 'Nel Forum si scrive con il profilo: nome vero per le glosse, nome o pseudonimo per le risposte (D-246).',
 } as const;
 
 export type AppSwitchKey = keyof typeof APP_SWITCHES;

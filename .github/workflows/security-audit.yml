@@ -28,16 +28,41 @@ jobs:
         with:
           inputs: services/visualex/requirements.txt
 
+  # What ships blocks; development tools are shown and never block (G-552). The runtime images
+  # install with `npm ci --omit=dev` and the web ships as built files. The Prisma CLI, which the
+  # one-shot `migrate` container runs against the database, is a production dependency of the
+  # server (G-555), so this job covers it. The web and the MCP server are audited in their own repositories. Development tools still run on the deployment host only
+  # while the images are built: the build tools of the web, the server and the MCP, on our own
+  # sources. The cost: a future high advisory in a development tool, these included, no longer blocks.
   npm-audit:
-    name: npm audit
+    name: npm audit, production dependencies
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        workspace: [apps/web, apps/server, apps/mcp]
+        workspace: [apps/server]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm audit --audit-level=high
+      - run: npm audit --omit=dev --audit-level=high
+        working-directory: ${{ matrix.workspace }}
+
+  npm-audit-dev:
+    name: npm audit, development tools included (shown, never blocks)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [apps/server]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # A finding becomes a warning on the run's summary page; the job itself stays green.
+      - run: |
+          if ! npm audit --audit-level=high; then
+            echo "::warning title=npm audit (${{ matrix.workspace }})::a high or critical advisory; this check never blocks, the production one does (G-552)"
+          fi
         working-directory: ${{ matrix.workspace }}

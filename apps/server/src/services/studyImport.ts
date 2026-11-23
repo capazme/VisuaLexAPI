@@ -14,12 +14,15 @@
  * they come from someone else, they carry the «da @utente» chip that tells them apart.
  */
 import { randomUUID } from 'node:crypto';
+import { isRecitalContent, rebuildRecitalEntry } from '../schemas/recitalEntry';
+import { citeRecital } from '../norms/recital';
 import type { Prisma } from '@prisma/client';
 import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { createLimiter } from '../middleware/rateLimiter';
 import type { PublishedContent } from '../utils/publishedContent';
+import { assertDossierRoom } from '../utils/dossierCaps';
 
 /** Imports a user may run in an hour: one small request can create a hundred dossiers. */
 export const IMPORTS_PER_HOUR = 30;
@@ -32,7 +35,7 @@ export async function spendStudyImport(userId: string): Promise<void> {
     await limiter.consume(userId);
   } catch (err) {
     if (err instanceof RateLimiterRes) {
-      throw new AppError(429, `Hai aggiunto troppi dossier in poco tempo (al massimo ${IMPORTS_PER_HOUR} volte all'ora): riprova più tardi.`);
+      throw new AppError(429, `Hai aggiunto troppe pratiche in poco tempo (al massimo ${IMPORTS_PER_HOUR} volte all'ora): riprova più tardi.`);
     }
     console.error('study import limiter error (fail-open):', err);
   }
@@ -108,7 +111,10 @@ function itemRow(entry: Row, dossierId: string, position: number, id: string, ab
   if (entry.type === 'sentenza') {
     return { id, dossierId, itemType: 'sentenza', title: String((data as Row).etichetta), content, position, aboutItemId: null };
   }
-  return { id, dossierId, itemType: 'norm', title: String((data as Row).tipo_atto || 'Norma'), content, position, aboutItemId: null };
+  // A recital (checked upstream by rebuildNormEntry) is titled with its citation, as the server titles one it stores.
+  const recital = isRecitalContent(data) ? rebuildRecitalEntry(data) : null;
+  const title = recital?.ok ? citeRecital(recital.entry) : String((data as Row).tipo_atto || 'Norma');
+  return { id, dossierId, itemType: 'norm', title, content, position, aboutItemId: null };
 }
 
 export async function importStudyDossiers(userId: string, content: PublishedContent, options: StudyImportOptions): Promise<StudyImportReport> {
@@ -188,6 +194,13 @@ export async function importStudyDossiers(userId: string, content: PublishedCont
     : [];
 
   await prisma.$transaction(async (tx) => {
+    // The caps (G-576) on everything this import adds, before anything is written: all or nothing.
+    const sizes = content.dossiers.map((dossier) => (Array.isArray(dossier.items) ? dossier.items.length : 0));
+    await assertDossierRoom(tx, userId, {
+      dossiers: content.dossiers.length,
+      items: sizes.reduce((sum, n) => sum + n, 0),
+      largestNewDossier: Math.max(0, ...sizes),
+    });
     for (const dossier of content.dossiers) {
       const entries = Array.isArray(dossier.items) ? (dossier.items as Row[]) : [];
       const ids = new Map(entries.map((entry) => [String(entry.id), randomUUID()]));

@@ -1,5 +1,7 @@
 """Tests for smart preset alias resolver — 50+ alias variations."""
 
+from datetime import date
+
 import pytest
 from visualex_api.tools.alias_resolver import resolve_alias, get_all_presets
 
@@ -95,8 +97,10 @@ class TestExactAliasResolution:
         assert r["act_number"] == "58"
 
     def test_tuir(self):
-        r = resolve_alias("tuir")
-        assert r["act_number"] == "917"
+        # Dated (G-577): the d.p.r. 917/1986 until 31 December 2026, then the annex of the d.lgs. 117/2026.
+        assert resolve_alias("tuir", date(2026, 12, 31))["act_number"] == "917"
+        r = resolve_alias("tuir", date(2027, 1, 1))
+        assert (r["act_number"], r["annex"]) == ("117", "1")
 
     def test_tuel(self):
         r = resolve_alias("tuel")
@@ -198,42 +202,6 @@ class TestGracefulFallback:
     def test_partial_match_no_false_positive(self):
         # "codice" alone should not match any alias
         assert resolve_alias("codice") is None
-
-
-class TestResolveNlQueryWithAlias:
-    """Test alias resolution integrated in _resolve_nl_query."""
-
-    def _make_controller(self):
-        from visualex_api.app import NormaController
-        return NormaController.__new__(NormaController)
-
-    def test_alias_resolved_via_query_field(self):
-        ctrl = self._make_controller()
-        result = ctrl._resolve_nl_query({"query": "gdpr"})
-        assert result["act_type"] == "regolamento UE"
-        assert result["act_number"] == "679"
-
-    def test_alias_with_article_via_query(self):
-        ctrl = self._make_controller()
-        result = ctrl._resolve_nl_query({"query": "art. 6 gdpr"})
-        assert result["act_type"] == "regolamento UE"
-        assert result["article"] == "6"
-
-    def test_explicit_act_type_skips_alias_merge(self):
-        ctrl = self._make_controller()
-        result = ctrl._resolve_nl_query({
-            "query": "gdpr",
-            "act_type": "legge",
-        })
-        assert result["act_type"] == "legge"
-        # Alias number/date not merged because act_type conflicts
-        assert "act_number" not in result
-
-    def test_nl_parser_fallback_when_alias_misses(self):
-        ctrl = self._make_controller()
-        result = ctrl._resolve_nl_query({"query": "art. 2043 cc"})
-        assert result["act_type"] == "codice civile"
-        assert result["article"] == "2043"
 
 
 class TestResolverFallback:

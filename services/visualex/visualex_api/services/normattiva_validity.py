@@ -331,14 +331,18 @@ def is_historical_request(version: Any, version_date: Any) -> bool:
     return isinstance(version_date, str) and bool(version_date.strip())
 
 
-class Upcoming(TypedDict):
+class _UpcomingRequired(TypedDict):
+    change: Optional[str]            # "abrogated", "amended", "inserted"; None when it cannot be told
+    valid_from: str                  # ISO day the later text comes into force
+    version_number: Optional[int]
+
+
+class Upcoming(_UpcomingRequired, total=False):
     """The wire shape: `upcoming` next to `validity` when the source has published a text
     not in force yet: next to today's text (G-355), next to an article inserted from a
     later day (G-358), or describing the later text asked for explicitly (G-357)."""
 
-    change: Optional[str]            # "abrogated", "amended", "inserted"; None when it cannot be told
-    valid_from: str                  # ISO day the later text comes into force
-    version_number: Optional[int]
+    versions_between: int            # other versions not in force yet before it; absent when none
 
 
 def starts_after_today(validity: Optional[Validity], today: Optional[date] = None) -> bool:
@@ -355,15 +359,31 @@ def starts_after_today(validity: Optional[Validity], today: Optional[date] = Non
     return valid_from > (today or _today_in_rome()).isoformat()
 
 
-def upcoming_change(validity: Validity, inserted: bool = False) -> Upcoming:
+def versions_between(later: Validity, today: Optional[Validity]) -> int:
+    """How many versions come after today's text and before `later`, by their numbers: the
+    undated page is the latest version, and a version in between cannot be read on its own
+    (a date after today answers today's text). 0 when either number is unknown."""
+    later_number = later.get("version_number")
+    today_number = (today or {}).get("version_number")
+    if not isinstance(later_number, int) or not isinstance(today_number, int):
+        return 0
+    return max(0, later_number - today_number - 1)
+
+
+def upcoming_change(validity: Validity, inserted: bool = False, today: Optional[Validity] = None) -> Upcoming:
     """What a later text does to the article: insert it (nothing is in force today),
-    repeal it, or change it."""
+    repeal it, or change it. `versions_between` is added when other versions not in force
+    yet come before it (`versions_between`): Normattiva does not show them on their own."""
     change = "inserted" if inserted else "abrogated" if validity.get("state") == "abrogated" else "amended"
-    return {
+    upcoming: Upcoming = {
         "change": change,
         "valid_from": validity["valid_from"],
         "version_number": validity.get("version_number"),
     }
+    between = 0 if inserted else versions_between(validity, today)
+    if between:
+        upcoming["versions_between"] = between
+    return upcoming
 
 
 def today_in_rome() -> date:

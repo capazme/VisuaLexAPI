@@ -33,7 +33,7 @@ describe('the permission to delete', () => {
     const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
     expect(shown.status).toBe(200);
     expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write']);
-    expect(shown.body.deletion.label).toMatch(/^Eliminare dossier, voci e schede/);
+    expect(shown.body.deletion.label).toMatch(/^Eliminare pratiche, voci e schede/);
   });
 
   it('tells the consent page when the connection already may delete, so a reconnect does not drop it unseen (final review)', async () => {
@@ -116,7 +116,9 @@ describe('the permission to delete', () => {
   it('a request for deletion alone asks for read and write too, since deleting needs them (M6)', async () => {
     const flow = await startAuthorization({ scope: 'content:delete' });
     const shown = await request(app).get(`/api/oauth/requests/${flow.requestId}`).set(authHeader(alice));
-    expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual(['dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write']);
+    expect(shown.body.scopes.map((s: { scope: string }) => s.scope)).toEqual([
+      'dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write', 'lingo:courses:read', 'lingo:courses:write',
+    ]);
   });
 
   it("PATCH on another user's grant or a revoked one is a 404, and the body is strict", async () => {

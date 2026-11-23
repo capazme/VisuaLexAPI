@@ -4,7 +4,9 @@ import helmet from 'helmet';
 import 'express-async-errors';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
-import { globalRateLimiter, writeRateLimiter } from './middleware/rateLimiter';
+import { globalRateLimiter, sessionCheckRateLimiter, writeRateLimiter } from './middleware/rateLimiter';
+import { authenticate } from './middleware/auth';
+import { getCurrentUser } from './controllers/authController';
 import { createScrapeGate } from './middleware/scrapeGate';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
@@ -25,6 +27,7 @@ import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
 import articleDiscussionRoutes from './routes/articleDiscussions';
+import forumCommunityRoutes from './routes/forumCommunity';
 import merltRoutes from './routes/merlt';
 import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
 import lingoCardsRoutes from './routes/lingoCards';
@@ -34,7 +37,11 @@ import lingoTestiRoutes from './routes/lingoTesti';
 import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
 import adminStudiaSoglieRoutes from './routes/adminStudiaSoglie';
 import lingoSrsRoutes from './routes/lingoSrs';
+import lingoLezioniRoutes from './routes/lingoLezioni';
+import lingoCorsiRoutes from './routes/lingoCorsi';
 import taskRoutes from './routes/tasks';
+import attiRoutes from './routes/atti';
+import praticaFilesRoutes from './routes/praticaFiles';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -42,6 +49,8 @@ import oauthAccountRoutes from './routes/oauthAccount';
 import { oauthConfig } from './oauth/config';
 import { delegatedAuth } from './middleware/delegated';
 import { TRUST_PROXY } from './lib/trustProxy';
+import { webSession } from './middleware/webSession';
+import { csrfGuard } from './middleware/csrfGuard';
 
 const app = express();
 
@@ -63,6 +72,11 @@ app.use(cors({
   origin: config.cors.origins,
   credentials: true,
 }));
+
+// The web's session (A.1): the cookie's session and its user, for everything below that reads `req.user`: the
+// ingress's login check, the limiters (a web user counts as a user, not as an address) and `authenticate`. A Bearer
+// token takes precedence until the web has moved to the cookie.
+app.use('/api', webSession);
 
 // The ingress asks here before it lets a scraping request through. The gate has its own limits
 // (per user and per address), so it comes before the general limiter: reading many articles must
@@ -86,6 +100,14 @@ app.get('/api/features', features);
 // table of routes, scopes and daily quota, before the general limiter so that
 // it is counted per user rather than per address.
 app.use('/api', delegatedAuth);
+
+// Requests another site starts (CSRF): a write that carries the session cookie, or says it comes from the web,
+// must carry the web's header and a matching origin. After `delegatedAuth`, whose tokens it exempts.
+app.use('/api', csrfGuard);
+
+// The session check, which the web asks at every load: its own limit, wider than the general one and outside
+// it (G-484), so that a page making many calls does not make the check fail and look like a lost session (#459).
+app.get('/api/auth/me', sessionCheckRateLimiter, authenticate, getCurrentUser);
 
 // Rate limiting: anonymous 100/min, authenticated 300/min, writes 200/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory
@@ -148,8 +170,15 @@ app.use('/api/lingo/testi', lingoTestiRoutes);
 app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
 app.use('/api/admin/studia/soglie', adminStudiaSoglieRoutes);
 app.use('/api/lingo/srs', lingoSrsRoutes);
+app.use('/api/lingo/lezioni', lingoLezioniRoutes);
+// Gymnasium's courses (Percorsi, A1), same reason; behind the switch `lingo_courses`.
+app.use('/api/lingo/corsi', lingoCorsiRoutes);
 // The planner's tasks, same reason.
 app.use('/api/tasks', taskRoutes);
+// The acts (Atti, draft for Alfred and Guglielmo), same reason.
+app.use('/api/atti', attiRoutes);
+// A case's act files and instructions (LC50): its own paths under /api/dossiers, before the dossier routes.
+app.use('/api/dossiers', praticaFilesRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 // The runtime switches' administration (GET /features is mounted above, before the limiters).
@@ -163,7 +192,7 @@ app.use('/api', annotationRoutes);
 app.use('/api', dossierRoutes);
 // D7b: the web app's routes for the assistant's proposals and notes (behind the `assistant_passages` switch).
 app.use('/api', assistantProposalRoutes);
-// D7b: an entry's text and the passages a connected application proposes on it (delegated, behind the same switch).
+// D7b and D8: an entry's text and the glosses a connected application proposes on it (delegated; the glosses behind `assistant_glosses`).
 app.use('/api', assistantPassageRoutes);
 app.use('/api', trashRoutes);
 app.use('/api', feedbackRoutes);
@@ -174,6 +203,7 @@ app.use('/api', quickNormRoutes);
 app.use('/api', customAliasRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api', articleDiscussionRoutes);
+app.use('/api', forumCommunityRoutes);
 
 // 404 handler
 app.use((_req, res) => {

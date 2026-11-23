@@ -25,7 +25,7 @@ import structlog
 from contextlib import asynccontextmanager
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Load environment variables
@@ -34,8 +34,12 @@ load_dotenv(env_file)
 log = structlog.get_logger()
 log.info("Environment variables loaded", env_file=str(env_file))
 
+from merlt.api.access_log import install as install_access_log_filter
 from merlt.storage.enrichment import init_db, close_db, create_tables
-from merlt.api.auth import verify_api_key, optional_api_key
+
+# The access log keeps method, path and status, never a query string (a person's search).
+install_access_log_filter()
+from merlt.api.auth import verify_api_key
 from merlt.api import (
     feedback_router,
     auth_router,
@@ -54,7 +58,6 @@ from merlt.api import (
     profile_router,
     rlcf_router,
     expert_metrics_router,
-    ws_router,
     tracking_router,
     policy_evolution_router,
     export_router,
@@ -116,9 +119,8 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             log.error("Failed to apply schema additions", error=str(e), exc_info=True)
             log.warning("pending_* reads will fail until storage/migrations/003_pending_source_reference.sql is applied")
-        # Admin API key for the ops routes (training, hygiene, ingestion, NER):
-        # seeded from MERLT_ADMIN_API_KEY so the BFF's MERLT_API_KEY works on a
-        # fresh stack without the manual /api-keys/bootstrap call.
+        # The API key every route needs: seeded from MERLT_ADMIN_API_KEY, so the
+        # BFF's MERLT_API_KEY works on a fresh stack. No route hands out a key.
         try:
             from merlt.api.api_key_seed import ensure_admin_api_key
             await ensure_admin_api_key()
@@ -266,19 +268,23 @@ async def lifespan(app: FastAPI):
         log.info("=" * 60)
 
 
+# The interactive API pages (/docs, /redoc, /openapi.json) are off unless MERLT_DOCS=true:
+# production never serves a map of the API (scan A.2).
+_DOCS = os.environ.get("MERLT_DOCS", "").strip().lower() in ("1", "true", "yes")
+
 # Create FastAPI app
 app = FastAPI(
     title="MERL-T API",
     description="Multi-Expert Reasoning with Legal Texts",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if _DOCS else None,
+    redoc_url="/redoc" if _DOCS else None,
+    openapi_url="/openapi.json" if _DOCS else None,
 )
 
 # CORS middleware (configure for your frontend)
 _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3102,http://localhost:5175").split(",")
-# Frontend sends JWT (not X-API-Key). Make API key auth optional globally;
-# routes using require_role() still enforce auth via null-check in _check_role.
-app.dependency_overrides[verify_api_key] = optional_api_key
 
 app.add_middleware(
     CORSMiddleware,
@@ -288,39 +294,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routers
-app.include_router(feedback_router, prefix="/api/v1", tags=["feedback"])
-app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
-app.include_router(experts_router, prefix="/api/v1", tags=["experts"])
-app.include_router(admin_router, prefix="/api/v1", tags=["admin"])
-app.include_router(enrichment_router, prefix="/api/v1", tags=["enrichment"])
-app.include_router(document_router, prefix="/api/v1", tags=["documents"])
-app.include_router(amendments_router, prefix="/api/v1", tags=["amendments"])
-app.include_router(candidates_router, prefix="/api/v1", tags=["extraction-candidates"])
-app.include_router(graph_router, prefix="/api/v1", tags=["graph"])
-app.include_router(pipeline_router, prefix="/api/v1", tags=["pipeline"])
-app.include_router(training_router, prefix="/api/v1", tags=["training"])
-app.include_router(trace_router, prefix="/api/v1", tags=["traces"])
-app.include_router(validity_router, prefix="/api/v1", tags=["validity"])
-app.include_router(citation_router, prefix="/api/v1", tags=["citations"])
-app.include_router(dashboard_router, prefix="/api/v1", tags=["dashboard"])
-app.include_router(profile_router, prefix="/api/v1", tags=["profile"])
-app.include_router(rlcf_router, prefix="/api/v1", tags=["rlcf"])
-app.include_router(expert_metrics_router, prefix="/api/v1", tags=["expert-metrics"])
-app.include_router(ws_router, prefix="/api/v1", tags=["websocket"])
-app.include_router(tracking_router, prefix="/api/v1", tags=["tracking"])
-app.include_router(policy_evolution_router, prefix="/api/v1", tags=["policy-evolution"])
-app.include_router(export_router, prefix="/api/v1", tags=["export"])
-app.include_router(devils_advocate_router, prefix="/api/v1", tags=["devils-advocate"])
-app.include_router(audit_router, prefix="/api/v1", tags=["audit"])
-app.include_router(circuit_breaker_router, prefix="/api/v1", tags=["circuit-breaker"])
-app.include_router(regression_router, prefix="/api/v1", tags=["regression"])
-app.include_router(quarantine_router, prefix="/api/v1", tags=["feedback-quarantine"])
-app.include_router(api_keys_router, prefix="/api/v1", tags=["api-keys"])
-app.include_router(ner_router, prefix="/api/v1", tags=["ner"])
-app.include_router(ingestion_mechanical_router, prefix="/api/v1", tags=["ingestion-mechanical"])
-app.include_router(rassegne_router, prefix="/api/v1", tags=["rassegne"])
-app.include_router(user_data_router, prefix="/api/v1", tags=["user-data"])
+# Register routers. Every route needs the API key (scan A.2): the only caller is the VisuaLex
+# server, which sends X-API-Key (MERLT_API_KEY, seeded here as MERLT_ADMIN_API_KEY). Only
+# /health (the containers' probe) and / stay open. With no key configured, every route answers
+# 401: there is no open mode.
+KEY_REQUIRED = [Depends(verify_api_key)]
+app.include_router(feedback_router, prefix="/api/v1", tags=["feedback"], dependencies=KEY_REQUIRED)
+app.include_router(auth_router, prefix="/api/v1", tags=["auth"], dependencies=KEY_REQUIRED)
+app.include_router(experts_router, prefix="/api/v1", tags=["experts"], dependencies=KEY_REQUIRED)
+app.include_router(admin_router, prefix="/api/v1", tags=["admin"], dependencies=KEY_REQUIRED)
+app.include_router(enrichment_router, prefix="/api/v1", tags=["enrichment"], dependencies=KEY_REQUIRED)
+app.include_router(document_router, prefix="/api/v1", tags=["documents"], dependencies=KEY_REQUIRED)
+app.include_router(amendments_router, prefix="/api/v1", tags=["amendments"], dependencies=KEY_REQUIRED)
+app.include_router(candidates_router, prefix="/api/v1", tags=["extraction-candidates"], dependencies=KEY_REQUIRED)
+app.include_router(graph_router, prefix="/api/v1", tags=["graph"], dependencies=KEY_REQUIRED)
+app.include_router(pipeline_router, prefix="/api/v1", tags=["pipeline"], dependencies=KEY_REQUIRED)
+app.include_router(training_router, prefix="/api/v1", tags=["training"], dependencies=KEY_REQUIRED)
+app.include_router(trace_router, prefix="/api/v1", tags=["traces"], dependencies=KEY_REQUIRED)
+app.include_router(validity_router, prefix="/api/v1", tags=["validity"], dependencies=KEY_REQUIRED)
+app.include_router(citation_router, prefix="/api/v1", tags=["citations"], dependencies=KEY_REQUIRED)
+app.include_router(dashboard_router, prefix="/api/v1", tags=["dashboard"], dependencies=KEY_REQUIRED)
+app.include_router(profile_router, prefix="/api/v1", tags=["profile"], dependencies=KEY_REQUIRED)
+app.include_router(rlcf_router, prefix="/api/v1", tags=["rlcf"], dependencies=KEY_REQUIRED)
+app.include_router(expert_metrics_router, prefix="/api/v1", tags=["expert-metrics"], dependencies=KEY_REQUIRED)
+app.include_router(tracking_router, prefix="/api/v1", tags=["tracking"], dependencies=KEY_REQUIRED)
+app.include_router(policy_evolution_router, prefix="/api/v1", tags=["policy-evolution"], dependencies=KEY_REQUIRED)
+app.include_router(export_router, prefix="/api/v1", tags=["export"], dependencies=KEY_REQUIRED)
+app.include_router(devils_advocate_router, prefix="/api/v1", tags=["devils-advocate"], dependencies=KEY_REQUIRED)
+app.include_router(audit_router, prefix="/api/v1", tags=["audit"], dependencies=KEY_REQUIRED)
+app.include_router(circuit_breaker_router, prefix="/api/v1", tags=["circuit-breaker"], dependencies=KEY_REQUIRED)
+app.include_router(regression_router, prefix="/api/v1", tags=["regression"], dependencies=KEY_REQUIRED)
+app.include_router(quarantine_router, prefix="/api/v1", tags=["feedback-quarantine"], dependencies=KEY_REQUIRED)
+app.include_router(api_keys_router, prefix="/api/v1", tags=["api-keys"], dependencies=KEY_REQUIRED)
+app.include_router(ner_router, prefix="/api/v1", tags=["ner"], dependencies=KEY_REQUIRED)
+app.include_router(ingestion_mechanical_router, prefix="/api/v1", tags=["ingestion-mechanical"], dependencies=KEY_REQUIRED)
+app.include_router(rassegne_router, prefix="/api/v1", tags=["rassegne"], dependencies=KEY_REQUIRED)
+app.include_router(user_data_router, prefix="/api/v1", tags=["user-data"], dependencies=KEY_REQUIRED)
 
 
 # Health check endpoint
@@ -393,6 +402,12 @@ async def health_check():
         log.debug("health_redis_failed", error=str(e))
         checks["redis"] = "unhealthy"
 
+    # The API key every route needs (a yes or no, never the key): without it the stores
+    # can be healthy while every route answers 401.
+    import merlt.api.api_key_seed as api_key_seed
+
+    checks["api_key"] = "healthy" if api_key_seed.KEY_READY else "missing"
+
     all_healthy = all(v == "healthy" for v in checks.values())
 
     payload: dict[str, Any] = {
@@ -413,7 +428,7 @@ async def root():
         "name": "MERL-T API",
         "description": "Multi-Expert Reasoning with Legal Texts",
         "version": "1.0.0",
-        "docs": "/docs",
+        "docs": app.docs_url,
         "health": "/health",
         "endpoints": {
             "feedback": "/api/v1/feedback",

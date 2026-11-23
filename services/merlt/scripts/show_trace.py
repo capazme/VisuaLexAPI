@@ -174,7 +174,7 @@ async def setup_infrastructure(cfg: dict):
         ckpt_path = Path(ckpt) if ckpt else None
 
         # LLM fallback router (no regex)
-        llm_model = routing_cfg.get("llm_classification", {}).get("model", "google/gemini-2.0-flash-001")
+        llm_model = routing_cfg.get("llm_classification", {}).get("model", "google/gemini-3.5-flash-lite")
         llm_router = ExpertRouter(ai_service=ai, classification_model=llm_model, disable_regex=True)
 
         hybrid_router = HybridExpertRouter(

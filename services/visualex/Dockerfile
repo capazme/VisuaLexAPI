@@ -21,8 +21,10 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /repo/services/visualex
 
 # Debian, not Alpine: Playwright does not support musl.
-COPY services/visualex/requirements.txt ./
-RUN pip install -r requirements.txt \
+# The lock, not requirements.txt: every package at the exact version CI tested
+# the frozen texts against (rule 23 of the root CLAUDE.md).
+COPY services/visualex/requirements-lock.txt ./
+RUN pip install -r requirements-lock.txt \
     && playwright install --with-deps chromium
 
 COPY version.txt /repo/version.txt
@@ -41,6 +43,6 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"
 
-# ONE worker. The rate limiter, the circuit breaker and the fetch queue keep
-# their state in memory, per process; more workers would each have their own.
+# ONE worker. The rate limiter and the fetch queue keep their state in memory,
+# per process; more workers would each have their own.
 CMD ["hypercorn", "asgi:app", "--bind", "0.0.0.0:5000", "--workers", "1"]

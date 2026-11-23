@@ -2,6 +2,7 @@ import asyncio
 import random
 import time
 from typing import Dict, Optional
+from urllib.parse import urljoin, urlparse
 
 import aiohttp
 import structlog
@@ -19,6 +20,41 @@ from ..tools.egress import is_allowed
 from ..tools.exceptions import DocumentNotFoundError, NetworkError
 
 log = structlog.get_logger()
+
+
+def _host_of(url: str) -> Optional[str]:
+    """The host alone, for the lines above debug: a source's address names the act asked
+    (Normattiva's URN in the query), and the norms of a filing pass here (/fetch_norm_links)."""
+    try:
+        return urlparse(url).hostname
+    except ValueError:
+        return None
+
+
+def redirect_guard() -> aiohttp.TraceConfig:
+    """Checks every redirect against the allow-list before aiohttp follows it (item 15 of the
+    security inventory). Without it only the first address was checked, and a declared source that
+    redirected elsewhere took the scraper to any host, an internal one included."""
+
+    async def on_redirect(_session, _ctx, params) -> None:
+        # The header aiohttp follows: Location, else URI (aiohttp's own fallback). With neither it stops.
+        location = params.response.headers.get("Location") or params.response.headers.get("URI")
+        if not location:
+            return
+        target = urljoin(str(params.url), location)
+        if not is_allowed(target):
+            log.error("Blocked redirect to undeclared host", host=_host_of(target))
+            raise NetworkError(f"Rinvio verso un host non consentito: {_host_of(target) or '?'}", status_code=403)
+
+    trace = aiohttp.TraceConfig()
+    trace.on_request_redirect.append(on_redirect)
+    return trace
+
+
+def new_session(**kwargs) -> aiohttp.ClientSession:
+    """An aiohttp session whose redirects are checked (`redirect_guard`). Every session passed to
+    `ThrottledHttpClient.request` must come from here."""
+    return aiohttp.ClientSession(trace_configs=[redirect_guard()], **kwargs)
 
 
 class HttpResult:
@@ -50,7 +86,7 @@ class ThrottledHttpClient:
             if self._session is None or self._session.closed:
                 timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
                 connector = aiohttp.TCPConnector()  # certificate verification enabled
-                self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+                self._session = new_session(connector=connector, timeout=timeout)
             return self._session
 
     async def close(self) -> None:
@@ -65,6 +101,7 @@ class ThrottledHttpClient:
         source: str = "generic",
         text_encoding: Optional[str] = None,
         max_retries: Optional[int] = None,
+        session: Optional[aiohttp.ClientSession] = None,
         **kwargs,
     ) -> HttpResult:
         """`text_encoding` overrides the codec that turns the body into `HttpResult.text`.
@@ -72,10 +109,12 @@ class ThrottledHttpClient:
         every existing caller. Pass "latin-1" for a binary body (a zip): latin-1 maps the
         bytes 0-255 one to one, so `text.encode("latin-1")` recovers them exactly.
         `max_retries` bounds the retries after the first attempt; None is the configured
-        HTTP_MAX_RETRIES."""
+        HTTP_MAX_RETRIES. `session` is the caller's own session, for a page that opens only
+        with the cookies of the page read before it (a part of a Normattiva article); the
+        rate limit, the host check and the retry budget are the same."""
         retries = HTTP_MAX_RETRIES if max_retries is None else max_retries
         if not is_allowed(url):
-            log.error("Blocked request to undeclared host", url=url[:120], source=source)
+            log.error("Blocked request to undeclared host", host=_host_of(url), source=source)
             raise NetworkError(
                 f"Host non consentito: {url[:80]}",
                 status_code=403,
@@ -90,9 +129,9 @@ class ThrottledHttpClient:
             while attempt <= retries:
                 await self._respect_source_pause(source)
                 await self._respect_min_interval()
-                session = await self._get_session()
+                client = session or await self._get_session()
                 try:
-                    async with session.request(method, url, **kwargs) as response:
+                    async with client.request(method, url, **kwargs) as response:
                         text = await response.text(encoding=text_encoding)
                         headers = dict(response.headers)
                         status = response.status
@@ -112,7 +151,7 @@ class ThrottledHttpClient:
                                 "Rate limit signal detected",
                                 extra={
                                     "source": source,
-                                    "url": url,
+                                    "host": _host_of(url),
                                     "status": status,
                                     "retry_after": wait_time,
                                 },
@@ -133,7 +172,8 @@ class ThrottledHttpClient:
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request failed; retrying",
-                        extra={"source": source, "url": url, "attempt": attempt, "error": str(exc)},
+                        extra={"source": source, "host": _host_of(url), "attempt": attempt,
+                               "error_type": type(exc).__name__},
                     )
                     attempt += 1
                     await self._wait_before(attempt, retries, wait_time)
@@ -142,7 +182,7 @@ class ThrottledHttpClient:
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request timeout; retrying",
-                        extra={"source": source, "url": url, "attempt": attempt},
+                        extra={"source": source, "host": _host_of(url), "attempt": attempt},
                     )
                     attempt += 1
                     await self._wait_before(attempt, retries, wait_time)

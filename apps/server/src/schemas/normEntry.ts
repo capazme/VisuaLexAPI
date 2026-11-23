@@ -9,7 +9,9 @@
  * Normattiva's or EUR-Lex's; unknown keys are dropped.
  */
 import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS } from '../norms/actTypes';
+import { PART_RANGE } from '../norms/parts';
 import { ARTICLE_SUFFIX_ALTERNATION } from '../utils/articleSuffixes';
+import { isRecitalContent, rebuildRecitalEntry, type RecitalEntry } from './recitalEntry';
 
 export interface NormEntry {
   tipo_atto: string;
@@ -20,6 +22,8 @@ export interface NormEntry {
   allegato?: string;
   versione?: 'vigente' | 'originale';
   data_versione?: string;
+  /** One part of an article Normattiva splits, by its comma range ("701-800", G-387 (a)). */
+  parte?: string;
   url?: string;
   urn?: string;
 }
@@ -43,6 +47,8 @@ const PATTERNS = {
   // "2", "2-bis", "2043 bis", "270-bis.1", "135-sex-decies", "2409octiesdecies", "8a", "314/2"
   numero_articolo: new RegExp(`^\\d{1,5}(?:[- ]?${ORDINAL}){0,2}(?:[- ]?[a-z])?(?:[./]\\d{1,3})?$`, 'i'),
   allegato: new RegExp(`^${ANNEX_PART}(?:[.-]${ANNEX_PART}){0,2}$`, 'i'),
+  // "701-800": a part's comma range, as the Python API writes it (norms/parts.ts).
+  parte: PART_RANGE,
 };
 const URN = /^urn:nir:[\w.:;~!@=-]{1,400}$/i;
 const SOURCE_HOSTS = new Set(['www.normattiva.it', 'normattiva.it', 'eur-lex.europa.eu']);
@@ -69,7 +75,11 @@ export function sourceUrl(value: unknown): string | null {
   }
 }
 
-export type NormEntryCheck = { ok: true; entry: NormEntry } | { ok: false; reason: string };
+/** A norm entry is an article or, with the key `considerando`, an EU recital (spec 2026-11-17 §6.2, G-538). */
+export type NormEntryCheck = { ok: true; entry: NormEntry | RecitalEntry } | { ok: false; reason: string };
+
+/** Whether a rebuilt entry is a recital's. */
+export const isRecitalEntry = (entry: NormEntry | RecitalEntry): entry is RecitalEntry => 'considerando' in entry;
 
 /** What a refusal says of a value: short, quoted, never the whole of what was sent. */
 const shown = (value: string): string => `«${value.length > 40 ? `${value.slice(0, 40)}…` : value}»`;
@@ -78,6 +88,7 @@ const FIELD_REASONS = {
   numero_atto: "Numero dell'atto non valido",
   data: "Data dell'atto non valida (anno, oppure anno-mese-giorno)",
   allegato: 'Allegato non valido',
+  parte: 'Parte dell’articolo non valida (i commi, per esempio 701-800)',
 } as const;
 
 /**
@@ -87,8 +98,13 @@ const FIELD_REASONS = {
  */
 export function rebuildNormEntry(raw: unknown): NormEntryCheck {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { ok: false, reason: 'Norma non leggibile' };
+  // A recital keeps its closed shape, its field included: never rebuilt into the article or the act it is not.
+  if (isRecitalContent(raw)) {
+    const recital = rebuildRecitalEntry(raw);
+    return recital.ok ? { ok: true, entry: recital.entry } : { ok: false, reason: recital.reason };
+  }
   const r = raw as Record<string, unknown>;
-  const FIELDS = ['tipo_atto', 'tipo_atto_reale', 'numero_articolo', 'numero_atto', 'data', 'allegato', 'versione', 'data_versione'] as const;
+  const FIELDS = ['tipo_atto', 'tipo_atto_reale', 'numero_articolo', 'numero_atto', 'data', 'allegato', 'versione', 'data_versione', 'parte'] as const;
   const mistyped = FIELDS.find((field) => wrongType(r[field]));
   if (mistyped) return { ok: false, reason: `Campo «${mistyped}» non valido: deve essere un testo` };
 
@@ -106,7 +122,7 @@ export function rebuildNormEntry(raw: unknown): NormEntryCheck {
     if (reale.length > 200 || !KNOWN_TYPES.has(key(reale))) return { ok: false, reason: `Tipo di atto non riconosciuto (${shown(reale)})` };
     entry.tipo_atto_reale = reale;
   }
-  for (const field of ['numero_atto', 'data', 'allegato'] as const) {
+  for (const field of ['numero_atto', 'data', 'allegato', 'parte'] as const) {
     const value = textOf(r[field]);
     if (!value) continue;
     if (!PATTERNS[field].test(value)) return { ok: false, reason: `${FIELD_REASONS[field]} (${shown(value)})` };
@@ -120,6 +136,11 @@ export function rebuildNormEntry(raw: unknown): NormEntryCheck {
   const dataVersione = textOf(r.data_versione);
   if (dataVersione) {
     if (!ISO_DAY.test(dataVersione)) return { ok: false, reason: `Data della versione non valida (${shown(dataVersione)})` };
+    // A date asks for the text in force that day (G-353): with «originale» the entry asks for two
+    // texts, and the API refuses the pair (400), so an entry saved with both would never open.
+    if (entry.versione === 'originale') {
+      return { ok: false, reason: `Versione originale con una data della versione (${shown(dataVersione)})` };
+    }
     entry.data_versione = dataVersione;
   }
   // The addresses never reach a citation: kept when they are the sources', else left out.

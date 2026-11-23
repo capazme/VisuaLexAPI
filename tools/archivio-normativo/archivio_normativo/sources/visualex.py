@@ -252,15 +252,18 @@ class VisuaLexClient:
             nd = line.get("norma_data") or {}
             raw = str(nd.get("numero_articolo") or "")
             annex_value = nd.get("allegato")
+            # The API's AKN fallback (scan A.7) is not the article's text (root CLAUDE.md,
+            # rule 23): an error, so it is never archived and the next run reads it again.
+            akn = line.get("text_source") == "akn" and not line.get("error")
             results.append(ArticleResult(
                 number=normalize_number(raw),
                 raw_number=raw,
-                text=line.get("article_text"),
+                text=None if akn else line.get("article_text"),
                 urn=nd.get("urn"),
                 url=line.get("url"),
                 annex=str(annex_value) if annex_value not in (None, "") else None,
                 brocardi=line.get("brocardi_info"),
                 brocardi_error=line.get("brocardi_error"),
-                error=line.get("error"),
+                error="AKN fallback served, not the article's text" if akn else line.get("error"),
             ))
         return results

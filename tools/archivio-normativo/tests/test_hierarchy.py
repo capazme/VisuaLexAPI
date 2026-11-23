@@ -111,3 +111,12 @@ class TestWalkTree:
     def test_non_article_dicts_are_skipped(self):
         out = walk_tree([{"numero": ""}, {"foo": 1}, {"numero": "3"}])
         assert [a.number for a in out] == ["3"]
+
+
+class TestASplitArticle:
+    def test_listed_once(self):
+        """Art. 1 l. 296/2006 is 14 parts in the tree: the article once, never 14 times (G-387 (a))."""
+        tree = [{"numero": "1", "allegato": None, "parte": None, "commi": "1-100"},
+                {"numero": "1", "allegato": None, "parte": "101-200", "commi": "101-200"},
+                {"numero": "2", "allegato": None}]
+        assert [a.number for a in walk_tree(tree)] == ["1", "2"]

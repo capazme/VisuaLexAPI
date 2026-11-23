@@ -8,6 +8,9 @@ import { ARTICLE_ORDINAL_SUFFIXES } from '../../src/utils/articleSuffixes';
  * services/visualex/visualex_api/tools/article_suffixes.py, and two mirrors:
  * the web app's and this one. A mirror that stops short ("decies") reads
  * "art. 25-terdecies" as 25-ter, an article that exists: nothing looks wrong.
+ * This file checks the server's mirror against the source; the web's is
+ * checked against conventions/contract/pins.json, which holds a copy of the
+ * source's table (apps/web/app/src/utils/__tests__/articleSuffixes.pins.test.ts).
  */
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
@@ -29,11 +32,6 @@ describe('ARTICLE_ORDINAL_SUFFIXES (server mirror)', () => {
     );
     expect(python.length).toBeGreaterThan(20);
     expect([...ARTICLE_ORDINAL_SUFFIXES].sort()).toEqual([...python].sort());
-  });
-
-  it('matches the web app mirror', () => {
-    const web = suffixesIn('apps/web/src/utils/articleSuffixes.ts', /ARTICLE_ORDINAL_SUFFIXES = \[/, '\n]');
-    expect([...ARTICLE_ORDINAL_SUFFIXES].sort()).toEqual([...web].sort());
   });
 });
 

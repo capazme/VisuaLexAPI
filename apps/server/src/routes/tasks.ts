@@ -27,8 +27,9 @@ import {
  *
  * - `GET /api/tasks?view=today|upcoming|inbox|dossier|trash[&dossierId=]` — `{ view, today, tasks, truncated }`;
  * - `GET /api/tasks/:id`, `POST /api/tasks`, `PUT /api/tasks/:id`;
- * - `POST /api/tasks/:id/complete { plannedDate }` (the occurrence ticked; required for a repeating task) — `{ task, recurred }`;
- *   `POST /api/tasks/:id/reopen`;
+ * - `POST /api/tasks/:id/complete { plannedDate, forever? }` (the occurrence ticked; required for a repeating task;
+ *   `forever` ends its series: no rule, closed, no next occurrence) — `{ task, recurred }`;
+ *   `POST /api/tasks/:id/reopen { recurrence? }` (the rule a `forever` took away, put back with the reopen);
  * - `POST /api/tasks/reorder { taskIds }` — the manual order;
  * - `DELETE /api/tasks/:id` — to the trash, with its subtasks; `POST /api/tasks/:id/restore`.
  *
@@ -94,7 +95,8 @@ const listSchema = z.object({
   view: closed(TASK_VIEWS, 'Vista non prevista.'),
   dossierId: id.optional(),
 });
-const completeSchema = z.object({ plannedDate: day.optional() }).strict();
+const completeSchema = z.object({ plannedDate: day.optional(), forever: z.boolean().optional() }).strict();
+const reopenSchema = z.object({ recurrence: closed(RECURRENCE_RULE_VALUES, 'Ripetizione non prevista.').optional() }).strict();
 const reorderSchema = z.object({ taskIds: z.array(id).min(1).max(MAX_REORDER) }).strict();
 
 router.get('/', async (req, res) => {
@@ -125,8 +127,8 @@ router.put('/:id', async (req, res) => {
 });
 
 router.post('/:id/complete', async (req, res) => {
-  const { plannedDate } = completeSchema.parse(req.body ?? {});
-  const { task, recurred } = await completeTask(req.user!.id, req.params.id, plannedDate);
+  const { plannedDate, forever } = completeSchema.parse(req.body ?? {});
+  const { task, recurred } = await completeTask(req.user!.id, req.params.id, plannedDate, undefined, forever);
   res.json({
     task: serializeTask(task),
     recurred: recurred && { previous_planned_date: recurred.previousPlannedDate, planned_date: recurred.plannedDate },
@@ -134,7 +136,8 @@ router.post('/:id/complete', async (req, res) => {
 });
 
 router.post('/:id/reopen', async (req, res) => {
-  res.json({ task: serializeTask(await reopenTask(req.user!.id, req.params.id)) });
+  const { recurrence } = reopenSchema.parse(req.body ?? {});
+  res.json({ task: serializeTask(await reopenTask(req.user!.id, req.params.id, recurrence)) });
 });
 
 router.delete('/:id', async (req, res) => {
@@ -158,7 +161,7 @@ router.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   }
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     // A dossier, an entry or a parent deleted meanwhile (a foreign key), or a row gone between the read and the write.
-    if (err.code === 'P2003') return res.status(409).json({ detail: 'Il dossier, la voce o il compito principale non esiste più: riprova.' });
+    if (err.code === 'P2003') return res.status(409).json({ detail: 'La pratica, la voce o il compito principale non esiste più: riprova.' });
     if (err.code === 'P2025') return res.status(404).json({ detail: 'Compito non trovato.' });
   }
   const kind = err instanceof Error ? err.name : typeof err;

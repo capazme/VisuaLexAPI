@@ -4,8 +4,16 @@
 #   ./start.sh [--dev]    the development stack, on this machine, with hot reload:
 #                           Docker (infra/compose.yml): postgres, redis, falkordb, qdrant — always;
 #                             mcp-legal-it, merlt-api, merlt-worker too with MERLT_ENABLED=true.
-#                           Host: Python API (services/visualex, :5000), server (apps/server, :3001),
-#                             web (apps/web, :5173).
+#                           Host: Python API (services/visualex, :5000 or VISUALEX_API_PORT), server (apps/server, :3001),
+#                             web (lexcraft-web's app, :5173), MCP server (lexcraft-mcp, :3002).
+#                           The web app and the MCP server are taken from LEXCRAFT_WEB_DIR (the
+#                             app/ folder of a clone of lexcraft-web) and LEXCRAFT_MCP_DIR (a
+#                             clone of lexcraft-mcp) when set, else from clones beside this
+#                             checkout (../lexcraft-web/app, ../lexcraft-mcp), else from the
+#                             versions the core pins (the app/ of the submodule apps/web, and
+#                             the submodule apps/mcp: to be read, not changed). A submodule of the checkout that is not initialised is
+#                             initialised here; one that is, is never updated: someone may be
+#                             working in it.
 #                           MERLT_API_IN_DOCKER=false runs the MERL-T api and worker on the host
 #                             (developer mode: a venv with the merlt deps, no mcp-legal-it tools).
 #                           A fresh checkout is prepared here: env files, venv, dependencies, Chromium.
@@ -108,9 +116,52 @@ if [ "$MODE" = prod ]; then
     exec sh "$PROJECT_ROOT/scripts/prod/deploy.sh" ${DEPLOY_ARGS[@]+"${DEPLOY_ARGS[@]}"}
 fi
 
+. "$PROJECT_ROOT/scripts/prod/lib.sh"
+
+# Where the web app and the MCP server live (G-603). The core pins lexcraft-web and lexcraft-mcp
+# as its submodules apps/web (the app in app/) and apps/mcp: those are to read, not to change. A
+# developer works in a clone of the repository: LEXCRAFT_WEB_DIR / LEXCRAFT_MCP_DIR name it, and a
+# clone beside this checkout is taken when they are unset.
+pick_dir() { # pick_dir <variable's value> <beside this checkout> <pinned in this checkout>
+    if [ -n "$1" ]; then echo "$1"
+    elif [ -f "$2/package.json" ]; then echo "$2"
+    else echo "$3"
+    fi
+}
+WEB_DIR="$(pick_dir "${LEXCRAFT_WEB_DIR:-}" "$PROJECT_ROOT/../lexcraft-web/app" "$PROJECT_ROOT/apps/web/app")"
+MCP_DIR="$(pick_dir "${LEXCRAFT_MCP_DIR:-}" "$PROJECT_ROOT/../lexcraft-mcp" "$PROJECT_ROOT/apps/mcp")"
+# A path as the messages show it: relative to the checkout when it is inside it.
+shown() { echo "${1#"$PROJECT_ROOT"/}"; }
+
+# A submodule that is not checked out (`-` in `git submodule status`) is initialised, with its
+# own submodules, and only that one: an initialised one may hold work in progress, so it is
+# never updated here. Offline, a failure is only a warning: what is needed and still missing is
+# reported just below, with the folder it was looked for in.
+if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    for sub in $(git -C "$PROJECT_ROOT" submodule status | sed -n 's/^-[0-9a-f]* \([^ ]*\).*/\1/p'); do
+        echo -e "${YELLOW}Initialising the $sub submodule...${NC}"
+        git -C "$PROJECT_ROOT" submodule update --init --recursive -- "$sub" \
+            || echo -e "${YELLOW}The $sub submodule could not be initialised (the network?)${NC}"
+    done
+fi
+require_dir() { # require_dir <folder> <variable that names it> <what it holds>
+    # Its package.json, not just a folder: an uninitialised submodule leaves an empty one, and the
+    # pull that turns a folder into a submodule leaves the ignored files (node_modules, .env) behind,
+    # which also stops the submodule from being checked out there.
+    [ -f "$1/package.json" ] && return 0
+    echo -e "${RED}The $3 is not at $1${NC} (no package.json) - $2 points there, or the submodule that holds it is not initialised: run 'git submodule update --init --recursive'. If the folder still holds files from before it became a submodule (node_modules, .env), move them away first."
+    exit 1
+}
+require_dir "$WEB_DIR" LEXCRAFT_WEB_DIR "web app"
+require_dir "$MCP_DIR" LEXCRAFT_MCP_DIR "MCP server"
+# Absolute from here on: the dev servers are started after a cd into apps/server.
+WEB_DIR="$(cd "$WEB_DIR" && pwd)"
+MCP_DIR="$(cd "$MCP_DIR" && pwd)"
+version_of() { git -C "$1" describe --tags --always --dirty 2>/dev/null || echo "not a git checkout"; }
+echo -e "${YELLOW}Web app: $(shown "$WEB_DIR") ($(version_of "$WEB_DIR")) · MCP server: $(shown "$MCP_DIR") ($(version_of "$MCP_DIR"))${NC}"
+
 # First run on a fresh checkout: the two env files the stack and the server read, from their
 # examples. Never overwritten. The JWT secret is generated here, not left as the example's.
-. "$PROJECT_ROOT/scripts/prod/lib.sh"
 if [ ! -f "$PROJECT_ROOT/infra/.env" ]; then
     cp "$PROJECT_ROOT/infra/.env.example" "$PROJECT_ROOT/infra/.env"
     echo -e "${YELLOW}Created infra/.env from the example (development passwords)${NC}"
@@ -126,11 +177,11 @@ if [ ! -f "$PROJECT_ROOT/apps/server/.env" ]; then
     echo -e "${YELLOW}Created apps/server/.env from the example, with a fresh JWT secret${NC}"
 fi
 # The MCP server's two secrets: its credential at the authorization server (shared by
-# apps/server and apps/mcp) and the key exchanged tokens are signed with. Added when
+# apps/server and the MCP server) and the key exchanged tokens are signed with. Added when
 # missing, also to an existing apps/server/.env; never replaced.
 (
     umask 077
-    S="$PROJECT_ROOT/apps/server/.env"; M="$PROJECT_ROOT/apps/mcp/.env"
+    S="$PROJECT_ROOT/apps/server/.env"; M="$MCP_DIR/.env"
     if [ -z "$(env_get "$S" OAUTH_MCP_CLIENT_SECRET)" ]; then
         env_set "$S" OAUTH_MCP_CLIENT_SECRET "$(random_secret 48)" '"'
         echo -e "${YELLOW}Added OAUTH_MCP_CLIENT_SECRET to apps/server/.env${NC}"
@@ -139,10 +190,10 @@ fi
         env_set "$S" OAUTH_DELEGATION_SECRET "$(random_secret 48)" '"'
         echo -e "${YELLOW}Added OAUTH_DELEGATION_SECRET to apps/server/.env${NC}"
     fi
-    if [ ! -f "$M" ] && [ -f "$PROJECT_ROOT/apps/mcp/.env.example" ]; then
-        cp "$PROJECT_ROOT/apps/mcp/.env.example" "$M"
+    if [ ! -f "$M" ] && [ -f "$MCP_DIR/.env.example" ]; then
+        cp "$MCP_DIR/.env.example" "$M"
         env_set "$M" MCP_CLIENT_SECRET "$(env_get "$S" OAUTH_MCP_CLIENT_SECRET)" '"'
-        echo -e "${YELLOW}Created apps/mcp/.env, with the server's MCP credential${NC}"
+        echo -e "${YELLOW}Created $(shown "$M"), with the server's MCP credential${NC}"
     fi
 )
 # Same values as Compose reads: ports, stack name, passwords.
@@ -157,6 +208,9 @@ export VITE_FEATURE_MERLT="${VITE_FEATURE_MERLT:-$MERLT_ENABLED}"
 MERLT_API_IN_DOCKER="${MERLT_API_IN_DOCKER:-true}"
 MERLT_ROOT="$PROJECT_ROOT/services/merlt"
 MERLT_PORT="${MERLT_API_PORT:-8000}"
+# The Python API's port, and with it the web proxy's, the server's and MERL-T's target.
+# On a Mac the AirPlay Receiver holds 5000: VISUALEX_API_PORT=5001 moves the API instead.
+export VISUALEX_API_PORT="${VISUALEX_API_PORT:-5000}"
 MERLT_HEALTH_TIMEOUT="${MERLT_HEALTH_TIMEOUT:-60}"
 SERVER_ENV="$PROJECT_ROOT/apps/server/.env"
 VENV="$PROJECT_ROOT/services/visualex/.venv"
@@ -205,13 +259,14 @@ check_port() {
         if [ "$holder" = "ControlCenter" ]; then
             # Killing it is useless: macOS starts it again at once.
             echo -e "${RED}Port $1 is held by macOS's AirPlay Receiver${NC} - turn it off: System Settings → General → AirDrop & Handoff → AirPlay Receiver"
+            [ "$1" != "$VISUALEX_API_PORT" ] || echo -e "or move the Python API: ${YELLOW}VISUALEX_API_PORT=5001 ./start.sh${NC}"
         else
             echo -e "${RED}Port $1 in use${NC} (${holder:-unknown}) - run: ${YELLOW}kill \$(lsof -t -i:$1)${NC}"
         fi
         return 1
     fi
 }
-for p in 5000 3001 5173 3002; do check_port "$p" || exit 1; done
+for p in "$VISUALEX_API_PORT" 3001 5173 3002; do check_port "$p" || exit 1; done
 
 if ! docker info >/dev/null 2>&1; then
     echo -e "${RED}Docker is not running${NC} - start Docker Desktop and run ./start.sh again"; exit 1
@@ -236,10 +291,10 @@ if ! "$VENV/bin/python" -c "import redis, playwright" 2>/dev/null; then
     echo -e "${YELLOW}Installing the Python dependencies...${NC}"
     "$VENV/bin/pip" install -q -r "$PROJECT_ROOT/services/visualex/requirements-dev.txt"
 fi
-for app in apps/server apps/web apps/mcp; do
-    if [ ! -d "$PROJECT_ROOT/$app/node_modules" ]; then
-        echo -e "${YELLOW}Installing the $app dependencies...${NC}"
-        npm ci --prefix "$PROJECT_ROOT/$app"
+for app in "$PROJECT_ROOT/apps/server" "$WEB_DIR" "$MCP_DIR"; do
+    if [ ! -d "$app/node_modules" ]; then
+        echo -e "${YELLOW}Installing the $(shown "$app") dependencies...${NC}"
+        npm ci --prefix "$app"
     fi
 done
 PW_CACHE="${PLAYWRIGHT_BROWSERS_PATH:-}"
@@ -265,7 +320,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
     if [ -n "$MERLT_INTERNAL_SECRET" ]; then export MERLT_INTERNAL_SECRET; else
         echo -e "${YELLOW}MERLT_INTERNAL_SECRET empty: MERL-T callbacks to the server will be refused${NC}"; fi
     if [ -n "$MERLT_API_KEY" ]; then export MERLT_API_KEY MERLT_ADMIN_API_KEY="$MERLT_API_KEY"; else
-        echo -e "${YELLOW}MERLT_API_KEY empty: MERL-T admin routes will answer 401${NC}"; fi
+        echo -e "${YELLOW}MERLT_API_KEY empty: every MERL-T route will answer 401${NC}"; fi
     if [ "$MERLT_API_IN_DOCKER" != "true" ] && ! "$MERLT_PYTHON" -c 'import merlt.app' >/dev/null 2>&1; then
         echo -e "${RED}MERLT_PYTHON ($MERLT_PYTHON) cannot import merlt.app${NC}"; exit 1
     fi
@@ -275,8 +330,8 @@ echo -e "\n${YELLOW}[1/5] Data stores...${NC}"
 STORES_STARTED=1
 "${COMPOSE[@]}" up -d --wait postgres redis falkordb qdrant
 
-echo -e "\n${YELLOW}[2/5] Python API (:5000)...${NC}"
-( cd "$PROJECT_ROOT/services/visualex" && exec "$VENV/bin/python" app.py ) &
+echo -e "\n${YELLOW}[2/5] Python API (:$VISUALEX_API_PORT)...${NC}"
+( cd "$PROJECT_ROOT/services/visualex" && PORT="$VISUALEX_API_PORT" HOST="$([ "$MERLT_ENABLED" = "true" ] && echo 0.0.0.0 || echo 127.0.0.1)" exec "$VENV/bin/python" app.py ) &
 API_PID=$!
 
 echo -e "\n${YELLOW}[3/5] Server (:3001)...${NC}"
@@ -285,17 +340,17 @@ npx prisma generate > /dev/null 2>&1 || echo -e "${YELLOW}prisma generate failed
 npx prisma migrate deploy || echo -e "${YELLOW}prisma migrate deploy failed - does DATABASE_URL in apps/server/.env point at port ${VISUALEX_PG_PORT:-5436}?${NC}"
 # The seed reads ADMIN_PASSWORD from apps/server/.env itself; the shell may override it.
 if [ -n "${ADMIN_PASSWORD:-$(server_env ADMIN_PASSWORD)}" ]; then npm run db:seed || echo -e "${YELLOW}db:seed failed${NC}"; fi
-npm run dev &
+LEGAL_API_URL="${LEGAL_API_URL:-http://localhost:$VISUALEX_API_PORT}" npm run dev &
 SERVER_PID=$!
 
 echo -e "\n${YELLOW}[4/5] Web (:5173)...${NC}"
-cd "$PROJECT_ROOT/apps/web"
+cd "$WEB_DIR"
 npm run dev &
 WEB_PID=$!
 
-# The MCP server for Claude Code and LibreLex (apps/mcp/CLAUDE.md): it reads apps/mcp/.env.
+# The MCP server for Claude Code and LibreLex (its CLAUDE.md): it reads the .env in its folder.
 echo -e "\n${YELLOW}[5/5] MCP server (:3002)...${NC}"
-cd "$PROJECT_ROOT/apps/mcp"
+cd "$MCP_DIR"
 npm run dev &
 MCP_PID=$!
 cd "$PROJECT_ROOT"
@@ -303,7 +358,7 @@ cd "$PROJECT_ROOT"
 if [ "$MERLT_ENABLED" = "true" ]; then
     if [ "$MERLT_API_IN_DOCKER" = "true" ]; then
         echo -e "\n${YELLOW}MERL-T in Docker...${NC}"
-        "${COMPOSE[@]}" --profile merlt up -d
+        VISUALEX_API_URL="${VISUALEX_API_URL:-http://host.docker.internal:$VISUALEX_API_PORT}" "${COMPOSE[@]}" --profile merlt up -d
     else
         echo -e "\n${YELLOW}MERL-T on the host (:$MERLT_PORT)...${NC}"
         DB="postgresql://merlt:${MERLT_DB_PASSWORD:-merlt}@localhost:${VISUALEX_PG_PORT:-5436}/merlt"
@@ -316,7 +371,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
             REDIS_HOST=localhost REDIS_PORT="${VISUALEX_REDIS_PORT:-6381}" REDIS_URL="$REDIS/0" RQ_REDIS_URL="$REDIS/1" \
             FALKORDB_HOST=localhost FALKORDB_PORT="${VISUALEX_FALKOR_PORT:-6382}" FALKORDB_GRAPH_NAME="${MERLT_GRAPH_NAME:-merl_t_legal}" \
             QDRANT_HOST=localhost QDRANT_PORT="${VISUALEX_QDRANT_PORT:-6343}" QDRANT_COLLECTION="${MERLT_QDRANT_COLLECTION:-merl_t_legal_chunks}" \
-            VISUALEX_API_URL=http://localhost:5000 \
+            VISUALEX_API_URL="http://localhost:$VISUALEX_API_PORT" \
             BFF_CALLBACK_URL=http://localhost:3001/api/merlt/internal/job-callback \
             BFF_EXTRACTION_CALLBACK_URL=http://localhost:3001/api/merlt/internal/extraction-callback \
             BFF_QA_CALLBACK_URL=http://localhost:3001/api/merlt/internal/qa-callback \
@@ -343,7 +398,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
 fi
 
 sleep 3
-echo -e "\n${GREEN}Running:${NC} Python API http://localhost:5000 · server http://localhost:3001 · web http://localhost:5173 · MCP http://localhost:3002/mcp"
+echo -e "\n${GREEN}Running:${NC} Python API http://localhost:$VISUALEX_API_PORT · server http://localhost:3001 · web http://localhost:5173 · MCP http://localhost:3002/mcp"
 [ "$MERLT_ENABLED" = "true" ] && echo -e "         MERL-T http://localhost:$MERLT_PORT"
 echo -e "${YELLOW}Ctrl+C stops everything (data stays in the volumes).${NC}\n"
 wait

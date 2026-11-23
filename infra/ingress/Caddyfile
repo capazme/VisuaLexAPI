@@ -12,10 +12,10 @@
 #   SCRAPERS_UPSTREAM   default scrapers:5000
 #   APP_SUBNET, EDGE_SUBNET   the subnets a forwarded client address is kept from
 #
-# Only the paths below reach the Python API. Its own /history, /dossiers… and
-# circuit-breaker pages stay unrouted: it keeps a global, unauthenticated history
-# and dossier file that were never meant for the outside. The paths that do reach it are
-# behind the login, except /version and /health (see the scrapers block).
+# Only the paths below reach the Python API; anything else stays unrouted. Its old global,
+# unauthenticated /history and /dossiers, and the circuit-breaker page of its unused twin,
+# were removed on 18 November 2026; paths.test.mjs keeps them out should they come back. The
+# paths that do reach it are behind the login, except /version and /health (see the scrapers block).
 
 {
 	admin off
@@ -53,6 +53,11 @@
 		reverse_proxy {$SERVER_UPSTREAM:server:3001}
 	}
 	handle /api/* {
+		# MERL-T's callbacks to the server come from inside the stack, with a secret of their
+		# own: they have no reason to be reachable from the network. Matched like introspection
+		# below: the exact path and anything under it, in any case.
+		@merltInternal path /api/merlt/internal /api/merlt/internal/*
+		respond @merltInternal 404
 		request_body {
 			max_size 10MB
 		}
@@ -87,8 +92,9 @@
 		respond 404
 	}
 
-	# The scrapers. The list below is the one Vite proxies to port 5000 in development,
-	# prefix for prefix; infra/ingress/paths.test.mjs keeps the two in step.
+	# The scrapers. The list below is the contract's (conventions/contract/legal-paths.json), the one
+	# Vite proxies to port 5000 in development, prefix for prefix; infra/ingress/paths.test.mjs keeps
+	# the two in step.
 	#
 	# Two of them stay open: /version and /health, exactly. Everything else asks the server
 	# first (forward_auth to GET /api/auth/verify, which answers 2xx for a signed-in user
@@ -104,7 +110,7 @@
 		}
 	}
 	@legal {
-		path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_rubriche* /fetch_alias_catalog* /fetch_decision* /fetch_decision_pdf* /search_decisions* /search_eu_case_law* /search_corte_cost_massime* /parse_query* /extract_citations* /export_pdf* /version* /health*
+		path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_recitals* /fetch_rubriche* /fetch_alias_catalog* /fetch_decision* /fetch_decision_pdf* /search_decisions* /search_eu_case_law* /fetch_rassegne* /search_rassegne* /parse_query* /fetch_norm_links* /extract_citations* /export_pdf* /version* /health*
 		not path /version /health
 	}
 	handle @legal {

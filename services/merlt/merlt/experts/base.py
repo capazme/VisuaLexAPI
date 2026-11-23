@@ -21,6 +21,7 @@ Ogni Expert:
 - Produce ExpertResponse strutturata con provenance
 """
 
+from merlt.config.llm_models import DEFAULT_EXPERT_MODEL
 import structlog
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -548,7 +549,7 @@ class BaseExpert(ABC):
         # only the fallback if the param is somehow absent from RuntimeConfig.
         from merlt.config.runtime_config import get_runtime_config
         self.model = get_runtime_config().get_str(
-            "expert_model", self.config.get("model", "google/gemini-2.5-flash")
+            "expert_model", self.config.get("model", DEFAULT_EXPERT_MODEL)
         )
         # experts.yaml max_tokens is now a real per-expert lever (was dead config:
         # the LLM call inherited the 128000 async default instead). 4096 fits any

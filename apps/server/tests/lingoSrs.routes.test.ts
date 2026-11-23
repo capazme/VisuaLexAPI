@@ -224,6 +224,17 @@ describe('the review routes', () => {
       expect((await session(a, 'DIRITTO_ALIENO')).status).toBe(400);
     });
 
+    it('answers 400 to a parameter it does not know, and to a course narrowed to a subject', async () => {
+      setClock(MONDAY_MORNING);
+      for (const query of [{ materia: 'DIRITTO_CIVILE', corso: 'c-1' }, { materia: 'DIRITTO_CIVILE', istituto: 'Contratto', modulo: 'm' }]) {
+        const response = await request(app).get(SESSION).query(query).set(a);
+        expect(response.status, JSON.stringify(query)).toBe(400);
+      }
+      // A course that is not the caller's (or the courses switched off) names nothing.
+      expect((await request(app).get(SESSION).query({ corso: 'c-1' }).set(a)).status).toBe(404);
+      expect((await request(app).get(SESSION).set(a)).status).toBe(200);
+    });
+
     describe('narrowed to one institute', () => {
       it('keeps the due and the new cards of that institute, own and community alike', async () => {
         setClock(MONDAY_MORNING);

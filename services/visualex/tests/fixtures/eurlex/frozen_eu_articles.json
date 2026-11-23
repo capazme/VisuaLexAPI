@@ -1,0 +1,106 @@
+{
+  "eprivacy_oj_legacy.html#art1": {
+    "length": 1220,
+    "sha256": "187bfa928c191413d5edd6d8f1806f8f9afa96128a9c955d28b9c505272f212f"
+  },
+  "eprivacy_oj_legacy.html#art10": {
+    "length": 1200,
+    "sha256": "ccf4b7bae5184af0e290905bff5a8aa6a7e3b7190c82d90accb772f1607ac462"
+  },
+  "eprivacy_oj_legacy.html#art11": {
+    "length": 274,
+    "sha256": "9fedc487d15247da388201303991caffd02443b26fad2c699962ba811b31f360"
+  },
+  "eprivacy_oj_legacy.html#art12": {
+    "length": 1674,
+    "sha256": "9ddb7dac40990677a3af0a9fea9ff5adcad006053075bc93c57453be94434d4a"
+  },
+  "eprivacy_oj_legacy.html#art13": {
+    "length": 2158,
+    "sha256": "e61c19176e6916ee1ef5762617c8820886fe760a654f9452ac26e1315ff48339"
+  },
+  "eprivacy_oj_legacy.html#art14": {
+    "length": 1435,
+    "sha256": "d0d1c0b0bd589d7e9b55fc799cdc728e7b84dac14c93dedfa5788103a098919a"
+  },
+  "eprivacy_oj_legacy.html#art15": {
+    "length": 1837,
+    "sha256": "1da56cecdfb35d22b15f8f17a18590df3079b75dd088ccd158dcd7a15e01fdc7"
+  },
+  "eprivacy_oj_legacy.html#art16": {
+    "length": 943,
+    "sha256": "4b3d54fd2101991074c565318160dd4e33d2ba8787f0dea4586bf35c576a2e18"
+  },
+  "eprivacy_oj_legacy.html#art17": {
+    "length": 699,
+    "sha256": "cdaeacff311910ab48036a91c2f515ecef90ee6ee8f1d8b48f49023e8f8b95a7"
+  },
+  "eprivacy_oj_legacy.html#art18": {
+    "length": 786,
+    "sha256": "d2768f9b5073c6ba799aa8765e38fad28a562dffdcfac29c143902a108eaba73"
+  },
+  "eprivacy_oj_legacy.html#art19": {
+    "length": 225,
+    "sha256": "973789d3eb56a8330c2e68eea42063e4496a58476cf8bec103fa2784a2dbcd8c"
+  },
+  "eprivacy_oj_legacy.html#art2": {
+    "length": 2266,
+    "sha256": "0d514b2cf34fd220396db02a397236027bb5a8ee196ca05eeea725670ac01b6b"
+  },
+  "eprivacy_oj_legacy.html#art20": {
+    "length": 144,
+    "sha256": "7fc2bd4c7c1e7142f08639503c8e85de376e2ad909600ca73ad79aaed5890f50"
+  },
+  "eprivacy_oj_legacy.html#art21": {
+    "length": 1009,
+    "sha256": "302f19505eb240a1b03901cf8ff13b1b5a6d047982cb9c2de2f042662f9af71d"
+  },
+  "eprivacy_oj_legacy.html#art3": {
+    "length": 701,
+    "sha256": "0823e4f353d9e05dfccba61a7a2a7fea1b9378b7a49ad1bbaea8b535bc8229a3"
+  },
+  "eprivacy_oj_legacy.html#art4": {
+    "length": 912,
+    "sha256": "9df7c137285cb2eaaecf9357b709d7222a53948d2a28c11278eb3c4bfa4a1fa0"
+  },
+  "eprivacy_oj_legacy.html#art5": {
+    "length": 1928,
+    "sha256": "f6a531b69ea3b43476ba899665f209aeeca07241aef3001b7c6f8056b86160a5"
+  },
+  "eprivacy_oj_legacy.html#art6": {
+    "length": 2509,
+    "sha256": "42c4b20c0e415287b4780473e024a4160d7a01d033d7a6807087f28e996f953d"
+  },
+  "eprivacy_oj_legacy.html#art7": {
+    "length": 488,
+    "sha256": "4259ab8372fe938f65c5f8412d1898763790f2f6afb1401d6e5fdc37b4846fad"
+  },
+  "eprivacy_oj_legacy.html#art8": {
+    "length": 2023,
+    "sha256": "afb169792851106e703acfc5bd0918441dc85b1fe3606e45f55d22b41c6249b5"
+  },
+  "eprivacy_oj_legacy.html#art9": {
+    "length": 1949,
+    "sha256": "018f1a8ea6d97dabc780625a1c153b1aecec067f45a6a43b0c62bbc4bf7059d3"
+  },
+  "gdpr_oj_trimmed.html#art1": {
+    "length": 587,
+    "sha256": "2dffab737ce1abdf49426d05a30ddecc4d8aa25d8c8d6ffeffc69078f011d6e6"
+  },
+  "gdpr_oj_trimmed.html#art17": {
+    "length": 2769,
+    "sha256": "efe982e1a22c2055cb75895ee337849829b91401d2ef9dbbe04d4a5947e9e302"
+  },
+  "gdpr_oj_trimmed.html#art2": {
+    "length": 1522,
+    "sha256": "23e79cc0ed45f837f7aa7cb5a47cc571c49c32970f00a1d66aec615d8f007488"
+  },
+  "gdpr_oj_trimmed.html#art3": {
+    "length": 1147,
+    "sha256": "b61e8eb72d8306a830ab9c353246203fd2bdc7ad962ac26cc522d7159606749e"
+  },
+  "gdpr_oj_trimmed.html#art4": {
+    "length": 9617,
+    "sha256": "78341d307e61a6d3c682d16af44e358de262b6173f8d8904480dc4202bb2f028"
+  }
+}

@@ -10,7 +10,8 @@ That runtime check covers the `ThrottledHttpClient` instances (the shared one
 and the decision readers' own), which carry the Normattiva tree too, and
 treextractor checks it before it starts a browser. Playwright's `page.goto()` in
 the EUR-Lex scraper and the PDF export never consults this module, no browser
-re-checks what a page loads, and the client does not re-check a redirect target.
+re-checks what a page loads. The client re-checks every redirect before it follows it
+(`http_client.redirect_guard`, on every session it makes).
 SECURITY.md ("Not yet covered") lists those gaps; do not describe this list as an
 enforced boundary until they are closed.
 

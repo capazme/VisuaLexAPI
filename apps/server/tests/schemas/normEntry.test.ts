@@ -62,4 +62,12 @@ describe('rebuildNormEntry', () => {
     expect(reason(['legge'])).toBe('Norma non leggibile');
     expect(reason({ tipo_atto: 'x'.repeat(500), numero_articolo: '1' })).toBe(`Tipo di atto non riconosciuto («${'x'.repeat(40)}…»)`);
   });
+
+  it('keeps a part of a split article by its commas, and refuses anything else there (G-387 (a))', () => {
+    const norm = { tipo_atto: 'legge', numero_atto: '296', data: '2006-12-27', numero_articolo: '1' };
+    expect(ok({ ...norm, parte: '701-800' }).parte).toBe('701-800');
+    expect(ok(norm)).not.toHaveProperty('parte');
+    expect(reason({ ...norm, parte: 'i commi utili' })).toMatch(/Parte dell’articolo non valida/);
+    expect(reason({ ...norm, parte: { dal: 701 } })).toMatch(/«parte»/);
+  });
 });

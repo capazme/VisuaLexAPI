@@ -3,17 +3,22 @@ import { Prisma, DossierItemType } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { boundedTags, boundedText, parseBody } from '../utils/bodyLimits';
 import { atMostUnits } from '../utils/utf16Length';
 import { AppError } from '../middleware/errorHandler';
+import { assertDossierRoom } from '../utils/dossierCaps';
 import { resolveReferences } from '../norms/resolveReference';
 import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '../norms/resolveDecisions';
 import { citeStoredAct } from '../norms/citation';
 import { citeDecision, citeStoredItem } from '../norms/decisionCitation';
 import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/decisionItem';
+import { isRecitalContent, rebuildRecitalEntry } from '../schemas/recitalEntry';
+import { citeRecital } from '../norms/recital';
 import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
 import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
 import { readableContent } from '../utils/publishedContent';
 import { assistantFieldsOf, assistantViewFor, type AssistantView } from '../assistant/notes';
+import { partOf } from '../norms/parts';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -29,10 +34,58 @@ const createdBy = (row: { createdByClientId: string | null; createdByClientName:
 type ItemRow = Prisma.DossierItemGetPayload<object>;
 
 /**
- * A dossier entry as every route answers it. `view` carries the assistant's notes for the user's session
- * (`assistantViewFor`): without it (an exchanged token, the switch off) both fields are null.
+ * Whether a note's text stays out of this answer (G-381 (b)): for a connected application whose token lacks
+ * `dossier:text`, or whose grant was approved before the words of that permission named the notes. The server is
+ * the gate; `apps/mcp` filters too.
  */
-function serializeItem(i: ItemRow, view: AssistantView | null) {
+const hidesNoteText = (req: Request): boolean => Boolean(req.delegation && !req.delegation.readsNotes);
+
+/**
+ * Whether a norm entry's content is cut to its identity in this answer: for a connected application whose token or
+ * grant lacks `dossier:text`. The consent page promises «il testo delle norme» only with that permission, and the web
+ * stores the article's text with the entry (`article_text`). The citation is computed from the whole content first,
+ * so it stays. The server is the gate, as for the notes; the MCP never reads a norm's content anyway.
+ */
+const hidesNormText = (req: Request): boolean => Boolean(req.delegation && !req.delegation.readsTexts);
+
+/** A norm entry's identity, as `schemas/normEntry.ts` reads it: nothing else. */
+const NORM_IDENTITY_KEYS = [
+  'tipo_atto', 'tipo_atto_reale', 'numero_atto', 'data', 'numero_articolo', 'allegato', 'versione', 'data_versione',
+  'parte', 'url', 'urn',
+] as const;
+
+type JsonObject = Record<string, Prisma.JsonValue | undefined>;
+const isObject = (value: unknown): value is JsonObject =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+function identityOf(norm: JsonObject): Record<string, Prisma.JsonValue> {
+  const kept: Record<string, Prisma.JsonValue> = {};
+  for (const key of NORM_IDENTITY_KEYS) {
+    const value = norm[key];
+    if (value !== undefined) kept[key] = value;
+  }
+  return kept;
+}
+
+/**
+ * A norm entry's content without its text: the identity, the older Forum shape's `articleRef` cut the same way, and the
+ * dossier's «important» mark rebuilt rather than copied. Anything that is not an object gives nothing: a gate that does
+ * not recognise what it holds lets none of it through.
+ */
+function normContentWithoutText(content: Prisma.JsonValue | null): Prisma.JsonValue | null {
+  if (!isObject(content)) return null;
+  const kept = identityOf(content);
+  if (isObject(content.articleRef)) kept.articleRef = identityOf(content.articleRef);
+  if (isObject(content._dossierMeta) && content._dossierMeta.important === true) kept._dossierMeta = { important: true };
+  return kept;
+}
+
+/**
+ * A dossier entry as every route answers it. `view` carries the assistant's notes for the user's session
+ * (`assistantViewFor`): without it (an exchanged token, the switch off) both fields are null. `hideNotes` drops a
+ * note's content (null), never a norm's or a decision's identity.
+ */
+function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false, hideNormText = false) {
   return {
     id: i.id,
     item_type: i.itemType,
@@ -42,7 +95,7 @@ function serializeItem(i: ItemRow, view: AssistantView | null) {
     citation: citeStoredItem(i.itemType, i.content),
     // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
     act_citation: citeStoredAct(i.itemType, i.content),
-    content: i.content,
+    content: hideNotes && i.itemType === 'note' ? null : hideNormText && i.itemType === 'norm' ? normContentWithoutText(i.content) : i.content,
     position: i.position,
     status: i.status,
     created_at: i.createdAt,
@@ -57,13 +110,15 @@ function serializeItem(i: ItemRow, view: AssistantView | null) {
 
 /** One entry's answer, with its view of the assistant's notes. */
 export async function serializeItemFor(req: Request, item: ItemRow) {
-  return serializeItem(item, await assistantViewFor(req, [item]));
+  return serializeItem(item, await assistantViewFor(req, [item]), hidesNoteText(req), hidesNormText(req));
 }
 
 /** Dossiers' answers, with one view of the assistant's notes for all their entries. */
 async function serializeDossiersFor(req: Request, dossiers: Parameters<typeof serializeDossier>[0][]) {
   const view = await assistantViewFor(req, dossiers.flatMap((d) => d.items));
-  return dossiers.map((d) => serializeDossier(d, view));
+  const hideNotes = hidesNoteText(req);
+  const hideNormText = hidesNormText(req);
+  return dossiers.map((d) => serializeDossier(d, view, hideNotes, hideNormText));
 }
 
 /**
@@ -83,6 +138,8 @@ type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean;
 function serializeDossier(
   d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null; _count: { tasks: number } },
   view: AssistantView | null,
+  hideNotes = false,
+  hideNormText = false,
 ) {
   return {
     id: d.id,
@@ -107,7 +164,7 @@ function serializeDossier(
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),
-    items: d.items.map((item) => serializeItem(item, view)),
+    items: d.items.map((item) => serializeItem(item, view, hideNotes, hideNormText)),
     // Its planner tasks, done and trashed ones too: all go to the trash with the dossier. A count, never
     // a title: a connected application reads it to tell the user, in the deletion's confirmation.
     task_count: d._count.tasks,
@@ -120,38 +177,38 @@ const dossierKindSchema = z.enum(['lavoro', 'studio']);
 const createDossierSchema = z.object({
   // In UTF-16 units, as the Forum counts a published dossier's title (`LIMITS.title`).
   name: z.string().min(1).refine(...atMostUnits(200)),
-  description: z.string().optional(),
-  color: z.string().optional(),
-  tags: z.array(z.string()).optional(),
+  description: boundedText(5_000, 'descrizione').optional(),
+  color: boundedText(50, 'colore').optional(),
+  tags: boundedTags(50, 100).optional(),
   kind: dossierKindSchema.optional(),
 });
 
 const updateDossierSchema = z.object({
   name: z.string().min(1).refine(...atMostUnits(200)).optional(),
-  description: z.string().optional().nullable(),
-  color: z.string().optional().nullable(),
-  tags: z.array(z.string()).optional(),
+  description: boundedText(5_000, 'descrizione').optional().nullable(),
+  color: boundedText(50, 'colore').optional().nullable(),
+  tags: boundedTags(50, 100).optional(),
   isPinned: z.boolean().optional(),
   kind: dossierKindSchema.optional(),
 });
 
 const createDossierItemSchema = z.object({
   itemType: z.enum(['norm', 'note', 'section', 'sentenza']),
-  title: z.string().min(1),
+  title: boundedText(1_000, 'titolo').min(1),
   content: z.any().optional(),
   position: z.number().optional(),
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
 });
 
 const updateDossierItemSchema = z.object({
-  title: z.string().min(1).optional(),
+  title: boundedText(1_000, 'titolo').min(1).optional(),
   content: z.any().optional(),
   position: z.number().optional(),
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
   // A note's article (or null to detach it): how the web app reattaches a note
   // to an article it restored with a new id. User session only: this route is
   // not in the delegated table, so a connected application cannot move notes.
-  aboutItemId: z.string().min(1).max(64).nullable().optional(),
+  aboutItemId: boundedText(64, 'articolo della nota').min(1).nullable().optional(),
 });
 
 const moveDossierItemSchema = z.object({
@@ -193,19 +250,22 @@ export const getDossier = async (req: Request, res: Response) => {
  * Create new dossier
  */
 export const createDossier = async (req: Request, res: Response) => {
-  const data = createDossierSchema.parse(req.body);
+  const data = parseBody(createDossierSchema, req.body);
 
-  const dossier = await prisma.dossier.create({
-    data: {
-      name: data.name,
-      description: data.description,
-      color: data.color,
-      tags: data.tags ?? [],
-      kind: data.kind ?? 'lavoro',
-      userId: req.user!.id,
-      ...provenanceFromRequest(req),
-    },
-    include: DOSSIER_INCLUDE,
+  const dossier = await prisma.$transaction(async (tx) => {
+    await assertDossierRoom(tx, req.user!.id, { dossiers: 1 });
+    return tx.dossier.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        color: data.color,
+        tags: data.tags ?? [],
+        kind: data.kind ?? 'lavoro',
+        userId: req.user!.id,
+        ...provenanceFromRequest(req),
+      },
+      include: DOSSIER_INCLUDE,
+    });
   });
 
   res.status(201).json((await serializeDossiersFor(req, [dossier]))[0]);
@@ -216,7 +276,7 @@ export const createDossier = async (req: Request, res: Response) => {
  */
 export const updateDossier = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const data = updateDossierSchema.parse(req.body);
+  const data = parseBody(updateDossierSchema, req.body);
 
   // Check ownership
   const existing = await prisma.dossier.findFirst({
@@ -259,7 +319,7 @@ export const importStudyDossiersRoute = async (req: Request, res: Response) => {
   const data = importStudySchema.parse(req.body);
   if (JSON.stringify(data.content ?? null).length > 1024 * 1024) throw new AppError(400, 'Il contenuto supera la dimensione massima (1 MB).');
   const { content, refused } = readableContent(data.content);
-  if (content.dossiers.length === 0) throw new AppError(400, 'Nessun dossier leggibile da aggiungere.');
+  if (content.dossiers.length === 0) throw new AppError(400, 'Nessuna pratica leggibile da aggiungere.');
   await spendStudyImport(req.user!.id);
   const report = await importStudyDossiers(req.user!.id, content, {
     addNotes: data.addNotes,
@@ -283,15 +343,33 @@ export const deleteDossier = async (req: Request, res: Response) => {
   res.json(await trashDossier(req.user!.id, req.params.id, null, BY_THE_USER));
 };
 
+const ARTICLE_OR_RECITAL = 'Una voce resta un articolo o un considerando: aggiungila di nuovo.';
+
+/**
+ * A recital's content (a `norm` entry with the key `considerando`, spec 2026-11-17 §6.2, G-538),
+ * closed and checked, with its title: the citation, set here on every write that carries content.
+ * A content that does not hold is a 400 in the fixture's words.
+ */
+function recitalItem(content: unknown): { content: Prisma.InputJsonObject; title: string } {
+  const recital = rebuildRecitalEntry(content);
+  if (!recital.ok) throw new AppError(400, recital.reason);
+  return {
+    content: { ...recital.entry, ...(recital.star ? { _dossierMeta: recital.star } : {}) },
+    title: citeRecital(recital.entry),
+  };
+}
+
 /**
  * Add item to dossier
  */
 export const addDossierItem = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const data = createDossierItemSchema.parse(req.body);
+  const data = parseBody(createDossierItemSchema, req.body);
 
   // A decision's content is its identity: checked before anything is written (design 2026-10-01 §6).
   const decision = data.itemType === 'sentenza' ? parseDecisionItemContent(data.content) : null;
+  // So is a recital's (spec 2026-11-17 §6.2).
+  const recital = data.itemType === 'norm' && isRecitalContent(data.content) ? recitalItem(data.content) : null;
 
   // Check ownership
   const dossier = await prisma.dossier.findFirst({
@@ -302,22 +380,23 @@ export const addDossierItem = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  // Get max position
-  const maxPos = await prisma.dossierItem.aggregate({
-    where: { dossierId: id },
-    _max: { position: true },
-  });
-
-  const item = await prisma.dossierItem.create({
-    data: {
-      dossierId: id,
-      itemType: data.itemType as DossierItemType,
-      title: decision ? decision.etichetta : data.title,
-      content: decision ?? (data.content || null),
-      position: data.position ?? (maxPos._max.position ?? -1) + 1,
-      ...(data.status !== undefined && { status: data.status }),
-      ...provenanceFromRequest(req),
-    },
+  const item = await prisma.$transaction(async (tx) => {
+    await assertDossierRoom(tx, req.user!.id, { items: 1, into: { dossierId: id, items: 1 } });
+    const maxPos = await tx.dossierItem.aggregate({
+      where: { dossierId: id },
+      _max: { position: true },
+    });
+    return tx.dossierItem.create({
+      data: {
+        dossierId: id,
+        itemType: data.itemType as DossierItemType,
+        title: decision ? decision.etichetta : recital ? recital.title : data.title,
+        content: decision ?? recital?.content ?? (data.content || null),
+        position: data.position ?? (maxPos._max.position ?? -1) + 1,
+        ...(data.status !== undefined && { status: data.status }),
+        ...provenanceFromRequest(req),
+      },
+    });
   });
 
   res.status(201).json(await serializeItemFor(req, item));
@@ -330,7 +409,7 @@ export const addDossierItem = async (req: Request, res: Response) => {
  */
 async function assertArticleOfDossier(dossierId: string, itemId: string): Promise<void> {
   const article = await prisma.dossierItem.findFirst({ where: { id: itemId, dossierId, itemType: 'norm' } });
-  if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questo dossier.');
+  if (!article) throw new AppError(400, 'La voce indicata non è un articolo di questa pratica.');
 }
 
 export const MAX_NOTE_LENGTH = 4000;
@@ -366,6 +445,7 @@ export const addDossierNote = async (req: Request, res: Response) => {
   if (aboutItemId) await assertArticleOfDossier(id, aboutItemId);
 
   const item = await prisma.$transaction(async (tx) => {
+    await assertDossierRoom(tx, req.user!.id, { items: 1, into: { dossierId: id, items: 1 } });
     const last = await tx.dossierItem.aggregate({ where: { dossierId: id }, _max: { position: true } });
     return tx.dossierItem.create({
       data: {
@@ -391,7 +471,7 @@ export const addDossierNote = async (req: Request, res: Response) => {
  */
 export const updateDossierItem = async (req: Request, res: Response) => {
   const { id, itemId } = req.params;
-  const data = updateDossierItemSchema.parse(req.body);
+  const data = parseBody(updateDossierItemSchema, req.body);
 
   // Check ownership
   const dossier = await prisma.dossier.findFirst({
@@ -425,6 +505,21 @@ export const updateDossierItem = async (req: Request, res: Response) => {
         data.content = decision;
         data.title = decision.etichetta;
       } else {
+        delete data.title;
+      }
+    }
+    // A recital stays a recital and an article an article (spec 2026-11-17 §6.2): its content is
+    // checked and its title is its citation, as for a decision.
+    if (existing?.itemType === 'norm') {
+      const storedRecital = isRecitalContent(existing.content);
+      if (data.content !== undefined) {
+        if (isRecitalContent(data.content) !== storedRecital) throw new AppError(400, ARTICLE_OR_RECITAL);
+        if (storedRecital) {
+          const recital = recitalItem(data.content);
+          data.content = recital.content;
+          data.title = recital.title;
+        }
+      } else if (storedRecital) {
         delete data.title;
       }
     }
@@ -502,6 +597,8 @@ export const moveDossierItem = async (req: Request, res: Response) => {
 
   try {
     const item = await prisma.$transaction(async (tx) => {
+      // Moved within the account: the target's cap counts, the account's total does not change.
+      await assertDossierRoom(tx, req.user!.id, { into: { dossierId: target.id, items: 1 } });
       // Read the append slot in the same transaction as the write. Under
       // Postgres' default isolation two moves arriving together can still read
       // the same max and claim the same position — the client sends one move at
@@ -620,7 +717,7 @@ const addNormsSchema = z.object({
 
 type NormOutcome = 'added' | 'already_present' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
 
-type NormIdentityFields = { urn: string; numero_articolo: string; allegato: string | null };
+type NormIdentityFields = { urn: string; numero_articolo: string; allegato: string | null; parte?: string };
 
 /**
  * Which article of which act a stored norm is. The urn alone is not enough:
@@ -632,7 +729,9 @@ type NormIdentityFields = { urn: string; numero_articolo: string; allegato: stri
 function normIdentity(norm: Partial<NormIdentityFields>): string | null {
   if (typeof norm.urn !== 'string') return null;
   const article = typeof norm.numero_articolo === 'string' ? norm.numero_articolo.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2') : '';
-  return `${norm.urn}|${norm.allegato ?? ''}|${article}`;
+  // A part of a split article is another entry than its article (G-387 (a)); the first part has no `parte`.
+  const part = partOf(norm.parte) ? `|${norm.parte}` : '';
+  return `${norm.urn}|${norm.allegato ?? ''}|${article}${part}`;
 }
 
 /**
@@ -679,6 +778,7 @@ export const addDossierNorms = async (req: Request, res: Response) => {
 
   if (toCreate.length > 0) {
     const created = await prisma.$transaction(async (tx) => {
+      await assertDossierRoom(tx, req.user!.id, { items: toCreate.length, into: { dossierId: dossier.id, items: toCreate.length } });
       const last = await tx.dossierItem.aggregate({ where: { dossierId: dossier.id }, _max: { position: true } });
       let position = (last._max.position ?? -1) + 1;
       const rows = [];
@@ -747,13 +847,17 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
   );
 
   type DecisionResult = {
-    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; detail?: string; itemId?: string;
+    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; candidates?: string[]; detail?: string; itemId?: string;
   };
   const toCreate: number[] = [];
   const results: DecisionResult[] = resolutions.map((resolution, index): DecisionResult => {
     const base = { reference: references[index], ...(resolution.detail ? { detail: resolution.detail } : {}) };
     if (resolution.outcome !== 'resolved') {
-      return { ...base, outcome: resolution.outcome, ...(resolution.court ? { court: resolution.court } : {}) };
+      return {
+        ...base, outcome: resolution.outcome,
+        ...(resolution.court ? { court: resolution.court } : {}),
+        ...(resolution.candidates ? { candidates: resolution.candidates } : {}),
+      };
     }
     const decision = resolution.decision!;
     const citation = citeDecision(decision);
@@ -776,6 +880,10 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
         const parsed = decisionItemContentSchema.safeParse(item.content);
         return parsed.success ? [decisionKeyOf(parsed.data)] : [];
       }));
+      // The caps, on what this call will add: a decision already present adds nothing. The reads above take no lock,
+      // so the account's row is still the first lock of this transaction.
+      const adding = toCreate.filter((index) => !kept.has(resolutions[index].key!)).length;
+      await assertDossierRoom(tx, req.user!.id, { items: adding, into: { dossierId: dossier.id, items: adding } });
       const last = await tx.dossierItem.aggregate({ where: { dossierId: dossier.id }, _max: { position: true } });
       let position = (last._max.position ?? -1) + 1;
       const rows: { index: number; id: string }[] = [];

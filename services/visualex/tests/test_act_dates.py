@@ -8,7 +8,7 @@ import pytest
 from app import NormaController
 from visualex_api.services import act_dates
 from visualex_api.services.http_client import HttpResult
-from visualex_api.tools.exceptions import NetworkError, ValidationError
+from visualex_api.tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 
 # The shape Normattiva gives every act page's title (measured on eight kinds, 2 Oct 2026).
 PAGE = """<html><head><title>LEGGE 4 maggio 1983, n. 184 - Normattiva</title></head><body>
@@ -393,6 +393,63 @@ class TestCompleteYear:
             assert await act_dates.complete_year("decreto legislativo", "2001", "231") == "2001-06-08"
 
 
+class TestLookupYear:
+    """Why a year stood (/fetch_norm_links): the source silent or slow is «try again»
+    (`unavailable`), the source answering with no date for this act is «complete the date»."""
+
+    @pytest.mark.parametrize("failure", [
+        NetworkError("down", status_code=503),          # the network, after the client's retries
+        NetworkError("paused", status_code=429),        # Normattiva asked to wait
+        RuntimeError("bug"),                             # anything else: the act was not told
+    ])
+    async def test_a_failure_is_unavailable(self, cache, failure):
+        with patch.object(act_dates.http_client, "request", new=AsyncMock(side_effect=failure)):
+            assert await act_dates.lookup_year("decreto legislativo", "2001", "231") == ("2001", True)
+
+    async def test_a_timeout_is_unavailable(self, cache, monkeypatch):
+        monkeypatch.setattr(act_dates, "LOOKUP_BUDGET", 0.05)
+
+        async def slow(*args, **kwargs):
+            await asyncio.sleep(5)
+
+        with patch.object(act_dates.http_client, "request", new=AsyncMock(side_effect=slow)):
+            assert await act_dates.lookup_year("decreto legislativo", "2001", "231") == ("2001", True)
+
+    @pytest.mark.parametrize("answer", [
+        AsyncMock(return_value=ok_page("DECRETO LEGISLATIVO 8 giugno 2002, n. 231")),   # another act's page
+        AsyncMock(return_value=HttpResult(text="<html></html>", status=200, headers={})),  # no title
+        AsyncMock(side_effect=DocumentNotFoundError("no page", urn="x")),               # no page (404)
+    ])
+    async def test_found_nothing_is_not_unavailable(self, cache, answer):
+        with patch.object(act_dates.http_client, "request", new=answer):
+            assert await act_dates.lookup_year("decreto legislativo", "2001", "231") == ("2001", False)
+
+    async def test_what_cannot_be_told_is_not_unavailable(self, cache):
+        request = AsyncMock(side_effect=AssertionError("no request may be made"))
+        with patch.object(act_dates.http_client, "request", new=request):
+            assert await act_dates.lookup_year("decreto ministeriale", "2014", "55") == ("2014", False)
+
+    async def test_the_acts_day(self, cache):
+        request = AsyncMock(return_value=real_page("resolver_dlgs231_2001_title_trimmed.html"))
+        with patch.object(act_dates.http_client, "request", new=request):
+            assert await act_dates.lookup_year("decreto legislativo", "2001", "231") == ("2001-06-08", False)
+
+    async def test_complete_year_is_its_date(self, cache):
+        with patch.object(act_dates.http_client, "request", new=AsyncMock(side_effect=NetworkError("down"))):
+            assert await act_dates.complete_year("decreto legislativo", "2001", "231") == "2001"
+
+    async def test_read_request_date_carries_it(self):
+        from visualex_api.tools.urngenerator import read_request_date
+
+        unavailable = AsyncMock(return_value=act_dates.YearLookup("2001", True))
+        with patch("visualex_api.tools.urngenerator.lookup_year", new=unavailable):
+            assert await read_request_date("decreto legislativo", "2001", "231") == ("2001", True)
+            assert await read_request_date("legge", "7 agosto 1990", "241") == ("1990-08-07", False)
+            assert await read_request_date("legge", None, "241") == (None, False)
+            assert await read_request_date("legge", "1990", None) == ("1990", False)
+        assert unavailable.await_count == 1
+
+
 class TestCompleteRequestDate:
     NO_LOOKUP = AsyncMock(side_effect=AssertionError("no lookup may be made"))
 
@@ -448,28 +505,3 @@ class TestTheNormBuiltFromAYear:
         response = await client.post("/fetch_norma_data", json={
             "act_type": "legge", "act_number": "241", "date": "7 agostissimo 1990", "article": "2"})
         assert response.status_code == 400
-
-
-class TestTheApiTwinBuildsTheNorm:
-    """The /api server (visualex_api/app.py) shares the date step. It used to spell a completed
-    date in words, which Norma refuses: every act of the five looked-up types was a 500."""
-
-    async def _norm(self, data, lookup=AsyncMock(return_value="2001-06-08")):
-        from visualex_api.app import NormaController as ApiController
-
-        with patch("visualex_api.tools.urngenerator.complete_year", new=lookup):
-            return await ApiController().create_norma_visitata_from_data({**data, "annex": ""})
-
-    async def test_a_year_gets_the_acts_own_day(self):
-        [nv] = await self._norm({"act_type": "decreto legislativo", "act_number": "231", "date": "2001", "article": "5"})
-        assert nv.norma.data == "2001-06-08"
-
-    @pytest.mark.parametrize("data,expected", [
-        ({"act_type": "legge", "act_number": "241", "date": "1990-08-07", "article": "2"}, "1990-08-07"),
-        ({"act_type": "codice civile", "article": "2043"}, "1942-03-16"),
-        ({"act_type": "regolamento ue", "act_number": "679", "date": "2016", "article": "5"}, "2016"),
-    ])
-    async def test_other_dates_build_too(self, data, expected):
-        lookup = AsyncMock(return_value="2016")
-        [nv] = await self._norm(data, lookup)
-        assert nv.norma.data == expected

@@ -350,12 +350,16 @@ class VisualexTreeAdapter:
             by_numero = {r.norma_data.get("numero_articolo"): r for r in results if r.norma_data}
             for numero in chunk:
                 result = by_numero.get(numero)
-                if result is None or result.error or not result.text:
+                # The AKN fallback (scan A.7) is not the article's text (root CLAUDE.md,
+                # rule 23): skipped as unread, never stored, read again on the next run.
+                akn = result is not None and getattr(result, "text_source", "html") == "akn"
+                if result is None or result.error or not result.text or akn:
                     log.warning(
                         "visualex_tree.article_fetch_failed",
                         act_type=act_type,
                         numero_articolo=numero,
-                        error=(result.error if result else "missing from response"),
+                        error=(result.error or ("AKN fallback, not the article's text" if akn else None))
+                        if result else "missing from response",
                     )
                     failed.append(numero)
                     continue

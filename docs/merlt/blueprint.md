@@ -393,7 +393,8 @@ quindi un cambio ha effetto dalla query successiva:
 
 - **Modello LLM** (editabile a caldo): `expert_model` (analisi+sintesi, default
   `anthropic/claude-sonnet-4.5`), `react_decision_model` (scelta tool nel ReAct, default
-  `google/gemini-2.5-flash`).
+  `google/gemini-3.5-flash-lite`). Solo modelli con un fornitore a conservazione zero, elencati in
+  `services/merlt/merlt/config/llm_models.py` (G-575): ogni chiamata rifiuta gli altri.
 - **Manopole**: `gating_confidence_threshold` (0.7), `llm_max_tokens` (4096), `max_experts` (4),
   `disagreement_model_enabled` (false), `tool_gating_ab_ratio` (0.0).
 - **Stato di costruzione** (richiede `POST /admin/engine/reinitialize`): `react_enabled`,
@@ -747,8 +748,9 @@ Due livelli di controllo, con doppia difesa (gate FE + guard BFF):
 ### 6.1 Superficie API (inventario dei router)
 
 Tutti i router sono montati con `prefix="/api/v1"` + il prefix interno. `/health` e `/` sono gli unici a
-livello root. Legenda auth: **PUB** = nessuna dipendenza; **OPT** = `verify_api_key` *softato* (non
-blocca, vedi 6.6); **ADMIN** = `require_role("admin")` (blocca davvero).
+livello root. Dalla correzione A.2 ogni router è incluso dietro `verify_api_key` (vedi 6.6). Legenda auth:
+**PUB** = nessuna dipendenza propria (resta la chiave); **OPT** = chiave richiesta, nessun ruolo; **ADMIN** =
+`require_role("admin")` (chiave e ruolo admin).
 
 **Router BFF-facing (usati da VisuaLex):**
 
@@ -767,7 +769,7 @@ blocca, vedi 6.6); **ADMIN** = `require_role("admin")` (blocca davvero).
 |---|---|---|---|
 | `rlcf_router` | `/rlcf` | `POST /training/{start,stop}`, `GET /training/status`, `/buffer/status`, `/policies/{weights,history}` (entrambi leggono `weight_versions`; `history` tramite `WeightStore.list_versions`, dal più vecchio), `WS /training/stream` | start/stop **ADMIN** |
 | `training_router` | `/training` | scheduler autopilota legacy (`/start`, `/pause`, `/config`, `/add-experience`) | pause/config **ADMIN** |
-| `admin_router` | `/admin` | `GET/PUT /config[/{key}]`, `POST /engine/reinitialize`, `/graph/hygiene` | **OPT** (dichiara solo `verify_api_key`: a monte è aperto, il solo cancello è `requireAdmin` del BFF, quindi `:8000` non va mai esposto) |
+| `admin_router` | `/admin` | `GET/PUT /config[/{key}]`, `POST /engine/reinitialize`, `/graph/hygiene` | **OPT** (chiave richiesta, nessun ruolo; lato BFF lo protegge anche `requireAdmin`) |
 | `ingestion_mechanical_router` | `/ingestion/mechanical` | `POST /run`, `GET /batches[/{id}]`, `POST /batches/{id}/{promote,reject}` | **ADMIN** |
 | `enrichment_router` | `/enrichment` | live enrichment, `propose/validate entity/relation`, `confirm-source`, pending, issue tracking | perlopiù OPT |
 | `quarantine_router` | `/feedback` | `POST /{id}/{flag,quarantine,approve}`, `GET /{flagged,quarantined}` | **ADMIN** |
@@ -824,7 +826,7 @@ obbligatorio su Linux/prod).
 | `FALKORDB_HOST/PORT` | localhost/6380 → container `falkordb:6379` | Grafo |
 | `QDRANT_HOST/PORT` | localhost/6333 | Vettori |
 | `MERLT_INTERNAL_SECRET` | `dev-internal-secret` | Callback worker/api↔BFF |
-| `MERLT_API_KEY` (BFF) / `MERLT_ADMIN_API_KEY` (api) | — | Ogni client BFF la invia come `X-API-Key` quando è impostata. Serve davvero solo alle route `require_role("admin")` (`/rlcf/training/{start,stop}`, `/ingestion/mechanical/*`). L'api la semina al boot come chiave `admin` |
+| `MERLT_API_KEY` (BFF) / `MERLT_ADMIN_API_KEY` (api) | — | Ogni client BFF la invia come `X-API-Key` quando è impostata. La chiede ogni route di MERL-T tranne `/health` e `/`. L'api la semina al boot come chiave `admin` e disattiva le altre |
 | `MERLT_RLCF_BUFFER_PATH` | `checkpoints/rlcf/replay_buffer.json` (compose: `/app/checkpoints/rlcf/replay_buffer.json`) | Replay buffer RLCF durevole |
 | `MERLT_EXTRACT_JOB_TIMEOUT` | 1800 | `job_timeout` RQ dell'estrazione appunti (sull'api, che accoda) |
 | `QDRANT_COLLECTION` | `<FALKORDB_GRAPH_NAME>_chunks` → `merl_t_legal_chunks` | Collection dei chunk (`storage/vectors/collection.py`) |
@@ -853,12 +855,10 @@ restano il registro per i DB che tracciano la storia, e vanno lanciate a mano.
 
 ### 6.6 Sicurezza: il trust boundary è il BFF
 
-`app.py` esegue `app.dependency_overrides[verify_api_key] = optional_api_key`: **ogni endpoint che
-dichiara `verify_api_key` diventa di fatto opzionale** — senza `X-API-Key` la richiesta passa. La
-superficie MERL-T **non è protetta a monte**; il vero cancello è `require_role("admin")` (blocca 401/403)
-e, soprattutto, **il BFF Node**, che autentica via JWT e inietta `user_id`. Regola: progetta qualsiasi
-nuovo endpoint sensibile assumendo che `verify_api_key` **non** filtri, e non esporre `:8000`
-direttamente.
+Ogni route di MERL-T chiede la chiave (scan A.2): `app.py` include ogni router dietro `verify_api_key`;
+restano aperte solo `/health` e `/`. Senza chiave configurata ogni route risponde 401. La chiave è una
+sola, seminata all'avvio da `MERLT_ADMIN_API_KEY`, che disattiva tutte le altre; nessuna route la
+consegna. Il BFF Node resta il cancello per l'utente: autentica via JWT e inietta `user_id`.
 
 **Immagine baked-at-build:** il codice `services/merlt/` è dentro l'immagine (solo `data/` è volume-montato).
 Modifiche al codice Python richiedono `docker compose -f infra/compose.yml --profile merlt build` + recreate — non

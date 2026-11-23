@@ -213,7 +213,9 @@ def test_the_tracking_route_answers_503_and_keeps_nothing_when_the_store_is_down
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from merlt.api.auth import optional_api_key, verify_api_key
+    from types import SimpleNamespace
+
+    from merlt.api.auth import verify_api_key
     from merlt.rlcf.database import get_async_session_dep
 
     tr = importlib.import_module("merlt.api.tracking_router")
@@ -231,7 +233,7 @@ def test_the_tracking_route_answers_503_and_keeps_nothing_when_the_store_is_down
         yield None
 
     app.dependency_overrides[get_async_session_dep] = no_session
-    app.dependency_overrides[verify_api_key] = optional_api_key
+    app.dependency_overrides[verify_api_key] = lambda: SimpleNamespace(role="admin", user_id="svc")
     response = TestClient(app).post(
         "/api/v1/tracking/events",
         json={"events": [{"type": "annotation:created", "data": {"user_id": "u", "note_text": "n"}, "timestamp": 1}]},

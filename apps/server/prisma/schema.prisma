@@ -33,6 +33,26 @@ model User {
   threadVotes           ArticleThreadVote[]
   commentVotes          ArticleCommentVote[]
   threadReports         ArticleThreadReport[]
+  // The Community (spec 2026-10-20-forum-community-glosse-design): reports on replies, the glosse a
+  // moderator locked, the reports a moderator closed, the user's notifications, the moderation acts.
+  commentReports         ArticleCommentReport[]
+  lockedThreads          ArticleThread[]           @relation("ArticleThreadLockedBy")
+  resolvedThreadReports  ArticleThreadReport[]     @relation("ArticleThreadReportResolvedBy")
+  resolvedCommentReports ArticleCommentReport[]    @relation("ArticleCommentReportResolvedBy")
+  forumNotifications     ForumNotification[]
+  forumModerationActs    ForumModerationLog[]
+  // The Forum's profile (spec 2026-11-14-forum-community-server-design §B), the reports «non è chi dice di
+  // essere» the person made, and those an owner closed.
+  forumProfile           ForumProfile?
+  forumProfileReports    ForumProfileReport[]      @relation("ForumProfileReporter")
+  resolvedProfileReports ForumProfileReport[]      @relation("ForumProfileReportResolvedBy")
+  // The Forum's communities (spec §C): the person's roles per subject, the ones they appointed, the
+  // validations they gave, their appeals and the ones they decided.
+  forumSubjectRoles      ForumSubjectRole[]        @relation("ForumSubjectRoleHolder")
+  appointedSubjectRoles  ForumSubjectRole[]        @relation("ForumSubjectRoleAppointedBy")
+  forumValidations       ForumValidation[]
+  forumAppeals           ForumAppeal[]             @relation("ForumAppealAuthor")
+  decidedForumAppeals    ForumAppeal[]             @relation("ForumAppealDecidedBy")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
@@ -78,11 +98,17 @@ model User {
   lingoPreferenzeStudio LingoPreferenzeStudio?
   lingoGiornateStudio   LingoGiornataStudio[]
   lingoCreditiXp        LingoCreditoXp[]
+  lingoLezioni          LingoLezione[]
+  // Gymnasium's courses (Percorsi, A1): the ones this user wrote, and their enrolments.
+  lingoCorsi            LingoCorso[]
+  lingoIscrizioni       LingoCorsoIscrizione[]
 
   // LingoLex validation: set by an administrator; the votes this user cast (kept,
   // anonymous, when the account goes), the notice versions they wrote (same) and
   // the ones they accepted (removed with the account).
   lingoValidatore       Boolean                  @default(false) @map("lingo_validatore")
+  // The Community's moderators (G-266): set by an administrator, with a reason in the moderation log.
+  forumModerator        Boolean                  @default(false) @map("forum_moderator")
   lingoValidazioni      LingoValidazioneCard[]
   lingoTestiScritti     LingoTestoVersione[]
   lingoAccettazioni     LingoAccettazioneTesto[]
@@ -104,9 +130,37 @@ model User {
 
   // The planner's tasks (wave 1): the ones the user owns, and the ones assigned to them (empty until wave 4)
   tasks         Task[] @relation("TaskOwner")
+  atti          Atto[]
   assignedTasks Task[] @relation("TaskAssignee")
+  // A case's act files, its instructions for Claude and their access log (LC50): they go with the account.
+  praticaFiles      PraticaFile[]
+  praticaIstruzioni PraticaIstruzioni[]
+  praticaAccessi    PraticaFileAccesso[]
+
+  // The web's sessions (A.1, spec 2026-11-16-web-session-cookies-design): they go with the account.
+  webSessions WebSession[]
 
   @@map("users")
+}
+
+/// A signed-in browser (A.1, spec 2026-11-16-web-session-cookies-design). The browser holds a random secret in an
+/// HttpOnly cookie; only its SHA-256 is kept here. Valid while now < expires_at and now < last_used_at + the idle
+/// limit, for an active user. Deleting the row ends the session at its next request. No IP address, and no raw
+/// User-Agent: `label` is the browser and system family («Firefox su macOS»), derived once at sign-in.
+model WebSession {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  secretHash String   @unique @map("secret_hash")
+  label      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+  expiresAt  DateTime @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("web_sessions")
 }
 
 enum MerltConsentLevel {
@@ -422,7 +476,8 @@ model Highlight {
   id          String   @id @default(uuid())
   normaKey    String   @map("norma_key")
   text        String // Highlighted text
-  color       String   @default("yellow") // yellow, green, red, blue
+  // yellow, green, red, blue; null only for a gloss (a CHECK in the migration)
+  color       String?  @default("yellow")
   startOffset Int      @map("start_offset")
   endOffset   Int      @map("end_offset")
   note        String? // Optional note
@@ -453,6 +508,9 @@ model Highlight {
   reviewComment        String?             @map("review_comment")
   noteEditedAt         DateTime?           @map("note_edited_at")
   noteEditedBy         String?             @map("note_edited_by")
+  // D8: a `gloss` is an assistant's note on a passage with no colour (a coloured mark is the user's gesture);
+  // every other row is a `mark`. A gloss always has a state and a note that is not empty (CHECKs in the migration).
+  kind                 HighlightKind       @default(mark)
 
   // Relationships
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -465,6 +523,12 @@ model Highlight {
   @@index([normaKey])
   @@index([userId, dossierItemId])
   @@map("highlights")
+}
+
+// What a highlight row is (D8): a coloured mark, the user's or a D7b proposal, or an assistant's gloss on a passage.
+enum HighlightKind {
+  mark
+  gloss
 }
 
 // The state of a note written by an assistant (D7b): yellow, green, red. The user's own notes have none.
@@ -515,8 +579,12 @@ model Dossier {
   snapshots        DossierSnapshot[]
   // The planner's tasks filed under this dossier (the dossier is the project, answer 1).
   tasks            Task[]
+  // The acts drafted on this dossier (Atti, draft for Alfred): SetNull when the dossier goes.
+  atti             Atto[]
   // Its copy in the Forum, if published: seen by its owner only, never in the public content.
   publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
+  // The course enrolments that study it (Percorsi, A1): SetNull when the dossier goes.
+  lingoIscrizioni  LingoCorsoIscrizione[]
   sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
   originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
@@ -617,20 +685,51 @@ model ArticleThread {
   passageReleasedById String?   @map("passage_released_by")
   title       String
   body        String
-  userId      String   @map("user_id")
+  // Null once the author's account is gone: the glossa stays, «utente cancellato» (G-307).
+  userId              String?       @map("user_id")
   isHidden    Boolean  @default(false) @map("is_hidden")
+  // The category a moderator chose when hiding it (the report reasons' closed list, a CHECK); null when visible.
+  hiddenReason        String?       @map("hidden_reason")
+  // When it was last hidden, cleared when shown again: an appeal belongs to one hiding (spec 2026-11-14 §C).
+  hiddenAt            DateTime?     @map("hidden_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  // Set at creation and by a new reply or comment, by nothing else: `updatedAt` moves on every update.
+  lastActivityAt      DateTime      @default(now()) @map("last_activity_at")
+  // The reply its author marked as the one that settled it (G-292).
+  acceptedCommentId   String?       @map("accepted_comment_id")
+  editedAt            DateTime?     @map("edited_at")
+  // Emptied by its author while others' replies hang on it: title and body are '' (a CHECK).
+  deletedAt           DateTime?     @map("deleted_at")
+  // Closed to new replies by a moderator; the moderator only together with the time (a CHECK).
+  lockedAt            DateTime?     @map("locked_at")
+  lockedById          String?       @map("locked_by")
+  materia             LingoMateria?
+  // The version of CONTRIBUTO_COMMUNITY it was written under; null for what came before that text.
+  licenceTextId       String?       @map("licence_text_id")
+  // The sum of its votes (+1 and -1), kept by a database trigger on the votes (migration
+  // 20261116100000_forum_votes_up_down): never written by the server.
+  score               Int           @default(0)
 
-  user       User                 @relation("ArticleThreadAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  user              User?               @relation("ArticleThreadAuthor", fields: [userId], references: [id], onDelete: SetNull)
   passageReleasedBy User?         @relation("ArticleThreadPassageReleasedBy", fields: [passageReleasedById], references: [id], onDelete: SetNull)
+  lockedBy          User?               @relation("ArticleThreadLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+  acceptedComment   ArticleComment?     @relation("ArticleThreadAccepted", fields: [acceptedCommentId], references: [id], onDelete: SetNull)
+  licenceText       LingoTestoVersione? @relation("ArticleThreadLicence", fields: [licenceTextId], references: [id], onDelete: Restrict)
   comments   ArticleComment[]
   votes      ArticleThreadVote[]
-  reports    ArticleThreadReport[]
+  notifications     ForumNotification[]
+  validations       ForumValidation[]
 
   @@index([normaKey, articleId, createdAt])
   @@index([userId])
   @@index([passageReleasedById])
+  @@index([lockedById])
+  @@index([acceptedCommentId])
+  @@index([licenceTextId])
+  @@index([isHidden, createdAt])
+  @@index([isHidden, lastActivityAt])
+  @@index([isHidden, score])
   @@map("article_threads")
 }
 
@@ -639,26 +738,43 @@ model ArticleComment {
   threadId  String   @map("thread_id")
   parentId  String?  @map("parent_id")
   body      String
-  userId    String   @map("user_id")
+  // Null once the author's account is gone (G-307).
+  userId    String?  @map("user_id")
   isHidden  Boolean  @default(false) @map("is_hidden")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  hiddenReason  String?   @map("hidden_reason")
+  hiddenAt      DateTime? @map("hidden_at")
+  editedAt      DateTime? @map("edited_at")
+  // Emptied by its author while something visible hangs on it: body is '' (a CHECK).
+  deletedAt     DateTime? @map("deleted_at")
+  licenceTextId String?   @map("licence_text_id")
+  // The sum of its votes, kept by a database trigger, as the glossa's.
+  score         Int       @default(0)
 
   thread   ArticleThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
   parent   ArticleComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   children ArticleComment[] @relation("CommentReplies")
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   votes    ArticleCommentVote[]
+  licenceText   LingoTestoVersione? @relation("ArticleCommentLicence", fields: [licenceTextId], references: [id], onDelete: Restrict)
+  acceptedIn    ArticleThread[]     @relation("ArticleThreadAccepted")
+  notifications ForumNotification[]
+  validations   ForumValidation[]
 
   @@index([threadId, createdAt])
   @@index([parentId])
+  @@index([userId])
+  @@index([licenceTextId])
   @@map("article_comments")
 }
 
+// One vote per person per glossa: +1 or -1 (a CHECK), never on one's own (D-248). Goes with the account.
 model ArticleThreadVote {
   id        String   @id @default(uuid())
   threadId  String   @map("thread_id")
   userId    String   @map("user_id")
+  value     Int      @default(1) @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at")
 
   thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -669,10 +785,12 @@ model ArticleThreadVote {
   @@map("article_thread_votes")
 }
 
+// As `ArticleThreadVote`, on a reply (a comment's old votes stay; no new one is cast).
 model ArticleCommentVote {
   id        String   @id @default(uuid())
   commentId String   @map("comment_id")
   userId    String   @map("user_id")
+  value     Int      @default(1) @db.SmallInt
   createdAt DateTime @default(now()) @map("created_at")
 
   comment ArticleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
@@ -683,21 +801,214 @@ model ArticleCommentVote {
   @@map("article_comment_votes")
 }
 
+// A report names its item by a plain id, with no foreign key: it outlives the item's deletion for
+// good, and the moderators still decide on the copy it kept (G-308). The reporter becomes null with
+// their account; the report stays, as the moderators' evidence. `reason` and `status` are closed
+// lists (CHECKs in the migration).
 model ArticleThreadReport {
   id        String   @id @default(uuid())
   threadId  String   @map("thread_id")
-  userId    String   @map("user_id")
+  userId    String?  @map("user_id")
   reason    String
   details   String?
   status    String   @default("pending")
   createdAt DateTime @default(now()) @map("created_at")
+  // The glossa's title and body when the report was made; erased 90 days after it is closed.
+  reportedText   String?   @map("reported_text")
+  resolvedById   String?   @map("resolved_by")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note")
 
-  thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("ArticleThreadReportResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
 
   @@unique([threadId, userId])
   @@index([status])
+  @@index([userId])
+  @@index([resolvedById])
+  @@index([resolvedAt])
   @@map("article_thread_reports")
+}
+
+// As `ArticleThreadReport`, on a reply or a comment; `threadId` (plain too) keeps the way to its glossa.
+model ArticleCommentReport {
+  id             String    @id @default(uuid())
+  commentId      String    @map("comment_id")
+  threadId       String    @map("thread_id")
+  userId         String?   @map("user_id")
+  reason         String
+  details        String?
+  status         String    @default("pending")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  reportedText   String?   @map("reported_text")
+  resolvedById   String?   @map("resolved_by")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note")
+
+  user       User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("ArticleCommentReportResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([commentId, userId])
+  @@index([status])
+  @@index([userId])
+  @@index([resolvedById])
+  @@index([resolvedAt])
+  @@map("article_comment_reports")
+}
+
+// What happened to a user's contributions: a reply to their glossa, a comment under their reply, their
+// reply accepted, something of theirs hidden. Goes with the account, the glossa or the reply it is about.
+model ForumNotification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  kind      String
+  threadId  String    @map("thread_id")
+  commentId String?   @map("comment_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread  ArticleThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  comment ArticleComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([threadId])
+  @@index([commentId])
+  @@index([readAt])
+  @@map("forum_notifications")
+}
+
+// Append-only: every act of a moderator or an administrator on the Community, with its reason. The
+// actor becomes null with their account; the act stays.
+model ForumModerationLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  targetKind String   @map("target_kind")
+  targetId   String   @map("target_id")
+  reason     String?
+  // The subject of an appointment of a subject's moderator or validator (spec 2026-11-14 §C).
+  materia    LingoMateria?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([targetKind, targetId])
+  @@index([createdAt])
+  @@map("forum_moderation_log")
+}
+
+// The Forum's minimal profile (spec 2026-11-14-forum-community-server-design §B, D-246, D-247, D-249): under
+// the real name or under a pseudonym, never both (G-477); the qualification and the real name declared
+// (D-247, G-479). `id` is the person's public id in the Forum, never the account's, renewed when the
+// profile moves to a pseudonym. The CHECKs and the case-blind unique pseudonym are in the migration.
+model ForumProfile {
+  id                  String         @id @default(uuid())
+  userId              String         @unique @map("user_id")
+  identity            String
+  realName            String?        @map("real_name")
+  pseudonym           String?
+  qualification       String
+  materie             LingoMateria[] @default([])
+  // Set together by an owner who confirms a report «non è chi dice di essere» (G-479), cleared when the
+  // name is given back.
+  nameWithdrawnAt     DateTime?      @map("name_withdrawn_at")
+  nameWithdrawnReason String?        @map("name_withdrawn_reason")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("forum_profiles")
+}
+
+// A subject's moderator or validator (spec 2026-11-14-forum-community-server-design §C, D-267), appointed by
+// an owner on the record. Goes with the account.
+model ForumSubjectRole {
+  userId       String       @map("user_id")
+  materia      LingoMateria
+  role         String
+  appointedBy  String?      @map("appointed_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  user      User  @relation("ForumSubjectRoleHolder", fields: [userId], references: [id], onDelete: Cascade)
+  appointer User? @relation("ForumSubjectRoleAppointedBy", fields: [appointedBy], references: [id], onDelete: SetNull)
+
+  @@id([userId, materia, role])
+  @@index([materia, role])
+  @@index([appointedBy])
+  @@map("forum_subject_roles")
+}
+
+// One validator's validation of a glossa or a reply (exactly one, a CHECK), in the subject it was given in.
+// Goes with the item; outlives the validator's account, unnamed, and still counts (§C).
+model ForumValidation {
+  id          String       @id @default(uuid())
+  threadId    String?      @map("thread_id")
+  commentId   String?      @map("comment_id")
+  validatorId String?      @map("validator_id")
+  materia     LingoMateria
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  thread    ArticleThread?  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  comment   ArticleComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  validator User?           @relation(fields: [validatorId], references: [id], onDelete: SetNull)
+
+  @@unique([threadId, validatorId])
+  @@unique([commentId, validatorId])
+  @@index([validatorId])
+  @@map("forum_validations")
+}
+
+// The author's appeal to the owners against a hiding (D-267), once per hiding. The item by a plain id, as
+// the reports name theirs; at most one pending per item (the migration's index).
+model ForumAppeal {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  targetKind   String    @map("target_kind")
+  targetId     String    @map("target_id")
+  threadId     String    @map("thread_id")
+  text         String
+  status       String    @default("pending")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  decidedById  String?   @map("decided_by")
+  decidedAt    DateTime? @map("decided_at")
+  decisionNote String?   @map("decision_note")
+
+  user      User  @relation("ForumAppealAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("ForumAppealDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([targetKind, targetId])
+  @@index([status])
+  @@index([threadId])
+  @@index([decidedById])
+  @@map("forum_appeals")
+}
+
+// A report «non è chi dice di essere» on a profile (G-479), read by the owners alone. The profile by a
+// plain id, as the Community's reports name their item; the reporter becomes null with their account.
+model ForumProfileReport {
+  id             String    @id @default(uuid())
+  profileId      String    @map("profile_id")
+  userId         String?   @map("user_id")
+  details        String?
+  status         String    @default("pending")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  resolvedById   String?   @map("resolved_by")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note")
+
+  user       User? @relation("ForumProfileReporter", fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("ForumProfileReportResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([profileId])
+  @@index([status])
+  @@index([userId])
+  @@index([resolvedById])
+  @@index([resolvedAt])
+  @@map("forum_profile_reports")
 }
 
 // ============================================
@@ -1150,10 +1461,17 @@ model LingoCard {
   validazioni   LingoValidazioneCard[]
   statiRipasso  LingoStatoRipasso[]
   revisioni     LingoRevisioneSRS[]
+  // A course's card (Percorsi, A1): its module, Cascade (always its author's draft); `daPercorso` is set when it is
+  // created with a module and never cleared, so the card stays out of the community once detached too.
+  moduloId      String?                @map("modulo_id")
+  daPercorso    Boolean                @default(false) @map("da_percorso")
+  modulo        LingoCorsoModulo?      @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  competenze    LingoCardCompetenza[]
 
   @@index([materia, istituto, stato])
   @@index([stato])
   @@index([autoreId])
+  @@index([moduloId])
   @@map("lingo_cards")
 }
 
@@ -1207,6 +1525,8 @@ model LingoValidazioneCard {
 enum LingoTestoChiave {
   PROPOSTA_SCHEDA
   INFORMATIVA_MERLT
+  MATERIALE_STUDIO
+  CONTRIBUTO_COMMUNITY
 }
 
 // A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
@@ -1225,8 +1545,11 @@ model LingoTestoVersione {
   autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
   accettazioni LingoAccettazioneTesto[]
   carte        LingoCard[]
+  corsi        LingoCorso[]
   merltPreferenze MerltUserPreference[] @relation("MerltPreferenceNotice")
   merltConsensi   MerltConsentAudit[]   @relation("MerltAuditNotice")
+  articleThreads  ArticleThread[]          @relation("ArticleThreadLicence")
+  articleComments ArticleComment[]         @relation("ArticleCommentLicence")
 
   @@unique([chiave, versione])
   @@map("lingo_testi_versioni")
@@ -1336,6 +1659,9 @@ enum LingoMissione {
   CONVALIDA
   SETTIMANA
   CONSOLIDA
+  MODULO
+  PERCORSO
+  LEZIONE
 }
 
 enum LingoFonteXp {
@@ -1343,13 +1669,16 @@ enum LingoFonteXp {
   PROPOSTA
   VOTO
   LETTURA
+  MODULO
+  ESAME
+  LEZIONE
 }
 
 model LingoCreditoXp {
   id        String        @id @default(uuid())
   utenteId  String        @map("utente_id")
   missione  LingoMissione
-  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once)
+  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once), M:/C:/L:<uuid> (a module, a course, a lesson)
   giorno    DateTime      @db.Date
   punti     Int
   fonte     LingoFonteXp
@@ -1365,11 +1694,32 @@ model LingoCreditoXp {
   @@map("lingo_crediti_xp")
 }
 
+// Learn's short lesson (LC63): 5–8 exercises the server built from the review scope's cards, with their keys
+// (`esercizi`, copied), the outcomes (`esiti`, `{ indice, giusta }` in the order answered) and the end. The person's
+// alone; the CHECKs (5–8 exercises, no more outcomes than exercises) are in the migration.
+model LingoLezione {
+  id        String       @id @default(uuid())
+  utenteId  String       @map("utente_id")
+  giorno    DateTime     @db.Date
+  materia   LingoMateria
+  esercizi  Json
+  esiti     Json         @default("[]")
+  finitaIl  DateTime?    @map("finita_il")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@index([utenteId, giorno])
+  @@map("lingo_lezioni")
+}
+
 // The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the
 // range of each value is a CHECK in the migration (not in this model), and lingo/validationSettings.ts.
 enum LingoImpostazioneChiave {
   SOGLIA_APPROVAZIONI
   SOGLIA_ERRATE
+  // The Forum's validations that make a glossa or a reply «validata» (spec 2026-11-14 §C, G-478).
+  FORUM_SOGLIA_VALIDAZIONI
 }
 
 model LingoImpostazione {
@@ -1398,6 +1748,310 @@ model LingoImpostazioneLog {
 
   @@index([chiave, createdAt])
   @@map("lingo_impostazioni_log")
+}
+
+// GYMNASIUM'S COURSES («Percorsi», A1; spec docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md §10.2).
+// Content (the author's) apart from progress (one person's), so that A3 can enrol others without copying the
+// content. Content rows are never updated once written, except a course's title and its `moduliPrevisti` (by the
+// user alone): a correction is a new module that names the one it supersedes. Ranges and «exactly one of» are
+// CHECKs in the migrations (20261029100000, 20261029100001), not here.
+
+enum LingoCorsoTipoDomanda {
+  RICHIAMO
+  QUIZ
+  APERTA
+  ESAME
+  ESAME_APERTA
+}
+
+model LingoCorso {
+  id                   String       @id @default(uuid())
+  autoreId             String       @map("autore_id")
+  titolo               String
+  // One of the five subjects (G-363: no new one); the title says what the course is about.
+  materia              LingoMateria
+  descrizione          String?
+  // The programme's count of modules, shown as «8 di 10 moduli»; lowered only by the user («Il programma finisce qui»).
+  moduliPrevisti       Int          @map("moduli_previsti")
+  // The declaration's version accepted when the course was created (the provenance A3 needs).
+  dichiarazioneTestoId String       @map("dichiarazione_testo_id")
+  // The connected application that created it, from the delegation, never from a body.
+  createdByClientId    String?      @map("created_by_client_id")
+  createdByClientName  String?      @map("created_by_client_name")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  autore             User                   @relation(fields: [autoreId], references: [id], onDelete: Cascade)
+  dichiarazioneTesto LingoTestoVersione     @relation(fields: [dichiarazioneTestoId], references: [id], onDelete: Restrict)
+  competenze         LingoCorsoCompetenza[]
+  moduli             LingoCorsoModulo[]
+  esami              LingoCorsoEsame[]
+  iscrizioni         LingoCorsoIscrizione[]
+
+  @@index([autoreId])
+  @@map("lingo_corsi")
+}
+
+model LingoCorsoCompetenza {
+  id      String @id @default(uuid())
+  corsoId String @map("corso_id")
+  // C1, C2…: given by the server in the order the course was created with.
+  codice  String
+  ordine  Int
+  // What the learner will be able to do, as an action.
+  testo   String
+
+  corso   LingoCorso                   @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  moduli  LingoCorsoModuloCompetenza[]
+  domande LingoCorsoDomandaCompetenza[]
+  carte   LingoCardCompetenza[]
+
+  @@unique([corsoId, codice])
+  @@map("lingo_corsi_competenze")
+}
+
+model LingoCorsoModulo {
+  id                  String   @id @default(uuid())
+  corsoId             String   @map("corso_id")
+  ordine              Int
+  titolo              String
+  // The estimate shown, in minutes.
+  minuti              Int?
+  // 0–3 pre-questions (strings), not graded and never answered to the server.
+  domandePrima        Json     @map("domande_prima")
+  // The module this one corrects; the user withdraws the old one in the web.
+  sostituisceId       String?  @map("sostituisce_id")
+  createdByClientId   String?  @map("created_by_client_id")
+  createdByClientName String?  @map("created_by_client_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  corso       LingoCorso                   @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  sostituisce LingoCorsoModulo?            @relation("LingoCorsoModuloCorrezione", fields: [sostituisceId], references: [id], onDelete: SetNull)
+  correzioni  LingoCorsoModulo[]           @relation("LingoCorsoModuloCorrezione")
+  competenze  LingoCorsoModuloCompetenza[]
+  blocchi     LingoCorsoBlocco[]
+  domande     LingoCorsoDomanda[]
+  stati       LingoCorsoModuloStato[]
+  carte       LingoCard[]
+
+  // Not unique: a correction shares its order with the module it supersedes.
+  @@index([corsoId, ordine])
+  @@index([sostituisceId])
+  @@map("lingo_corsi_moduli")
+}
+
+model LingoCorsoModuloCompetenza {
+  moduloId     String @map("modulo_id")
+  competenzaId String @map("competenza_id")
+
+  modulo     LingoCorsoModulo     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([moduloId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_corsi_moduli_competenze")
+}
+
+model LingoCorsoBlocco {
+  id       String  @id @default(uuid())
+  moduloId String  @map("modulo_id")
+  ordine   Int
+  titolo   String?
+  // The lesson's closed Markdown subset (lingo/courseFormat.ts), stored as the assistant sent it.
+  testo    String  @db.Text
+  // Counted by the server.
+  parole   Int
+  // [{ marcatore, voce, tipo, riferimento, citation }]: copies of the course dossier's entries.
+  citazioni Json
+
+  modulo  LingoCorsoModulo  @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  domande LingoCorsoDomanda[]
+
+  @@unique([moduloId, ordine])
+  @@map("lingo_corsi_blocchi")
+}
+
+model LingoCorsoEsame {
+  id                  String   @id @default(uuid())
+  corsoId             String   @map("corso_id")
+  // Null: the course's own first exam. Set: written for one enrolment after a failed attempt.
+  iscrizioneId        String?  @map("iscrizione_id")
+  createdByClientId   String?  @map("created_by_client_id")
+  createdByClientName String?  @map("created_by_client_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  corso      LingoCorso            @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  iscrizione LingoCorsoIscrizione? @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  domande    LingoCorsoDomanda[]
+  tentativi  LingoCorsoTentativo[]
+
+  @@index([corsoId])
+  @@index([iscrizioneId])
+  @@map("lingo_corsi_esami")
+}
+
+model LingoCorsoDomanda {
+  id              String                @id @default(uuid())
+  // Exactly one of the two (a CHECK).
+  moduloId        String?               @map("modulo_id")
+  esameId         String?               @map("esame_id")
+  // A recall question's block, of the same module.
+  bloccoId        String?               @map("blocco_id")
+  tipo            LingoCorsoTipoDomanda
+  applicazione    Boolean               @default(false)
+  ordine          Int
+  testo           String                @db.Text
+  // 2–6 { chiave: 'a'…'f', testo, spiegazione }; for APERTA the hybrid's options.
+  opzioni         Json?
+  // The right key: a column of its own, so that every read selects it explicitly (never by default).
+  corretta        String?
+  rispostaModello String?               @map("risposta_modello") @db.Text
+  // 3–5 criteria, the open kinds only.
+  rubrica         Json?
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  modulo     LingoCorsoModulo?             @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  esame      LingoCorsoEsame?              @relation(fields: [esameId], references: [id], onDelete: Cascade)
+  blocco     LingoCorsoBlocco?             @relation(fields: [bloccoId], references: [id], onDelete: Cascade)
+  competenze LingoCorsoDomandaCompetenza[]
+  esiti      LingoCorsoEsito[]
+
+  @@index([moduloId])
+  @@index([esameId])
+  @@index([bloccoId])
+  @@map("lingo_corsi_domande")
+}
+
+model LingoCorsoDomandaCompetenza {
+  domandaId    String @map("domanda_id")
+  competenzaId String @map("competenza_id")
+
+  domanda    LingoCorsoDomanda    @relation(fields: [domandaId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([domandaId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_corsi_domande_competenze")
+}
+
+/// A learner's goal for a course (G-488): the web groups the paths by it.
+enum LingoCorsoObiettivo {
+  ESAME_AVVOCATO
+  ESAME_MATERIA
+  AGGIORNAMENTO_NORMATIVO
+  ALTRO
+}
+
+model LingoCorsoIscrizione {
+  id         String    @id @default(uuid())
+  corsoId    String    @map("corso_id")
+  utenteId   String    @map("utente_id")
+  // The course's study dossier, linked from the enrolment (each learner's own in A3); SetNull when it goes.
+  dossierId  String?   @map("dossier_id")
+  // The Rome day the course was passed: written once, never cleared.
+  superatoIl DateTime? @map("superato_il") @db.Date
+  // The learner's goal and exam date (G-488), set from the web only (`PATCH /:id`): a kind, an optional sentence
+  // (1–200, only with a kind: a CHECK) and a Rome day, refused when past as it is set and kept once it passes.
+  obiettivo     LingoCorsoObiettivo?
+  obiettivoNota String?              @map("obiettivo_nota")
+  dataEsame     DateTime?            @map("data_esame") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  corso     LingoCorso              @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  utente    User                    @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  dossier   Dossier?                @relation(fields: [dossierId], references: [id], onDelete: SetNull)
+  stati     LingoCorsoModuloStato[]
+  esiti     LingoCorsoEsito[]
+  tentativi LingoCorsoTentativo[]
+  esami     LingoCorsoEsame[]
+
+  @@unique([corsoId, utenteId])
+  @@index([utenteId])
+  @@index([dossierId])
+  @@map("lingo_corsi_iscrizioni")
+}
+
+model LingoCorsoModuloStato {
+  // Also the XP event's id («Completa un modulo»).
+  id               String    @id @default(uuid())
+  iscrizioneId     String    @map("iscrizione_id")
+  moduloId         String    @map("modulo_id")
+  apertoIl         DateTime  @default(now()) @map("aperto_il")
+  fattoIl          DateTime? @map("fatto_il")
+  fattoGiorno      DateTime? @map("fatto_giorno") @db.Date
+  quizPercentuale  Int?      @map("quiz_percentuale")
+  giudizio         Int?
+  giudizioNota     String?   @map("giudizio_nota")
+  ritiratoIl       DateTime? @map("ritirato_il")
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  modulo     LingoCorsoModulo     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+
+  @@unique([iscrizioneId, moduloId])
+  @@index([moduloId])
+  @@map("lingo_corsi_moduli_stati")
+}
+
+model LingoCorsoEsito {
+  id           String    @id @default(uuid())
+  iscrizioneId String    @map("iscrizione_id")
+  domandaId    String    @map("domanda_id")
+  tentativoId  String?   @map("tentativo_id")
+  scelta       String?
+  // Null when no choice was graded (an open question answered by the rubric alone).
+  corretto     Boolean?
+  // The rubric's criteria ticked (open kinds); empty otherwise. Never scored.
+  spuntate     Int[]     @default([])
+  // The server's Rome day.
+  giorno       DateTime  @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at")
+  segnalatoIl  DateTime? @map("segnalato_il")
+  segnalazione String?
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  domanda    LingoCorsoDomanda    @relation(fields: [domandaId], references: [id], onDelete: Cascade)
+  tentativo  LingoCorsoTentativo? @relation(fields: [tentativoId], references: [id], onDelete: Cascade)
+
+  @@unique([iscrizioneId, domandaId])
+  @@index([iscrizioneId, giorno])
+  @@index([domandaId])
+  @@index([tentativoId])
+  @@map("lingo_corsi_esiti")
+}
+
+model LingoCorsoTentativo {
+  id            String    @id @default(uuid())
+  iscrizioneId  String    @map("iscrizione_id")
+  esameId       String    @map("esame_id")
+  apertoIl      DateTime  @default(now()) @map("aperto_il")
+  consegnatoIl  DateTime? @map("consegnato_il")
+  giorno        DateTime? @db.Date
+  percentuale   Int?
+  superato      Boolean?
+  // { codice: percentuale } as graded.
+  perCompetenza Json?     @map("per_competenza")
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  esame      LingoCorsoEsame      @relation(fields: [esameId], references: [id], onDelete: Cascade)
+  esiti      LingoCorsoEsito[]
+
+  // An exam is never shown twice.
+  @@unique([iscrizioneId, esameId])
+  @@index([esameId])
+  @@map("lingo_corsi_tentativi")
+}
+
+// A course card's competences (codes of its module's course).
+model LingoCardCompetenza {
+  cardId       String @map("card_id")
+  competenzaId String @map("competenza_id")
+
+  card       LingoCard            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_card_competenze")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
@@ -1488,6 +2142,10 @@ model OAuthGrant {
   createdAt  DateTime  @default(now()) @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
   revokedAt  DateTime? @map("revoked_at")
+  // The words of `dossier:text` the user last approved (`TEXT_CONSENT_VERSION` in oauth/config.ts); null for a grant
+  // without the texts. A lower version never receives a note's text until reconnected (G-381 (b); the grants that held
+  // `dossier:text` when the column came were given 1, G-385).
+  textConsentVersion Int? @map("text_consent_version")
 
   user   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   client OAuthClient              @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -1539,6 +2197,8 @@ enum TrashKind {
   DOSSIER
   DOSSIER_ITEMS
   LINGO_CARDS
+  LINGO_CORSO
+  LINGO_CORSO_MODULO
 }
 
 model TrashEntry {
@@ -1676,4 +2336,132 @@ model Task {
   @@index([assigneeId])
   @@index([deletedAt])
   @@map("tasks")
+}
+
+// ─── Atti (DRAFT for Alfred and Guglielmo, 15-11-2026; not merged without their yes) ───
+// A lawyer's act being drafted (atto di citazione, appello, memoria...): its text, the dossier whose
+// sources it rests on, and where it stands. One row per act; versions, the AI's proposals and the
+// trash are open questions (docs/superpowers/specs/2026-11-15-atti-backend-draft.md).
+enum AttoStato {
+  bozza
+  finale
+}
+
+model Atto {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  // The dossier whose norms and decisions the act cites; none = an act on its own.
+  dossierId String?   @map("dossier_id")
+  titolo    String
+  // A free label for now («Atto di citazione», «Appello»): a closed list is an open question.
+  tipo      String?
+  // The text as the editor writes it (plain text with paragraphs for now).
+  testo     String    @default("") @db.Text
+  stato     AttoStato @default(bozza)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  // Which connected application created this row (MCP); null = the user. Set by the server, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dossier Dossier? @relation(fields: [dossierId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([dossierId])
+  @@map("atti")
+}
+
+// ─── A case's act files (LC50, server part; testing only, no real client files) ───
+// The files a lawyer uploads to a case (a `lavoro` dossier), with their versions, encrypted at rest under
+// PRATICA_FILES_DIR (src/pratica/fileStore.ts). None of these tables has a foreign key to `dossiers`, on purpose
+// (as `dossier_items.about_item_id`): deleting a dossier moves it to the trash and a restore brings it back with
+// the same id, so its files stay on disk, unreachable (the owner check finds no dossier), until the trash entry is
+// emptied or swept, which removes them. The account's deletion removes them through `users`' cascade and the disk.
+enum PraticaFileAutore {
+  utente
+  claude
+}
+
+model PraticaFile {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  dossierId String  @map("dossier_id")
+  // The name shown and sent back on download; never the name on disk (the id is).
+  nome      String
+  // Checked on the content's first bytes, never taken from the client.
+  mime      String
+  // Bytes of the plaintext.
+  peso      Int
+  // SHA-256 of the plaintext, lower-case hex.
+  sha256    String
+  // The original this is a version of (always the original, never another version); null for an original.
+  // A plain column, no foreign key: the routes keep a group together.
+  versioneDi String? @map("versione_di")
+  // 1 for an original, then 2, 3... within its group.
+  versione  Int     @default(1)
+  autore    PraticaFileAutore @default(utente)
+  // Which connected application deposited it (MCP); null = the user. Set by the server, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+  // A pseudonymised copy (VeloPII); always false until that exists.
+  pseudonimizzato Boolean @default(false)
+  // The file's own key, wrapped (AES-256-GCM) with PRATICA_FILES_KEY: iv (12) | tag (16) | key (32).
+  chiaveCifrata Bytes @map("chiave_cifrata")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  // In the case's trash; removed from disk only by the permanent deletion.
+  deletedAt DateTime? @map("deleted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, dossierId])
+  @@index([versioneDi])
+  @@map("pratica_files")
+}
+
+// The case's instructions for Claude: one row per dossier, free Markdown.
+model PraticaIstruzioni {
+  dossierId String   @id @map("dossier_id")
+  userId    String   @map("user_id")
+  testo     String   @default("") @db.Text
+  // Who wrote the last change: a connected application (MCP), or null = the user.
+  updatedByClientId   String? @map("updated_by_client_id")
+  updatedByClientName String? @map("updated_by_client_name")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("pratica_istruzioni")
+}
+
+enum PraticaFileAzione {
+  elenco
+  scaricamento
+  deposito
+  cestino
+  ripristino
+  cancellazione
+}
+
+// Every read, download, deposit and deletion of a case's files. `file_id` has no foreign key: the line
+// outlives the file. Null for a listing.
+model PraticaFileAccesso {
+  id        String            @id @default(uuid())
+  userId    String            @map("user_id")
+  dossierId String            @map("dossier_id")
+  fileId    String?           @map("file_id")
+  azione    PraticaFileAzione
+  clientId   String?          @map("client_id")
+  clientName String?          @map("client_name")
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([fileId])
+  @@map("pratica_file_accessi")
 }

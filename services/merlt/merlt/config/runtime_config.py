@@ -16,6 +16,7 @@ In-memory: values reset to the env defaults on restart (the panel re-applies).
 
 from __future__ import annotations
 
+from merlt.config.llm_models import ADMIN_MODEL_CHOICES, DEFAULT_EXPERT_MODEL, DEFAULT_FAST_MODEL
 import os
 import threading
 from dataclasses import dataclass
@@ -89,45 +90,39 @@ class RuntimeConfig:
 
     # -- registry --------------------------------------------------------
     def _register_defaults(self) -> None:
-        model_choices = [
-            "google/gemini-2.5-flash",
-            "google/gemini-2.5-flash-lite",
-            "google/gemini-2.5-pro",
-            "anthropic/claude-haiku-4.5",
-            "anthropic/claude-sonnet-4.5",
-            "anthropic/claude-sonnet-5",
-            "anthropic/claude-opus-4.8",
-        ]
+        # Only models with a zero-retention provider: every call refuses the others (G-456, G-575).
+        model_choices = list(ADMIN_MODEL_CHOICES)
         specs = [
             ParamSpec(
                 key="expert_model",
                 kind="enum",
-                default=_env_str("MERLT_EXPERT_MODEL", "anthropic/claude-sonnet-4.5"),
+                default=_env_str("MERLT_EXPERT_MODEL", DEFAULT_EXPERT_MODEL),
                 choices=model_choices,
                 requires_restart=False,
                 description=(
                     "Modello LLM per l'analisi degli esperti e la sintesi (la "
                     "qualità della risposta). Claude = più accurato, Gemini "
-                    "flash = più economico."
+                    "flash = più economico. Solo modelli con un fornitore a "
+                    "conservazione zero."
                 ),
             ),
             ParamSpec(
                 key="react_decision_model",
                 kind="enum",
-                # gemini-2.5-flash: reliable JSON output on tight max_tokens
-                # decision calls (gemini-2.5-pro preambles/burns its budget on
-                # reasoning and breaks strict json_object). Cheap on the ReAct
-                # high-frequency path; the user can raise it to Claude/Pro from
-                # the panel if they want stronger tool selection.
-                default=_env_str("MERLT_REACT_DECISION_MODEL", "google/gemini-2.5-flash"),
+                # The cheap model with a zero-retention provider (G-575): short,
+                # strict JSON decisions on the ReAct high-frequency path (a Pro
+                # model preambles and burns its budget on reasoning, breaking
+                # strict json_object). The admin can raise it to Claude from the
+                # panel for stronger tool selection.
+                default=_env_str("MERLT_REACT_DECISION_MODEL", DEFAULT_FAST_MODEL),
                 choices=model_choices,
                 requires_restart=False,
                 description=(
                     "Modello LLM per la scelta dello strumento nel loop ReAct e "
                     "per la classificazione query (chiamate ad alta frequenza, "
                     "output JSON breve). Consigliato un modello 'flash' affidabile; "
-                    "salire a Pro/Claude solo se serve una selezione strumenti più "
-                    "accurata."
+                    "salire a Claude solo se serve una selezione strumenti più "
+                    "accurata. Solo modelli con un fornitore a conservazione zero."
                 ),
             ),
             ParamSpec(

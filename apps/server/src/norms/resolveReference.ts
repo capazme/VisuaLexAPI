@@ -26,6 +26,7 @@
  */
 
 import { ARTICLE_ORDINAL_SUFFIXES } from '../utils/articleSuffixes';
+import { isSwitchOn } from '../assistant/switches';
 import { citeArticle } from './citation';
 
 export type ReferenceOutcome = 'resolved' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
@@ -42,6 +43,8 @@ export interface NormaVisitata {
   tipo_atto_reale?: string | null;
   versione?: string | null;
   data_versione?: string | null;
+  /** One part of a split article ("701-800", G-387 (a)), when the reference's comma is in it. */
+  parte?: string;
 }
 
 export interface Resolution {
@@ -117,11 +120,39 @@ export const articleKey = (article: string): string => {
   return split && ORDINALS.has(split[2] + split[3]) ? `${split[1]}-${split[2]}${split[3]}${split[4]}` : key;
 };
 
+/** The API's sentence for a regional law (services/visualex `regional_law.REGIONAL_LAW_REFUSAL`). */
+const REGIONAL_LAW = 'Le leggi regionali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla banca dati della Regione.';
+
+/** «codice dell'ambiente (d.lgs. 3 aprile 2006, n. 152) o testo unico accise (…)» from `/parse_query`'s
+ * `ambiguous`, or null when the answer names no such acts. */
+function ambiguousActs(choices: unknown): string | null {
+  if (!Array.isArray(choices)) return null;
+  const named = choices
+    .filter((c): c is { name: string; display: string } =>
+      typeof c === 'object' && c !== null && typeof c.name === 'string' && typeof c.display === 'string')
+    .map((c) => `${c.name} (${c.display})`);
+  return named.length > 1 ? named.join(' o ') : null;
+}
+
 /** Steps 1 and 2 for one reference: what it names, or why not. */
 async function identify(reference: string): Promise<Resolution> {
   const parsed = await postLegalApi('/parse_query', { query: reference });
   if (parsed.status !== 200) throw new SourceUnavailable(`parse_query ${parsed.status}`);
   const params = parsed.data.parsed as Record<string, string> | null | undefined;
+  // A regional law (G-577): no source covers it, and the API never reads it as the State's law of that number.
+  if (parsed.data.refusal === 'regional_law') {
+    return { outcome: 'not_recognised', detail: REGIONAL_LAW };
+  }
+  // A recital clause («considerando 26 GDPR», refused or not): added from the reader, not by reference
+  // (spec 2026-11-17 §6.3). Checked first: a refused reading must never fall through to an article.
+  if (params?.recital || parsed.data.refusal) {
+    return { outcome: 'not_recognised', detail: 'Un considerando si aggiunge al dossier dal lettore di LexCraft, non da qui.' };
+  }
+  // A name of two acts («art. 1 tua», G-577): the API names them, and the reference must say which.
+  const named = ambiguousActs(parsed.data.ambiguous);
+  if (named) {
+    return { outcome: 'ambiguous', detail: `Il nome indica più atti: ${named}. Indica l’atto per numero e data.` };
+  }
   if (!parsed.data.recognized || !params?.act_type) {
     return { outcome: 'not_recognised', detail: 'Riferimento non riconosciuto: indica articolo e atto (es. «art. 2043 c.c.»).' };
   }
@@ -136,8 +167,13 @@ async function identify(reference: string): Promise<Resolution> {
     return { outcome: 'ambiguous', display, detail: 'Il riferimento indica più articoli: scrivine uno per riferimento.' };
   }
 
-  const fetched = await postLegalApi('/fetch_norma_data', params);
-  if (NOT_PRESENT.test(String(fetched.data.error ?? ''))) {
+  // The API reads a single article's comma (or a part's label) and answers the part of a split article that holds
+  // it (G-387 (a)). Until the web opens a part (the switch `article_parts`), a reference is stored as the article,
+  // as before: its comma is not sent on.
+  const { comma: _comma, parte: _parte, ...article } = params;
+  const fetched = await postLegalApi('/fetch_norma_data', (await isSwitchOn('article_parts')) ? params : article);
+  // «Articolo … non presente», and for a part: a comma past the article's last, a range it does not have.
+  if (NOT_PRESENT.test(String(fetched.data.error ?? '')) || (fetched.status === 404 && typeof fetched.data.error === 'string')) {
     return { outcome: 'does_not_exist', display, detail: String(fetched.data.error) };
   }
   if (sourceFailed(fetched.status)) throw new SourceUnavailable(`fetch_norma_data ${fetched.status}`);

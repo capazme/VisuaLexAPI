@@ -165,7 +165,8 @@ describe('POST /api/merlt/ops/ingestion/run', () => {
       .send({ source: 'visualex_tree', source_ref: 'codice-civile', scope_label: 'CC libro IV' });
 
     expect(res.status).toBe(503);
-    expect(res.body.detail).toBe('merlt_unavailable');
+    // The refused key is named as what it is: the server's configuration.
+    expect(res.body.detail).toBe('merlt_auth_misconfigured');
   });
 
   it('503s on a network/timeout failure, not only on an upstream 5xx', async () => {

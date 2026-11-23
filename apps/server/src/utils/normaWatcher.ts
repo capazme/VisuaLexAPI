@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { citeStoredNorm } from '../norms/citation';
+import { partOf } from '../norms/parts';
 
 let running = false;
 
@@ -50,6 +51,8 @@ function requestBody(data: Record<string, unknown>) {
     version: String(data.versione ?? 'vigente'),
     version_date: String(data.data_versione ?? ''),
     annex: data.allegato ? String(data.allegato) : undefined,
+    // A part of a split article is watched as that part (G-387 (a)); the first has no `parte`.
+    parte: partOf(data.parte),
     show_brocardi_info: false,
   };
 }
@@ -98,6 +101,10 @@ async function checkWatch(watch: { id: string; userId: string; normaKey: string;
   // on the snapshot, not a write that poisons it with stale metadata.
   if (!article.norma_data || typeof article.norma_data !== 'object') { await touch(); return; }
   if (typeof article.article_text !== 'string' || article.article_text.length === 0) { await touch(); return; }
+  // The AKN export, served when Normattiva's HTML could not be read (scan A.7): a different string
+  // from the HTML text (rule 23), so compared it would read as a change and stored it would make the
+  // HTML text's return read as one. Nothing is compared or stored until the HTML text is back.
+  if (article.text_source === 'akn') { await touch(); return; }
 
   const snapshotForCompare: NormaSnapshot = { norma_data: article.norma_data, article_text: article.article_text };
   const outcome = compareNormaSnapshots(watch.normaData, snapshotForCompare);

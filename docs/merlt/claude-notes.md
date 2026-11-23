@@ -1,7 +1,7 @@
 # MERL-T integration notes — server and web
 
 The MERL-T sections of the former root `CLAUDE.md`. `apps/server/CLAUDE.md`,
-`apps/web/CLAUDE.md` and `services/merlt/CLAUDE.md` point here; read the section
+`apps/web/app/CLAUDE.md` and `services/merlt/CLAUDE.md` point here; read the section
 you need before changing a MERL-T route, gate, guard or surface.
 
 ### MERL-T Integration (on `develop`): where to look
@@ -180,23 +180,23 @@ interpolates. That value defaults to `dev-internal-secret`, and
 no `X-User-ID` is forwarded. MERL-T learns who the user is only from the
 `user_id` the BFF injects into the body.
 
-`services/merlt/merlt/app.py` overrides `verify_api_key` with `optional_api_key`, so only
-`require_role("admin")` routes need the key. Of the routes the BFF proxies,
-those are `/rlcf/training/start` and `/ingestion/mechanical/*`. The `/admin/*`
-routes (config, engine reinitialize, graph hygiene) and `/ner/*` declare only
-`verify_api_key`, so MERL-T itself leaves them open. The BFF `requireAdmin` is
-their only gate, and `:8000` must never be exposed.
+Every MERL-T route needs the key (scan A.2): `services/merlt/merlt/app.py`
+includes every router behind `verify_api_key`, and only `/health` and `/` stay
+open. With no key configured every route answers 401. The `require_role("admin")`
+routes (`/rlcf/training/*`, `/ingestion/mechanical/*`) also need the admin role;
+the BFF's `requireAdmin` still guards the admin pages on its side.
 
-The admin key is seeded at boot from `MERLT_ADMIN_API_KEY`; compose passes it
-`${MERLT_API_KEY}`. A fresh stack therefore no longer needs the manual
-`POST /api/v1/api-keys/bootstrap`, which nothing ever called.
+The key is seeded at boot from `MERLT_ADMIN_API_KEY`; compose passes it
+`${MERLT_API_KEY}`. The seed deactivates every other active key, and no route
+hands one out (the old bootstrap route is gone).
 
-When MERL-T refuses the key:
-
-- the `ops.ts` routes answer 503 `merlt_auth_misconfigured` on an upstream
-  401/403;
-- `opsIngestion.ts` collapses every upstream 4xx except 404/409 to 503
-  `merlt_unavailable`.
+When MERL-T refuses the key (401 or 403), every client throws `MerltAuthError`
+and every route answers 503 `merlt_auth_misconfigured` (the data export, which
+calls MERL-T on its own in `userData.ts`, answers its 503 «MERL-T non è
+raggiungibile»): a fault of the server's
+configuration, never relayed as the user's 401 (the web would read that as an
+expired session and spend a token refresh on each call). `opsIngestion.ts` still
+collapses every other upstream 4xx except 404/409 to 503 `merlt_unavailable`.
 
 **Job nets (`services/merlt/jobWatchdog.ts`).** `apps/server/src/index.ts` schedules
 the watchdog every 5 min; it is off in tests. The watchdog is what unblocks a
@@ -305,7 +305,7 @@ declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
 | `global` (mounted once in `Layout`) | `GlobalMerltSlot` | `VITE_FEATURE_MERLT` |
 | `article_sidebar` | `ArticleGraphSideRail` | `VITE_FEATURE_MERLT_GRAPH`, and the development mode (`ArticleTabContent` draws the slot only with it) |
 
-- **The development mode** (`apps/web/src/features/devMode/`, spec
+- **The development mode** (`apps/web/app/src/features/devMode/`, spec
   `docs/superpowers/specs/2026-10-12-dev-mode-and-sidebar.md`) hides the MERL-T
   surfaces that are still in testing from everyone but the accounts the
   administrator enabled and that switched it on. Behind it: the Sidebar's
@@ -314,8 +314,7 @@ declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
   the `article_sidebar` graph rail, `AskMerltEntry`, and the citation reports
   that feed MERL-T («Segnala come citazione», `MissedCitationReporter`). Not
   behind it: the `article_content_after` tracker, the `global` slot (the
-  trackers and `ConsentScreen`), `article_case_law` (the Massimario's panel,
-  content for every reader) and the implicit citation feedback on a click, so
+  trackers and `ConsentScreen`) and the implicit citation feedback on a click, so
   collection runs for whoever consented, with or without the mode. The mode
   never replaces a permission: the consent ladder and the server's guards stay
   the real barrier.
@@ -426,7 +425,6 @@ turns the article URN into the arguments of `ingest_norm`:
   - `searchEntities(q, limit)`, a fuzzy name autocomplete. The semantic
     `POST /api/v1/graph/search` is not proxied.
   - `listProvisionalReview` and `adjudicateProvisional`.
-  - `rassegneByNorma(query)`, for the reader's panel (below).
 - `services/merlt/lazyIngest.ts`: `ensureIngestionJob(prisma, graphClient, urn,
   userId)`. The explicit `POST /graph/ingest` and the `article:viewed` trigger
   both use it; do not duplicate it.
@@ -600,7 +598,7 @@ per-item review → promotion to RLCF `pending_*` → community vote.
 
 | Route | Notes |
 |---|---|
-| `POST /contrib/documents` | multer; PDF, TXT or DOCX up to 50 MB |
+| `POST /contrib/documents` | multer; PDF, TXT or DOCX up to 10 MB (the declared length is checked before multer reads the body) |
 | `POST /contrib/documents/:id/extract` | creates a `MerltExtractionJob` and enqueues |
 | `GET /contrib/documents/:id/candidates` | MERL-T scopes it with the caller's `user_id` |
 | `GET /contrib/jobs/:jobId/status`, `GET /contrib/me/jobs` | authenticate only, owner-scoped |
@@ -942,11 +940,13 @@ though that doc's header still says DRAFT.
   (`conflict_report.massimario`) and its paragraphs in `extras`; promotion
   writes the graph, then a chained job (`merlt_bulk`) writes vectors and bridge
   rows 100 paragraphs at a time, with progress in `stats.vectors`.
-- Reader: `GET /api/merlt/rassegne?urn&anno&archivio&cursor` (authenticated,
-  no sub-flag, no consent) → MERL-T `GET /api/v1/rassegne/by-norma`. The BFF
-  strips the URN's version marker; any MERL-T failure, an upstream 401
-  included, is `503 merlt_unavailable`. The web panel
-  (`features/merlt/rassegne`) sits in the `article_content_after` slot.
+- Reader: no longer MERL-T's (design
+  `2026-10-30-rassegne-without-merlt`, G-394). The web's panel
+  (`components/features/rassegne`, a block of «Giurisprudenza», no plugin)
+  reads the Python API's own store through `/fetch_rassegne`; the BFF's
+  `/api/merlt/rassegne` and `graphClient.rassegneByNorma` are gone. MERL-T's
+  `rassegne_router.py` and `reader.py` stay until PR 3 deletes them; nothing
+  calls them.
 
 **Graph co-evolution.** The design is
 `docs/superpowers/specs/2026-07-16-merlt-graph-coevolution-design.md`; see
@@ -1070,10 +1070,9 @@ the worker share.
 ### MERL-T testing
 
 - **Backend.** vitest + supertest on a real Postgres test DB, with nock
-  through `apps/server/tests/nockShim.ts`. `apps/server/tests/setup.ts` truncates
-  `merlt_qa_jobs`, `merlt_ingestion_jobs`, `merlt_extraction_jobs`,
-  `merlt_consent_audits`, `merlt_user_preferences` and
-  `merlt_user_authority_cache` between tests.
+  through `apps/server/tests/nockShim.ts`. `apps/server/tests/setup.ts` empties
+  every table before each test, the `merlt_*` ones included (`apps/server/CLAUDE.md`,
+  Tests).
 - **Frontend.** vitest + jsdom.
 - **CI.** `.github/workflows/ci.yml` runs on `main` and `develop`. Its
   `merlt` job, on `develop` and on pull requests into it, runs the MERL-T suite on Python 3.11

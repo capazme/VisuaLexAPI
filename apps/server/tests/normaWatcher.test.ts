@@ -91,7 +91,7 @@ describe('runNormaWatcher', () => {
   });
 
   async function seedWatch(normaKey: string, storedSnapshot: unknown) {
-    // A fresh user per call: setup.ts truncates `users` (CASCADE) before every
+    // A fresh user per call: setup.ts empties every table, `users` too, before every
     // test, so reusing a `user` created in an earlier test would point
     // `seedWatch` at a userId that no longer exists.
     user = await createTestUser(`watcher-${normaKey}`);
@@ -131,6 +131,21 @@ describe('runNormaWatcher', () => {
     expect(notifications).toHaveLength(1);
     // A snapshot that names no article is named by its key, as before.
     expect(notifications[0].message).toBe(`La norma salvata «${watch.normaKey}» è cambiata`);
+  });
+
+  it('watches a part of a split article as that part (G-387 (a))', async () => {
+    process.env.LEGAL_API_URL = 'http://legal-api.test';
+    await seedWatch('legge--296--2006-12-27--1--c701-800', {
+      norma_data: { tipo_atto: 'legge', numero_atto: '296', data: '2006-12-27', numero_articolo: '1', parte: '701-800' },
+      article_text: 'Old text',
+    });
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
+      bodies.push(JSON.parse(init.body));
+      return { ok: true, json: async () => [{ norma_data: { tipo_atto: 'legge' }, article_text: 'Old text' }] };
+    }));
+    await runNormaWatcher();
+    expect(bodies).toEqual([expect.objectContaining({ article: '1', parte: '701-800' })]);
   });
 
   it('strips a trailing slash on the base URL instead of producing a double slash', async () => {
@@ -208,6 +223,30 @@ describe('runNormaWatcher', () => {
     const updated = await prisma.normaWatch.findUnique({ where: { id: watch.id } });
     expect(updated?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - 10_000);
     expect((updated?.normaData as { article_text?: string })?.article_text).toBe('Old text');
+    expect(await prisma.normaChangeNotification.count({ where: { watchId: watch.id } })).toBe(0);
+  });
+
+  it('neither notifies nor stores an AKN fallback text (scan A.7)', async () => {
+    // The AKN export is a different string from the HTML text (accents transliterated, a
+    // markdown heading): compared with the stored HTML text it would always read as a change,
+    // and stored it would make the HTML text's return read as one too.
+    process.env.LEGAL_API_URL = 'http://legal-api.test';
+    const watch = await seedWatch('legge--7--2020--1', {
+      norma_data: { tipo_atto: 'legge' },
+      article_text: 'Old text',
+    });
+    await prisma.normaWatch.update({ where: { id: watch.id }, data: { lastSeenAt: new Date(Date.now() - 60_000) } });
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => [{ norma_data: { tipo_atto: 'legge' }, article_text: "### Art. 1\n\ne' il testo", text_source: 'akn' }],
+    })));
+
+    await runNormaWatcher();
+
+    const updated = await prisma.normaWatch.findUnique({ where: { id: watch.id } });
+    expect((updated?.normaData as { article_text?: string })?.article_text).toBe('Old text');
+    expect(updated?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - 10_000);
     expect(await prisma.normaChangeNotification.count({ where: { watchId: watch.id } })).toBe(0);
   });
 

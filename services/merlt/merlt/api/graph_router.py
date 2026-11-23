@@ -627,7 +627,7 @@ async def search_entities(
     # Limit max results
     limit = min(limit, 50)
 
-    log.info("Searching entities", query=q, article_urn=article_urn, include_pending=include_pending, limit=limit)
+    log.info("Searching entities", query_chars=len(q), article_urn=article_urn, include_pending=include_pending, limit=limit)
 
     all_entities = []
 
@@ -766,7 +766,7 @@ async def search_entities(
 
     log.info(
         "Entity search completed",
-        query=q,
+        query_chars=len(q),
         total_results=len(all_entities),
         approved_count=sum(1 for e in all_entities if not e["is_pending"]),
         pending_count=sum(1 for e in all_entities if e["is_pending"]),
@@ -1803,7 +1803,7 @@ async def search_graph(
 
     log.info(
         "Graph semantic search",
-        query=request.query,
+        query_chars=len(request.query),
         filters=request.filters,
         limit=request.limit,
     )
@@ -2079,7 +2079,7 @@ async def search_graph(
 
             log.info(
                 "Graph search completed",
-                query=request.query,
+                query_chars=len(request.query),
                 nodes_count=len(top_nodes),
                 edges_count=len(filtered_edges),
                 query_time_ms=query_time,
@@ -2105,7 +2105,7 @@ async def search_graph(
             await graph_client.close()
 
     except Exception as e:
-        log.error(f"Graph search failed: {e}", query=request.query, exc_info=True)
+        log.error(f"Graph search failed: {e}", query_chars=len(request.query), exc_info=True)
         raise HTTPException(status_code=500, detail=f"Graph search failed: {str(e)}")
 
 

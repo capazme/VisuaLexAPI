@@ -7,9 +7,10 @@ from .text_op import normalize_act_type, parse_date
 from .map import EURLEX, codice_urn
 from .exceptions import ValidationError
 from ..services.eurlex_scraper import EurlexScraper
-from ..services.act_dates import complete_year
+from ..services.act_dates import complete_year, lookup_year
 
-# Configure logging
+# Configure logging. The lines that name an act, an article or an address are at debug: the
+# norms of a document the user may hold confidential pass here (/fetch_norm_links).
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
                     handlers=log_handlers("norma.log"))
@@ -27,19 +28,36 @@ async def complete_request_date(act_type, date, act_number):
     year stands, never another act's date. A full date is read into ISO for the types
     above and passed on unchanged for the others; no date stays no date.
     """
+    return (await _request_date(act_type, date, act_number, _year_only))[0]
+
+
+async def read_request_date(act_type, date, act_number):
+    """`(date, unavailable)`: `complete_request_date`'s date, and whether a year stood only
+    because Normattiva did not answer the lookup (`act_dates.lookup_year`). The links of a
+    filing answer that «source unavailable», not «date incomplete» (/fetch_norm_links)."""
+    return await _request_date(act_type, date, act_number, lookup_year)
+
+
+async def _year_only(act_type, year, act_number):
+    # complete_year by its module name, so a test that patches it reaches the fetch path.
+    return await complete_year(act_type, year, act_number), False
+
+
+async def _request_date(act_type, date, act_number, complete):
     if date is None or str(date).strip() == '':
-        return None
+        return None, False
     date = str(date).strip()
     if re.fullmatch(r"\d{4}", date):
         if not act_number:
-            return date
-        return await complete_year(act_type, date, act_number)
+            return date, False
+        found, unavailable = await complete(act_type, date, act_number)
+        return found, unavailable
     if act_type in _SPELLED_DATE_TYPES:
         try:
-            return parse_date(date)
+            return parse_date(date), False
         except ValueError:
             raise ValidationError(f"Data non valida: {date}")
-    return date
+    return date, False
 
 
 def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None,
@@ -61,7 +79,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     Returns:
     str -- The generated URN
     """
-    logging.info(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, annex: {annex}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
+    logging.debug(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, annex: {annex}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
     normalized_act_type = normalize_act_type(act_type)
     
@@ -87,7 +105,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     codice_fragment = codice_urn(normalized_act_type)
     if codice_fragment:
         urn = codice_fragment
-        logging.info(f"URN found in the codici table: {urn}")
+        logging.debug(f"URN found in the codici table: {urn}")
 
         # IMPORTANT: The URN from the codici table may already contain an allegato suffix (e.g., ":1")
         # Pattern: "regio.decreto:1930-10-19;1398:1" where the final ":1" is the allegato
@@ -97,7 +115,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
         if allegato_match:
             base_urn = allegato_match.group(1)  # URN without allegato
             default_allegato = allegato_match.group(2)  # The default allegato from the map
-            logging.info(f"Stripped default allegato {default_allegato} from codice URN, base: {base_urn}")
+            logging.debug(f"Stripped default allegato {default_allegato} from codice URN, base: {base_urn}")
 
             # If annex is explicitly None, use the base URN (dispositivo)
             # If annex is provided, it will be added later in the code
@@ -111,9 +129,11 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
             formatted_date = complete_date_or_parse(date, act_type, act_number)
             # An act with no number (a d.p.c.m.) has no ";": never ";None".
             urn = f"{normalized_act_type_urn}:{formatted_date}" + (f";{act_number}" if act_number else "")
-            logging.info(f"Generated base URN: {urn}")
+            logging.debug(f"Generated base URN: {urn}")
         except Exception as e:
-            logging.error(f"Error generating URN: {e}", exc_info=True)
+            # The type only above debug: the message may quote the act.
+            logging.error("Error generating URN: %s", type(e).__name__)
+            logging.debug(f"Error generating URN: {e}", exc_info=True)
             return None
     
     if annex:
@@ -125,7 +145,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
 
     final_urn = base_url + urn
     result = final_urn if urn_flag else final_urn.split("~")[0]
-    logging.info(f"Final URN: {result}")
+    logging.debug(f"Final URN: {result}")
     
     return result
 
@@ -171,7 +191,7 @@ def append_article_info(urn, article, extension):
         urn += f"~art{article}"
         if extension:
             urn += extension
-        logging.info(f"Appended article info to URN: {urn}")
+        logging.debug(f"Appended article info to URN: {urn}")
     return urn
 
 def append_version_info(urn, version, version_date):
@@ -200,7 +220,7 @@ def append_version_info(urn, version, version_date):
         urn += "@originale"
     elif version == "vigente":
         urn += "!vig="
-    logging.info(f"Appended version info to URN: {urn}")
+    logging.debug(f"Appended version info to URN: {urn}")
     return urn
 
 _UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
@@ -281,13 +301,32 @@ def export_url(urn, today):
     return _N2LS + pdf_urn_in_force(_exported_urn(urn), today)
 
 
+URN_TOO_LONG = "URN too long for a file name"
+
+# The parts of an exportable URN, in their places (the grammar of `_EXPORTABLE_URN`).
+_URN_PARTS = re.compile(
+    r"urn:nir:(?P<authority>[a-z]+(?:\.[a-z]+)*):(?P<kind>[a-z]+(?:\.[a-z]+)*)(?::(?P<date>\d{4}(?:-\d{2}-\d{2})?))?"
+    r"(?:;(?P<number>[0-9A-Za-z.-]+))?(?::(?P<annex>[0-9A-Za-z]+))?(?:~art[0-9A-Za-z.-]+)?"
+    r"(?P<version>!vig=(?:\d{4}-\d{2}-\d{2})?|@originale)?",
+    re.ASCII,
+)
+
+
+def export_version_date(url):
+    """The day an export's address asks for (`!vig=<day>`), or None: the original, or no day."""
+    match = re.search(r"!vig=(\d{4}-\d{2}-\d{2})", url or "")
+    return match.group(1) if match else None
+
+
 def urn_to_filename(urn):
     """
-    Converts a URN to a filename: the act (type, date, number, annex) and its version.
+    Converts a URN to a filename: the act (authority, type, date, number, annex) and its version.
 
-    The article is left out: the export is the act's. Until 21 October 2026 the name was
-    the number and the year alone, so acts of different types with the same number and
-    year, and an act's versions, shared one cached file.
+    The article is left out: the export is the act's. Each part has its place, joined by «_»,
+    which no part of the grammar holds, so two URNs never share a name: until 21 October 2026
+    the name was the number and the year alone, and until 25 October it dropped the authority
+    and read «:» and «;» alike. A name over the limit is refused (ValueError), never cut: a
+    cut would drop the version.
 
     Arguments:
     urn -- The URN string
@@ -296,16 +335,15 @@ def urn_to_filename(urn):
     str -- The generated filename: always a bare file name, safe to join to a directory
     """
     logging.info(f"Converting URN to filename: {urn}")
-    exported = _exported_urn(urn)
-    try:
-        act = exported.split('stato:')[1].split('~')[0]
-    except IndexError:
-        logging.error("Invalid URN format")
+    parts = _URN_PARTS.fullmatch(_exported_urn(urn))
+    if not parts:
         raise ValueError("Invalid URN format")
-    act = _VERSION_IN_URN.sub("", act).replace("!vig=", "")
-    version = _VERSION_IN_URN.search(exported)
-    marker = version.group(0).replace("!vig=", "_vig_").replace("@", "_") if version else ""
-    filename = _safe_filename(f"{act}{marker}.pdf".replace(":", "_").replace(";", "_"))
+    version = parts["version"] or ""
+    version = "originale" if version == "@originale" else version.replace("!vig=", "vig") if version else ""
+    name = "_".join(parts[key] or "" for key in ("authority", "kind", "date", "number", "annex")) + f"_{version}.pdf"
+    if len(name) > _MAX_FILENAME:
+        raise ValueError(URN_TOO_LONG)
+    filename = _safe_filename(name)
     logging.info(f"Generated filename: {filename}")
     return filename
 

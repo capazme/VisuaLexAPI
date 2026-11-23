@@ -20,6 +20,7 @@ later from the user's reviewed/reformulated text.
 
 from __future__ import annotations
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import logging
 import os
 from dataclasses import dataclass, field
@@ -151,7 +152,7 @@ class RelationExtractor:
 
     def _llm_config(self) -> Dict[str, Any]:
         return {
-            "model": os.environ.get("LLM_ENRICHMENT_MODEL", "google/gemini-2.5-flash"),
+            "model": os.environ.get("LLM_ENRICHMENT_MODEL", DEFAULT_FAST_MODEL),
             "temperature": 0.0,
             "max_tokens": 2000,
             "timeout": 60,

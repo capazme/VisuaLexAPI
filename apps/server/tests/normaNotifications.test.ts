@@ -8,6 +8,16 @@ describe('saved norm change notifications', () => {
     user = await createTestUser('norma-watch-user');
   });
 
+  it('registers no watch for a recital (spec 2026-11-17 §6.3)', async () => {
+    const recital = { norma_data: { tipo_atto: 'regolamento ue', numero_atto: '679', data: '2016', considerando: '26' }, article_text: 'Testo del considerando' };
+    const res = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: 'celex:32016R0679~rct26', normaData: recital });
+    expect(res.body).toEqual({ watched: false, changed: false });
+    expect(await prisma.normaWatch.count({ where: { userId: user.id } })).toBe(0);
+  });
+
   it('creates a watch, ignores equal snapshots, and records body changes', async () => {
     const first = { norma_data: { tipo_atto: 'legge', numero_atto: '1', data: '2020', numero_articolo: '1' }, article_text: 'Testo uno' };
     const second = { ...first, article_text: 'Testo due' };
@@ -66,6 +76,40 @@ describe('saved norm change notifications', () => {
       .send({ normaKey: 'legge--10--2020--1', normaData: { norma_data: { tipo_atto: 'legge' }, article_text: '' } });
     expect(unknown.body).toEqual({ watched: false, changed: false });
     expect(await prisma.normaWatch.count({ where: { userId: user.id, normaKey: 'legge--10--2020--1' } })).toBe(0);
+
+    await prisma.normaWatch.deleteMany({ where: { userId: user.id } });
+  });
+
+  it('neither notifies nor stores an AKN fallback text the reader was shown (scan A.7)', async () => {
+    const key = 'legge--11--2020--1';
+    const populated = { norma_data: { tipo_atto: 'legge' }, article_text: 'Testo pieno' };
+    await request(app).post('/api/notifications/normas/check').set(authHeader(user)).send({ normaKey: key, normaData: populated });
+
+    const akn = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: key, normaData: { norma_data: { tipo_atto: 'legge' }, article_text: "### Art. 1\n\ne' il testo", text_source: 'akn' } });
+    expect(akn.status).toBe(200);
+    expect(akn.body).toEqual({ watched: true, changed: false });
+
+    const stored = await prisma.normaWatch.findUnique({ where: { userId_normaKey: { userId: user.id, normaKey: key } } });
+    expect((stored?.normaData as { article_text?: string })?.article_text).toBe('Testo pieno');
+    expect(await prisma.normaChangeNotification.count({ where: { userId: user.id } })).toBe(0);
+
+    // The web does not send the field yet: the export's heading tells it.
+    const unmarked = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: key, normaData: { norma_data: { tipo_atto: 'legge' }, article_text: "### Art. 1\n\ne' il testo" } });
+    expect(unmarked.body).toEqual({ watched: true, changed: false });
+    expect(await prisma.normaChangeNotification.count({ where: { userId: user.id } })).toBe(0);
+
+    // Nor does it start a watch: its first snapshot would be a text that is never served again.
+    const fresh = await request(app)
+      .post('/api/notifications/normas/check')
+      .set(authHeader(user))
+      .send({ normaKey: 'legge--12--2020--1', normaData: { norma_data: { tipo_atto: 'legge' }, article_text: 'x', text_source: 'akn' } });
+    expect(fresh.body).toEqual({ watched: false, changed: false });
 
     await prisma.normaWatch.deleteMany({ where: { userId: user.id } });
   });

@@ -5,7 +5,7 @@ import { SOGLIE_PREDEFINITE, Soglie, stateAfterVotes } from './validationRule';
  * The validation thresholds an administrator sets (Studia spec 2026-10-18). The
  * database holds one row per key (`lingo_impostazioni`), every change is logged
  * (`lingo_impostazioni_log`), and a missing row reads as the default: the test
- * reset truncates `users` with cascade, which empties the rows.
+ * setup empties every table before each test, these rows too.
  *
  * Every function takes the transaction it runs in. The locks are taken in one
  * order everywhere: the cards by id, then the settings (account deletion does the
@@ -78,7 +78,7 @@ export async function anteprimaSoglie(db: Db, soglie: Soglie): Promise<Anteprima
  * account is gone is deleted, as the vote route does: nobody could see it.
  */
 export async function applicaSoglie(db: Db, nuove: Soglie, utenteId: string): Promise<EsitoSoglie> {
-  // The rows exist before they are locked (a truncated test database has none).
+  // The rows exist before they are locked (an emptied test database has none).
   await db.$executeRaw`
     INSERT INTO lingo_impostazioni (chiave, valore) VALUES
       ('SOGLIA_APPROVAZIONI', ${SOGLIE_PREDEFINITE.approvazioni}), ('SOGLIA_ERRATE', ${SOGLIE_PREDEFINITE.errate})

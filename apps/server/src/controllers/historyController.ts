@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { boundedText, refuseTooLong } from '../utils/bodyLimits';
 import type { SearchHistory } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { readDecisionKey } from '../norms/decisionKey';
@@ -9,11 +10,11 @@ import { readDecisionKey } from '../norms/decisionKey';
 // one alone is the answer, as in the discussion controller. Unknown fields are ignored, as they
 // always were; parseHistory refuses the two kinds together before the schemas see the body.
 const normFields = z.object({
-  act_type: z.string().min(1),
-  act_number: z.string().optional(),
-  article: z.string().optional(),
-  date: z.string().optional(),
-  version: z.string().optional().default('vigente'),
+  act_type: boundedText(200, 'tipo di atto').min(1),
+  act_number: boundedText(100, 'numero').optional(),
+  article: boundedText(5_000, 'articolo').optional(),
+  date: boundedText(100, 'data').optional(),
+  version: boundedText(100, 'versione').optional().default('vigente'),
 });
 
 const decisionFields = z.object({
@@ -31,6 +32,7 @@ function parseHistory(body: unknown): HistoryInput {
   if (!hasDecision && !hasNorm) throw new AppError(400, 'Manca la norma o la sentenza');
   const result = (hasDecision ? decisionFields : normFields).safeParse(body);
   if (!result.success) {
+    refuseTooLong(result.error);
     throw new AppError(400, hasDecision ? 'La chiave della sentenza non è valida' : 'La norma della cronologia non è valida');
   }
   return result.data;

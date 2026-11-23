@@ -3,9 +3,14 @@ import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 
 export class AppError extends Error {
+  /**
+   * `code`, when given, is answered as `error`: a stable name a client can act on without reading the
+   * Italian `detail` (as `{ detail, error }` elsewhere, e.g. `insufficient_scope`).
+   */
   constructor(
     public statusCode: number,
     public message: string,
+    public code?: string,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -13,15 +18,55 @@ export class AppError extends Error {
   }
 }
 
+const SAFE_TOKEN = /^[A-Za-z0-9_.-]{1,80}$/;
+
+/**
+ * What the log says of an unexpected error: its kind, Prisma's code and the model and fields it names, the request's
+ * method and path, and where it was thrown. Never its message: a Prisma validation error quotes the query's arguments
+ * (the text the user was saving, an act with a client's name in it), and other errors may quote their input. Whoever
+ * reads the logs on the host must not read that. The stack keeps its frames, not its first line, which repeats the
+ * message. The path, not the URL: a query string can carry what the user searched for.
+ */
+export function describeUnexpectedError(err: unknown, req?: Pick<Request, 'method' | 'path'>): string {
+  const where = req ? ` on ${req.method} ${String(req.path).slice(0, 200)}` : '';
+  if (!(err instanceof Error)) return `a thrown ${typeof err}, not an Error${where}`;
+
+  const parts = [SAFE_TOKEN.test(err.name) ? err.name : 'Error'];
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === 'string' && SAFE_TOKEN.test(code)) parts.push(`code ${code}`);
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.meta) {
+    const { modelName, target } = err.meta as { modelName?: unknown; target?: unknown };
+    if (typeof modelName === 'string' && SAFE_TOKEN.test(modelName)) parts.push(`model ${modelName}`);
+    const fields = Array.isArray(target) ? target : typeof target === 'string' ? [target] : [];
+    const named = fields.filter((field): field is string => typeof field === 'string' && SAFE_TOKEN.test(field));
+    if (named.length) parts.push(`fields ${named.join(',')}`);
+  }
+
+  // V8 writes `${name}: ${message}` first, then one line per frame: keep only the frames. A stack that does not start
+  // with that header (rewritten by a library, or a message changed after the stack was read) cannot be told apart from
+  // its message, so none of it is written.
+  const stack = typeof err.stack === 'string' ? err.stack : '';
+  const header = String(err);
+  if (!stack.startsWith(header)) return `${parts.join(', ')}${where} (stack omitted)`;
+  const frames = stack
+    .slice(header.length)
+    .split('\n')
+    .filter((line) => /^\s+at /.test(line))
+    .slice(0, 10)
+    .join('\n');
+  return `${parts.join(', ')}${where}${frames ? `\n${frames}` : ''}`;
+}
+
 export const errorHandler = (
   err: Error | AppError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) => {
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       detail: err.message,
+      ...(err.code ? { error: err.code } : {}),
     });
   }
 
@@ -83,7 +128,7 @@ export const errorHandler = (
     if (err.code === 'P2002') return res.status(409).json({ detail: 'Already exists' });
   }
 
-  console.error('Unexpected error:', err);
+  console.error(`Unexpected error: ${describeUnexpectedError(err, req)}`);
 
   return res.status(500).json({
     detail: 'Internal server error',

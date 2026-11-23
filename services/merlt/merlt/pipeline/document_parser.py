@@ -439,7 +439,7 @@ class DocumentParserService:
                                 if dres.best_match:
                                     potential_dup = dres.best_match.entity_id
                             except Exception as dup_exc:  # dedup is best-effort
-                                log.warning("dedup check failed", entity=entity_data.nome, exc=str(dup_exc))
+                                log.warning("dedup check failed", entity_chars=len(entity_data.nome), exc=str(dup_exc))
                             row = ExtractionCandidate(
                                 document_id=document_id,
                                 contributor_id=user_id,
@@ -450,7 +450,7 @@ class DocumentParserService:
                                 descrizione=entity_data.descrizione or "",
                                 verbatim_excerpt=snippet,
                                 llm_confidence=entity_data.confidence or 0.8,
-                                llm_model="google/gemini-2.5-flash",
+                                llm_model=extractor._get_llm_config()["model"],
                                 potential_duplicate_of=potential_dup,
                                 status="draft",
                                 # #3: ephemeral — purged after this TTL if not promoted.
@@ -467,7 +467,7 @@ class DocumentParserService:
                                 ambito=legal_domain or "",
                                 fonte="llm_extraction",
                                 llm_confidence=entity_data.confidence or 0.8,
-                                llm_model="google/gemini-2.5-flash",
+                                llm_model=extractor._get_llm_config()["model"],
                                 llm_reasoning=snippet,  # Context snippet
                                 contributed_by=user_id,
                                 contributor_authority=0.5,
@@ -478,10 +478,10 @@ class DocumentParserService:
                         entities_count += 1
 
                         log.debug(
-                            f"Extracted entity: {entity_data.nome} ({entity_data.tipo})"
+                            f"Extracted entity ({entity_data.tipo}, {len(entity_data.nome)} chars)"
                         )
                         log.info(
-                            f"✅ Added to session: {entity_id} - {entity_data.nome}"
+                            f"✅ Added to session: {entity_id}"
                         )
 
                 except Exception as e:
@@ -600,7 +600,7 @@ class DocumentParserService:
                         descrizione=rel.descrizione or "",
                         verbatim_excerpt=snippet,
                         llm_confidence=rel.confidence,
-                        llm_model="google/gemini-2.5-flash",
+                        llm_model=extractor._llm_config()["model"],
                         status="draft",
                         expires_at=datetime.now() + timedelta(hours=STAGING_TTL_HOURS),
                     )
@@ -616,7 +616,7 @@ class DocumentParserService:
                         certezza=rel.confidence,
                         fonte="llm_extraction",
                         llm_confidence=rel.confidence,
-                        llm_model="google/gemini-2.5-flash",
+                        llm_model=extractor._llm_config()["model"],
                         contributed_by=user_id,
                         contributor_authority=0.5,
                         validation_status="pending",
@@ -706,7 +706,7 @@ class DocumentParserService:
                     )
                     resolved = strong[0].entity_id
             except Exception as exc:  # resolution is best-effort
-                log.warning("relation endpoint dedup failed", endpoint=raw, exc=str(exc))
+                log.warning("relation endpoint dedup failed", endpoint_chars=len(str(raw)), exc=str(exc))
 
         if resolved is not None and len(resolved) > ENDPOINT_MAX_LEN:
             resolved = None

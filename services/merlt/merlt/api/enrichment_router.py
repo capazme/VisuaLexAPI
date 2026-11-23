@@ -15,6 +15,7 @@ Endpoint:
 - GET /enrichment/pending - Lista pending per validazione
 """
 
+from merlt.config.llm_models import DEFAULT_FAST_MODEL
 import asyncio
 import os
 import re
@@ -727,7 +728,7 @@ async def _save_entities_to_db(
             # Quality gate: never persist junk entity names
             entity_name = entity_data.get("nome", "")
             if not is_valid_entity_name(entity_name, entity_type_str):
-                log.warning("Skipping junk entity (LLM extraction)", nome=entity_name, tipo=entity_type_str)
+                log.warning("Skipping junk entity (LLM extraction)", nome_chars=len(entity_name), tipo=entity_type_str)
                 skipped += 1
                 continue
 
@@ -1128,7 +1129,7 @@ async def live_enrich(
 
                 # Quality gate: never persist junk entity names
                 if not is_valid_entity_name(entity_data.nome, entity_type_str):
-                    log.warning("Skipping junk entity (live enrich)", nome=entity_data.nome, tipo=entity_type_str)
+                    log.warning("Skipping junk entity (live enrich)", nome_chars=len(entity_data.nome), tipo=entity_type_str)
                     continue
 
                 # Get user authority for this domain
@@ -1151,7 +1152,7 @@ async def live_enrich(
                     ambito=entity_data.ambito,
                     fonte="llm_extraction",
                     llm_confidence=entity_data.llm_confidence,
-                    llm_model=os.environ.get("LLM_ENRICHMENT_MODEL", "google/gemini-2.5-flash"),
+                    llm_model=os.environ.get("LLM_ENRICHMENT_MODEL", DEFAULT_FAST_MODEL),
                     validation_status="pending",
                     contributed_by=request.user_id,
                     contributor_authority=voter_authority,
@@ -2183,7 +2184,7 @@ async def check_entity_duplicate(
     """
     log.info(
         "API: check_entity_duplicate",
-        entity_text=request.entity_text,
+        entity_chars=len(request.entity_text),
         entity_type=request.entity_type,
         scope=request.scope,
     )
@@ -2337,7 +2338,7 @@ async def propose_entity(
     log.info(
         "API: propose_entity",
         tipo=request.tipo,
-        nome=request.nome,
+        nome_chars=len(request.nome),
         user_id=request.user_id,
         skip_duplicate_check=request.skip_duplicate_check,
     )
@@ -2353,7 +2354,7 @@ async def propose_entity(
 
     # Quality gate: reject junk entity names before writing to pending_entities
     if not is_valid_entity_name(request.nome, tipo_str):
-        log.info("Rejected junk entity proposal", nome=request.nome, tipo=tipo_str)
+        log.info("Rejected junk entity proposal", nome_chars=len(request.nome), tipo=tipo_str)
         return EntityProposalResponse(
             success=False,
             pending_entity=None,
@@ -2406,7 +2407,7 @@ async def propose_entity(
             if has_exact_match:
                 log.info(
                     "Exact duplicate found, action required",
-                    exact_match=dedup_result.exact_match.entity_text if dedup_result.exact_match else None,
+                    exact_match_chars=len(dedup_result.exact_match.entity_text) if dedup_result.exact_match else None,
                 )
 
                 return EntityProposalResponse(
@@ -4131,7 +4132,7 @@ async def export_dossier_training_set_full(
 
     log.info(
         "API: export_dossier_training_set_full",
-        dossier_title=dossier_title,
+        dossier_title_chars=len(dossier_title),
         articles_count=len(articles),
         user_id=user_id,
     )

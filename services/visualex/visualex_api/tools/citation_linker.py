@@ -14,9 +14,12 @@ from bisect import bisect_right
 from dataclasses import dataclass
 from typing import Optional
 
+from .act_identity import NUMBERED_ACT_TYPES
+from .article_clause import ARTICLE_CLAUSE_SOURCE
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import NORMATTIVA_SEARCH
 from .nl_parser import build_eu_act_pattern, eu_act_from_groups
+from .regional_law import regional_law_spans
 
 # Pre-build lowercase lookup for case-insensitive resolution
 _SEARCH_LOWER = {k.lower(): v for k, v in NORMATTIVA_SEARCH.items()}
@@ -41,16 +44,11 @@ _ACT_ABBREV_PATTERN = (
     "(?:" + "|".join(re.escape(a) for a in _ACT_ABBREVS) + r")(?![A-Za-z])(?!['\u2019][A-Za-z])(?!\s+milita(?:re|ri)\b)"
 )
 
-# Acts that cannot be opened without a number. One that comes out of a
-# pattern number-less ("art. 17 della legge 23 agosto 1988, n. 400" — a form
-# no pattern reads) stays in the result, but must not take over the context
+# Acts that cannot be opened without a number (act_identity.py, the convention's list).
+# One that comes out of a pattern number-less ("art. 17 della legge 23 agosto 1988, n. 400"
+# — a form no pattern reads) stays in the result, but must not take over the context
 # of the bare articles after it: they would inherit an act nobody can open.
-_NUMBERED_ACT_TYPES = frozenset({
-    "legge", "decreto legge", "decreto legislativo",
-    "decreto del presidente della repubblica", "regio decreto",
-    "decreto ministeriale", "regolamento ue", "direttiva ue",
-    "legge costituzionale", "regio decreto legge", "decreto legislativo luogotenenziale",
-})
+_NUMBERED_ACT_TYPES = NUMBERED_ACT_TYPES
 
 # One article: a number, an optional bis/ter/.../terdecies suffix or a range
 # ("1-10"). The suffix table is the shared one — numbering goes far past
@@ -83,33 +81,13 @@ _ARTICLE_LIST_SOURCE = (
     _ARTICLE_NUMBER_RE.pattern
     + r"(?:\s*+(?:,|\be\b)\s*+" + _ARTICLE_NUMBER_RE.pattern + r")*"
 )
-# "comma 1", "co. 3", "commi 1 e 2", "comma 1, lett. b)": qualifies the
-# article, never the act. The closing comma ("art. 5, comma 1, del …") is
-# ordinary Italian punctuation and is consumed by the act-binding patterns.
-# Texts also write the paragraph as a word, after or before «comma» («commi
-# secondo, terzo e quarto»; «secondo comma», as Normattiva's own texts do), with
-# its own suffix («comma 3-bis»), and follow it with a number («comma 2, n. 3»;
-# «n.1»). Unread, the clause broke the match and the article fell to the bare
-# pattern and the context: «articolo 52, commi secondo, terzo e quarto, del
-# codice penale» in art. 2044 c.c. became art. 52 c.c. in the graph.
-_COMMA_ORDINAL_SOURCE = r"(?:primo|secondo|terzo|quarto|quinto|sesto|settimo|ottavo|nono|decimo)\b"
-# A list goes on in the kind it started with: after «comma 4,» an ordinal is the
-# sentence's («secondo periodo», «secondo la Corte»), never a paragraph; and an
-# ordinal before «periodo» is a sentence of the paragraph, not another paragraph.
-_COMMA_ORDINAL_ITEM_SOURCE = _COMMA_ORDINAL_SOURCE + r"(?!\s++periodo\b)"
-_COMMA_DIGITS_SOURCE = r"\d+(?:\s*+(?:-\s*+)?" + _SUFFIX_SOURCE + r")?"
-_LIST_SEPARATOR_SOURCE = r"\s*+(?:,|\be\b)\s*+"
-_COMMA_CLAUSE_SOURCE = (
-    r"(?:\s*+(?:,\s*+)?(?:"
-    r"(?:comm[ai]|co)\.?\s*+(?:"
-    + _COMMA_DIGITS_SOURCE + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_DIGITS_SOURCE + r")*"
-    r"|" + _COMMA_ORDINAL_ITEM_SOURCE
-    + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_ORDINAL_ITEM_SOURCE + r")*)"
-    r"|" + _COMMA_ORDINAL_SOURCE + r"(?:" + _LIST_SEPARATOR_SOURCE + _COMMA_ORDINAL_SOURCE + r")*"
-    r"\s++comm[ai]\b)"
-    r"(?:\s*+(?:,\s*+)?nn?\.\s*+\d+(?:" + _LIST_SEPARATOR_SOURCE + r"\d+)*)?)?"
-    r"(?:\s*+(?:,\s*+)?(?:lett\.?|lettera)\s*+[a-z]\b\)?)?"
-)
+# The clause after the article («comma 1», «secondo comma», «par. 1», «n. 3», «lett.
+# b)»): qualifies the article, never the act, and is the search's too (article_clause.py).
+# The closing comma ("art. 5, comma 1, del …") is ordinary Italian punctuation and is
+# consumed by the act-binding patterns. Unread, a clause broke the match and the
+# article fell to the bare pattern and the context: «articolo 52, commi secondo, terzo
+# e quarto, del codice penale» in art. 2044 c.c. became art. 52 c.c. in the graph.
+_COMMA_CLAUSE_SOURCE = ARTICLE_CLAUSE_SOURCE
 
 # Pattern: "art. N [suffix] [comma N] <act_abbrev>"
 _EXPLICIT_CITE_RE = re.compile(
@@ -293,6 +271,17 @@ def extract_citations(
             used_starts.insert(i, c.start)
             used_ends.insert(i, c.end)
 
+    # A regional law is never read as a State law (G-577): its citation, with the article written
+    # before it, is taken before any pass, so no pattern links «legge 65/2014 della Regione
+    # Toscana» to the legge 65/2014; and it ends the context, so a bare «art. 4» after it does
+    # not fall to the act named before it.
+    regional = regional_law_spans(text)
+    for start, end in regional:
+        if not _overlaps(start, end):
+            i = bisect_right(used_starts, start)
+            used_starts.insert(i, start)
+            used_ends.insert(i, end)
+
     def _register_eu(m: re.Match, list_group: int, act_start: int, act_end: int,
                      resolved: tuple[str, str, str]) -> None:
         """One Citation for a single article (the whole match, act included);
@@ -431,9 +420,12 @@ def extract_citations(
     # the year travel with the act type — with the type alone, an EU act was
     # unreachable and a numbered national one opened the wrong act.
     current_context = (context_act_type, None, None) if context_act_type else None
+    regional_starts, k = [start for start, _ in regional], 0
     for c in citations:
+        while k < len(regional_starts) and regional_starts[k] < c.start:
+            current_context, k = None, k + 1
         if c.act_type:
-            if c.act_number or c.act_type not in _NUMBERED_ACT_TYPES:
+            if c.act_number or c.act_type.casefold() not in _NUMBERED_ACT_TYPES:
                 current_context = (c.act_type, c.act_number, c.date)
         elif current_context:
             c.act_type, c.act_number, c.date = current_context

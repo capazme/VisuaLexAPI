@@ -6,9 +6,9 @@ import { atMostUnits } from '../utils/utf16Length';
 import { isSwitchOn } from './switches';
 
 /**
- * Notes and marks written by an assistant, validated by hand (D7b, first cut). The state belongs to the
- * assistant's NOTE, never to the highlight: a mark with no note is only the assistant's mark (provenance,
- * removable), with no state. A note starts `proposed` (yellow), becomes `validated` (green; «modificato da
+ * Notes and marks written by an assistant, validated by hand (D7b, first cut), and glosses (D8: an assistant's
+ * note on a passage, with no colour, always with a state). The state belongs to the assistant's NOTE, never to
+ * the highlight: a mark with no note is only the assistant's mark (provenance, removable), with no state. A note starts `proposed` (yellow), becomes `validated` (green; «modificato da
  * te» once edited) or `review` (red, with an optional comment kept for the second cut). The model's
  * original is never overwritten. Two holders: a highlight the assistant proposed on a dossier entry, and a
  * note entry the assistant wrote in a dossier. Neither the state nor the comment is ever shown to a connected
@@ -83,10 +83,12 @@ const editor = (id: string | null, usernames: Map<string, string>) => {
   return username ? { username } : null;
 };
 
-/** A proposal (an assistant's highlight) as the web's routes answer it. */
+/** A proposal (an assistant's highlight: a coloured mark saved before D8, or a gloss) as the web's routes answer it. */
 export function serializeProposal(h: Highlight, usernames: Map<string, string>) {
   return {
     id: h.id,
+    // `gloss`: a note on the passage with no colour (`color` null); `mark`: a coloured passage (D7b).
+    kind: h.kind,
     normaKey: h.normaKey,
     text: h.text,
     color: h.color,

@@ -84,10 +84,17 @@ _EU_SECTOR_3 = {"regolamento ue": "R", "direttiva ue": "L"}
 
 
 def eu_identity(tipo_atto: str, data: Optional[str], numero_atto: Optional[str],
-                articolo: Optional[str] = None) -> Optional[str]:
-    """``celex:32016R0679`` for the act, ``celex:32016R0679~art5`` for an article; None when the
-    act is not one of the Union's or its year and number are not both known."""
+                articolo: Optional[str] = None, considerando: Optional[str] = None) -> Optional[str]:
+    """``celex:32016R0679`` for the act, ``celex:32016R0679~art5`` for an article,
+    ``celex:32016R0679~rct26`` for a recital (``rct`` is EUR-Lex's own name for it, ``div#rct_26``;
+    spec 2026-11-17 §2.1); None when the act is not one of the Union's or its year and number are
+    not both known. A treaty has no numbered recitals: None. An article and a recital together
+    are no one thing: ValueError."""
+    if articolo and considerando:
+        raise ValueError("an article or a recital, not both")
     kind = (tipo_atto or "").strip().lower()
+    if considerando and kind in _TREATY_CELEX:
+        return None
     if kind in _TREATY_CELEX:
         celex = _TREATY_CELEX[kind]
     elif kind in _EU_SECTOR_3:
@@ -99,6 +106,8 @@ def eu_identity(tipo_atto: str, data: Optional[str], numero_atto: Optional[str],
     else:
         return None
     key = f"celex:{celex}"
+    if considerando:
+        return f"{key}~rct{considerando}"
     return f"{key}~art{articolo.replace('-', '')}" if articolo else key
 
 
@@ -126,6 +135,33 @@ _NAMED = {
     "cdfue": "CDFUE",
 }
 _EU = {"regolamento ue": "reg. (UE)", "direttiva ue": "dir. (UE)"}
+
+
+def _eu_institution(date: str) -> str:
+    """The Community an act before 2015 was adopted by, as its number names it: CEE until the
+    Maastricht Treaty (1 November 1993), CE until the Lisbon Treaty (1 December 2009), UE after.
+    A year alone counts 1993 as CEE and 2009 as CE, the year's most acts (G-540)."""
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return "CEE" if date < "1993-11-01" else "CE" if date < "2009-12-01" else "UE"
+    year = int(date[:4])
+    return "CEE" if year <= 1993 else "CE" if year <= 2009 else "UE"
+
+
+def _eu_act(kind: str, date: str, number: str) -> str:
+    """An EU regulation or directive as cited (G-540). Since 2015 the year comes first, «reg. (UE)
+    2016/679», «dir. (UE) 2022/2555». Before, as the Official Journal numbered them: a regulation
+    «reg. (CE) n. 1907/2006», a directive «dir. 2002/58/CE», with the year in two digits before
+    1999 («dir. 95/46/CE», «reg. (CEE) n. 1408/71»)."""
+    year = date[:4]
+    if not (number and len(year) == 4 and year.isdigit()):
+        return _EU[kind]
+    if int(year) >= 2015:
+        return f"{_EU[kind]} {year}/{number}"
+    institution = _eu_institution(date)
+    short_year = year if int(year) >= 1999 else year[2:]
+    if kind == "regolamento ue":
+        return f"reg. ({institution}) n. {number}/{short_year}"
+    return f"dir. {short_year}/{number}/{institution}"
 # In lower case, like the act (owner, 1 October 2026; D4 of 4 October). A type the table does
 # not know is written in full.
 _TYPES = {
@@ -212,8 +248,7 @@ def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
         return name, " "
     number, date, real = _text(norm, "numero_atto"), _text(norm, "data"), _text(norm, "tipo_atto_reale")
     if kind in _EU:
-        year = date[:4]
-        return (f"{_EU[kind]} {year}/{number}" if number and year.isdigit() else _EU[kind]), ", "
+        return _eu_act(kind, date, number), ", "
     if not real:
         # An act the codes table names (an aliased code, the regulation of the c.p.i.): cited by
         # its decree, with the table's date and number where the norm carries none.
@@ -247,8 +282,31 @@ def cite_act(norm: Mapping[str, Any]) -> str:
     return _act(norm)[0]
 
 
+def recital_numbers(spec: str) -> str:
+    """«26», «26 e 27», «26, 27 e 30», «26-30»: a list joins with commas and «e», a range keeps its dash."""
+    numbers = [n.strip() for n in spec.split(",") if n.strip()]
+    if len(numbers) < 2:
+        return spec.strip()
+    return f"{', '.join(numbers[:-1])} e {numbers[-1]}"
+
+
+def cite_recital(norm: Mapping[str, Any]) -> str:
+    """«considerando 26, reg. (UE) 2016/679» (spec 2026-11-17 §2.2): the word written out, never
+    «cons.», and the act as `cite_act` writes it. A list reads «considerando 26 e 27, …» (the word
+    is invariable), a range «considerando 26-30, …». Only a regulation or a directive of the Union
+    has numbered recitals: anything else is a ValueError."""
+    if _key(_text(norm, "tipo_atto")) not in _EU:
+        raise ValueError("only an EU regulation or directive has numbered recitals")
+    act, joiner = _act(norm)
+    return f"considerando {recital_numbers(_text(norm, 'considerando'))}{joiner}{act}"
+
+
 def cite_article(norm: Mapping[str, Any]) -> str:
-    """"art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679"."""
+    """"art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679".
+
+    A part of a split article names its commas after the article (G-389, Q2): "art. 1, commi
+    701-800, l. 27 dicembre 2006, n. 296"; the first part has no `parte` and keeps the article's.
+    """
     act, joiner = _act(norm)
     annex = _text(norm, "allegato")
     kind = _key(_text(norm, "tipo_atto"))
@@ -257,4 +315,6 @@ def cite_article(norm: Mapping[str, Any]) -> str:
     # turismo is «d.lgs. 23 maggio 2011, n. 79», never «… (Allegato 1)»).
     named = (f" (Allegato {annex})" if annex and joiner == ", " and kind not in _EU
              and not _is_default_annex(norm, annex) else "")
-    return f"art. {_text(norm, 'numero_articolo')}{joiner}{act}{named}"
+    part = _text(norm, "parte")
+    commas = f", commi {part}" if part else ""
+    return f"art. {_text(norm, 'numero_articolo')}{commas}{joiner}{act}{named}"

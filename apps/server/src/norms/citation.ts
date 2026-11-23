@@ -13,6 +13,7 @@
  * `conventions/sources/golden.json`.
  */
 import { ACT_TYPES, ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
+import { partOf } from './parts';
 
 export interface CitableNorm {
   tipo_atto: string;
@@ -21,6 +22,8 @@ export interface CitableNorm {
   numero_atto?: string | null;
   data?: string | null;
   allegato?: string | null;
+  /** One part of a split article ("701-800", G-387 (a)). */
+  parte?: string | null;
 }
 
 export type CitableAct = Omit<CitableNorm, 'numero_articolo'>;
@@ -105,6 +108,24 @@ function namedAct(norm: CitableAct): string | undefined {
   return NAMED_ACTS[key(norm.tipo_atto)];
 }
 
+/**
+ * An EU regulation or directive as cited (G-540), the API's `sources._eu_act`: since 2015 the year comes
+ * first, «reg. (UE) 2016/679»; before, as the Official Journal numbered them, «reg. (CE) n. 1907/2006»,
+ * «dir. 2002/58/CE», the year in two digits before 1999 («dir. 95/46/CE», «reg. (CEE) n. 1408/71»), the
+ * Community CEE until 1 November 1993, CE until 1 December 2009, UE after (a year alone: 1993 is CEE, 2009 CE).
+ */
+function euAct(kind: string, date: string, number: string): string {
+  const year = date.slice(0, 4);
+  if (!number || !/^\d{4}$/.test(year)) return EU_ACTS[kind];
+  const y = parseInt(year, 10);
+  if (y >= 2015) return `${EU_ACTS[kind]} ${year}/${number}`;
+  const institution = /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date < '1993-11-01' ? 'CEE' : date < '2009-12-01' ? 'CE' : 'UE'
+    : y <= 1993 ? 'CEE' : y <= 2009 ? 'CE' : 'UE';
+  const shortYear = y >= 1999 ? year : year.slice(2);
+  return kind === 'regolamento ue' ? `reg. (${institution}) n. ${number}/${shortYear}` : `dir. ${shortYear}/${number}/${institution}`;
+}
+
 // The act, and how an article joins it: a code, the Constitution and a treaty follow the
 // article with a space ("art. 1284 c.c."), every other act with a comma (short: a space).
 function actOf(norm: CitableAct, short: boolean): { act: string; joiner: string } {
@@ -112,12 +133,7 @@ function actOf(norm: CitableAct, short: boolean): { act: string; joiner: string 
   const named = namedAct(norm);
   if (named) return { act: named, joiner: ' ' };
   const joiner = short ? ' ' : ', ';
-  const eu = EU_ACTS[kind];
-  if (eu) {
-    const number = text(norm.numero_atto);
-    const year = text(norm.data).slice(0, 4);
-    return { act: number && /^\d{4}$/.test(year) ? `${eu} ${year}/${number}` : eu, joiner };
-  }
+  if (EU_ACTS[kind]) return { act: euAct(kind, text(norm.data), text(norm.numero_atto)), joiner };
   const { type, date, number } = realType(norm);
   const abbreviation = ACT_TYPES[type] ?? type;
   const spelled = citationDate(date);
@@ -153,16 +169,21 @@ export function citeAct(norm: CitableAct): string {
   return actOf(norm, false).act;
 }
 
-/** "art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679". */
+/**
+ * "art. 2, l. 7 agosto 1990, n. 241", "art. 2043 c.c.", "art. 5, reg. (UE) 2016/679". A part of a split article
+ * names its commas after the article (G-389, Q2): "art. 1, commi 701-800, l. 27 dicembre 2006, n. 296".
+ */
 export function citeArticle(norm: CitableNorm): string {
   const { act, joiner } = actOf(norm, false);
-  return `art. ${text(norm.numero_articolo)}${joiner}${act}${annexOf(norm, false)}`;
+  const part = text(norm.parte) ? `, commi ${text(norm.parte)}` : '';
+  return `art. ${text(norm.numero_articolo)}${part}${joiner}${act}${annexOf(norm, false)}`;
 }
 
-/** The article in little room: "art. 2 l. 241/1990", "art. 2043 c.c.". */
+/** The article in little room: "art. 2 l. 241/1990", "art. 2043 c.c.", a part "art. 1 (commi 701-800) l. 296/2006". */
 export function shortNorm(norm: CitableNorm): string {
   const { act, joiner } = actOf(norm, true);
-  return `art. ${text(norm.numero_articolo)}${joiner}${act}${annexOf(norm, true)}`;
+  const part = text(norm.parte) ? ` (commi ${text(norm.parte)})` : '';
+  return `art. ${text(norm.numero_articolo)}${part}${joiner}${act}${annexOf(norm, true)}`;
 }
 
 // A stored item's content is whatever the client sent (the items route takes
@@ -181,6 +202,7 @@ function storedAct(itemType: string, content: unknown): (CitableAct & { numero_a
     data: text('data'),
     allegato: text('allegato'),
     numero_articolo: text('numero_articolo') ?? undefined,
+    parte: partOf(raw.parte) ?? null,
   };
 }
 

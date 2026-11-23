@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { readRoles } from '../forum/roles';
+import { readReportGroups } from '../forum/reportQueue';
 import { changeMessage, compareNormaSnapshots } from '../utils/normaWatcher';
 
 // 2 MB cap on article_text: generous for any real article, but bounds the
@@ -11,11 +13,19 @@ const checkNormaSchema = z.object({
   normaData: z.object({
     norma_data: z.record(z.string(), z.unknown()),
     article_text: z.string().max(2 * 1024 * 1024),
+    // Where the text came from, as the Python API says it (scan A.7). "akn" is the export served when
+    // Normattiva's HTML could not be read: never compared nor stored (normaWatcher.ts says why). Optional:
+    // a client that does not send it is read as before.
+    text_source: z.enum(['html', 'akn']).optional(),
   }),
 });
 
 /**
- * Forum-unread aggregate. Two counts:
+ * Forum-unread aggregate. Three counts in the total, and one beside it:
+ * - community: the user's unread Community notifications (a reply, a comment, an
+ *   acceptance, a hiding; spec 2026-10-20-forum-community-glosse-design §6.5);
+ * - pendingReports (moderators and admins only, not in the total): the Community's
+ *   reported items still waiting for a decision.
  * - pendingSuggestions: SuggestionItem rows with status='pending' on envs the
  *   current user owns. Doesn't use a cursor — pending IS the unread state.
  * - newLikes: SharedEnvironmentLike rows since the user's
@@ -25,14 +35,16 @@ const checkNormaSchema = z.object({
 export const getForumUnreadCount = async (req: Request, res: Response) => {
   const userId = req.user!.id;
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { notificationLastSeenAt: true },
-  });
+  const [user, roles] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { notificationLastSeenAt: true } }),
+    readRoles(prisma, userId),
+  ]);
 
   const since = user?.notificationLastSeenAt ?? undefined;
+  // The whole Community's moderators, and a subject's (spec 2026-11-14 §C): each counts what their queue holds.
+  const moderates = roles.isModerator || roles.moderates.length > 0;
 
-  const [pendingSuggestions, newLikes] = await Promise.all([
+  const [pendingSuggestions, newLikes, community, pendingReports] = await Promise.all([
     prisma.suggestionItem.count({
       where: {
         status: 'pending',
@@ -46,12 +58,16 @@ export const getForumUnreadCount = async (req: Request, res: Response) => {
         userId: { not: userId },
       },
     }),
+    prisma.forumNotification.count({ where: { userId, readAt: null } }),
+    moderates ? readReportGroups(prisma, 'pending', roles).then(groups => groups.length) : Promise.resolve(null),
   ]);
 
   res.json({
     pendingSuggestions,
     newLikes,
-    total: pendingSuggestions + newLikes,
+    community,
+    ...(pendingReports !== null ? { pendingReports } : {}),
+    total: pendingSuggestions + newLikes + community,
   });
 };
 
@@ -72,6 +88,16 @@ export const markForumRead = async (req: Request, res: Response) => {
  * an article is opened, so a changed article produces a durable notification
  * without polling Normattiva from the Node process.
  */
+/**
+ * The AKN fallback, by its field or, for a client that does not send it (today's web), by the
+ * markdown heading the export opens with («### Art. …»), which the HTML extractor never writes.
+ * A false positive only skips one check: the background watcher still compares the HTML text.
+ */
+function isAknText(normaData: { article_text: string; text_source?: 'html' | 'akn' }): boolean {
+  if (normaData.text_source) return normaData.text_source === 'akn';
+  return normaData.article_text.startsWith('### ');
+}
+
 export const checkNorma = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const { normaKey, normaData } = checkNormaSchema.parse(req.body);
@@ -89,10 +115,13 @@ export const checkNorma = async (req: Request, res: Response) => {
   });
 
   // Nothing to compare: an empty body would read as a change against a
-  // populated watch and replace its text with nothing. Touch the watch if
+  // populated watch and replace its text with nothing; an AKN fallback text
+  // would read as a change against the HTML text, and back again. Touch the watch if
   // there is one, register nothing otherwise — the watcher refuses empty
   // text the same way.
-  if (!snapshotData.article_text) {
+  // A recital is never watched (spec 2026-11-17 §6.3): it has no versions, and its text is not an article's.
+  const recital = Object.prototype.hasOwnProperty.call(normaData.norma_data, 'considerando');
+  if (!snapshotData.article_text || isAknText(normaData) || recital) {
     if (existing) {
       await prisma.normaWatch.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } });
     }

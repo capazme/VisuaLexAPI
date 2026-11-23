@@ -23,10 +23,54 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (~6 s, measured), past what a process manager waits before its SIGKILL (pm2,
   on the old server, waited 1.6 s).
 - `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
-  authenticated 300/min (by userId), writes 200/min. `RateLimiterRedis` when
-  `REDIS_ENABLED=true`, else in-memory with a startup warning.
+  authenticated 300/min (by userId), writes 200/min. Every limiter comes from
+  `createLimiter`: `RateLimiterRedis` when `REDIS_ENABLED=true`, else in-memory
+  with a startup warning. On Redis, a store error (down, not ready; a Redis that hangs without erring is not covered, there is no command timeout) hands the
+  count to an in-memory limiter with the same limits (the insurance limiter),
+  so a limit holds per process; the fail-open branches are only a last resort.
+  The session check (`GET /api/auth/me`, G-484) has its own counter,
+  `SESSION_CHECK_POINTS` (600) a minute per user or address, mounted in `app.ts`
+  after `delegatedAuth` and before the general limiter, which it skips.
+- `src/routes/auth.ts` — failed sign-ins and registrations: 5 per 15 minutes per
+  address (shared, as before, with the wrong passwords of `PUT /auth/change-password`,
+  `POST /auth/contributions/remove` and `DELETE /auth/account`); failed attempts on those three
+  (a wrong password, or any other refusal) per signed-in user (`rl:password-checks-user`, the
+  user's id): 10 an hour from any address, a count of its own, so it never blocks the owner's
+  sign-in; ending every session (`POST /auth/logout-all`) needs no password, and ends the
+  sessions the server holds (cookie sessions, #517); failed sign-ins per account (the SHA-256 of the
+  email as typed, trimmed and lower-cased, existing or not): 10 an hour from any
+  address; refreshes: 30 a minute per address. Counted on arrival (a burst is
+  held too) and given back on success. A refusal is 429 with `Retry-After`.
+  Someone who knows an email can block that sign-in for up to an hour: the
+  accepted price of stopping guesses spread over many addresses.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
-  connection errors fail open.
+  connection errors go to the limiters' memory fallback.
+- **The web's session (A.1, step 1 of `docs/superpowers/specs/2026-11-16-web-session-cookies-design.md`).**
+  `src/auth/webSession.ts`: a session is a `WebSession` row (SHA-256 of the
+  secret, a coarse device label, no IP); the browser holds the secret in an
+  `HttpOnly; SameSite=Strict; Path=/` cookie, `__Host-vx_session` and `Secure`
+  when the first `ALLOWED_ORIGINS` entry is https (`SESSION_COOKIE_SECURE`
+  overrides), `vx_session` otherwise. 7 days idle, 30 at most
+  (`SESSION_IDLE_DAYS`, `SESSION_MAX_DAYS`); `lastUsedAt` written at most every
+  10 minutes; dead rows swept at most daily on a sign-in.
+  `middleware/webSession.ts`, mounted on `/api` before the ingress's login check
+  and the limiters, sets `req.user` and `req.webSessionId`; a Bearer token takes
+  precedence until the web has moved. Sign-in opens a session only for a request
+  with `X-VisuaLex-Client: web` (answering the user, no tokens), otherwise the
+  tokens as before. Routes: `POST /auth/logout`, `GET /auth/sessions`,
+  `DELETE /auth/sessions/:id`, `POST /auth/logout-all`. What ends sessions
+  (D3): one's own password change (all but the one in use), the
+  administrator's reset and `db:reset-admin` (all, and every OAuth grant
+  revoked), a deactivation (all), account deletion (cascade).
+- `src/middleware/csrfGuard.ts` — on `/api` after `delegatedAuth`: a
+  POST/PUT/PATCH/DELETE that carries the session cookie or the web header must
+  carry `X-VisuaLex-Client: web` and, when an `Origin` is present, one in
+  `ALLOWED_ORIGINS` or the request's own host; otherwise **403**
+  `code: "csrf_refused"`. Exempt: exchanged tokens, `/api/merlt/internal/*`,
+  and (until step 3) a Bearer token or a request with neither cookie nor
+  header. The scraping gate applies the same rule to a cookie-authenticated
+  write named by `X-Forwarded-Method`. In tests, `authHeader` sends the cookie
+  and the header; `bearerHeader` the old JWT; `cookieOnly` the cookie alone.
 - `src/middleware/auth.ts` — `authenticate` answers **401** only when the
   session is over: no token, a token that does not verify, the wrong type, a
   missing or disabled user. When it cannot read the user (the database is
@@ -39,7 +83,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   minute: a flood with no token stops here), `authenticate`, the user's quota
   (`SCRAPE_QUOTA_POINTS`, 300 points per `SCRAPE_QUOTA_WINDOW_SECONDS`, charged by the route
   the ingress names in `X-Forwarded-Uri`: an export 20, a stream 3, a whole act 5, the
-  detailed health page 5, a decision lookup 2, anything else 1), then `204`. A `401` or `429`
+  detailed health page 5, a decision lookup 2, a batch of norm readings
+  (`/parse_query_batch`, up to 200 strings) 3, a batch of link addresses (`/fetch_norm_links`,
+  up to 200 norms of 30 acts, which reaches Normattiva) 5, anything else 1), then `204`. A `401` or `429`
   (with `Retry-After`) goes back to the browser as it is. Mounted **before** the general
   limiter in `app.ts` on purpose: it has limits of its own, and reading many articles must
   not spend the quota of every other call. Both caps count over
@@ -72,7 +118,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   consent page words it (`SCOPE_LABELS`); session only, like every `/api/oauth` route but
   the quota. Housekeeping (`oauth/sweep.ts`) runs, awaited, on registration
   at most every ten minutes: never fire-and-forget it, a background sweep
-  deadlocked the test suite's TRUNCATE.
+  deadlocked the test suite's TRUNCATE (the suite now empties tables with DELETEs, which
+  take no table lock but still wait on the rows a write in flight holds, and can deadlock
+  with it; a write that commits after its table's DELETE leaves a row for the next test).
 - **Exchanged tokens: how the MCP server acts for a user** (spec section 5).
   `grant_type=urn:ietf:params:oauth:grant-type:token-exchange` on
   `/oauth/token` (`oauth/exchange.ts`), for `mcp-omnilex` only: the client's
@@ -86,7 +134,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `insufficient_scope` — to a live grant and an active user, and to the daily
   quota (points by route, `OAUTH_DAILY_POINTS`; and named daily counters,
   `DELEGATED_COUNTERS`: 10 dossiers created, 100 notes, 20 deletions, 100
-  cards, 100 passages proposed, 200 pages of an entry's text; an entry may also need a second
+  cards, 100 glosses proposed on passages (the counter `passage`), 200 pages of an entry's text, 3 courses, 40 modules and exams; an entry may also need a second
   scope, `alsoScope`). A delegated POST must be JSON (415): the weight is read from the body
   before the app's parsers run. A refused call (4xx/5xx) gives back its points
   and the counter it spent; a route may give back part of both on a 200 (`res.locals.delegatedRefund`,
@@ -104,6 +152,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and never from a body; answered as `created_by: { clientName } | null`.
   Every dossier and item answer goes through `serializeDossier`/`serializeItem`
   in `dossierController.ts`: add a field there, not in a route.
+  Caps (G-576, `utils/dossierCaps.ts`): 500 dossiers per account, 2,000 entries per
+  dossier, 10,000 entries in all per account. Every path that creates dossiers or
+  entries calls `assertDossierRoom` first in its transaction (it locks the account's
+  row, as the Atti do): create, add an entry, notes, norms, decisions, move, the study
+  import (and the Forum download and environment recovery through it), a taken
+  suggestion, and both trash restores. A refusal is 409 with an Italian `detail` that
+  names the cap and `error` `dossier_limit`, `dossier_items_limit` or
+  `account_items_limit`. A new creation path must call it too.
   A dossier has a `kind`, `lavoro` (a practice: it may hold a client's data; the default, and
   what every dossier older than the column became) or `studio` (a topic studied: a dossier
   taken from a Forum suggestion is one); `POST`/`PUT /dossiers` take it. Each dossier answer
@@ -122,54 +178,114 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   session only, the route is not in the delegated table). An undone removal on the
   web no longer needs it: the trash restores an entry with its own id (question 181).
   `assertArticleOfDossier` is the one check behind both routes.
-- **D7b: passages and notes an assistant proposes, validated by hand** (spec
+- **D7b: passages and notes an assistant proposes, validated by hand; D8: glosses in place of the passages** (spec
   `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, as its first cut revised it on
-  25 October 2026; migration `20261027100000_assistant_proposed_marks`). Behind the runtime switch
-  `assistant_passages` (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET
-  /api/features` is public, mounted before every limiter, and answers `{ assistantPassages }` from five
-  seconds' memory, which an admin's change clears; an admin switches it with `PUT
-  /api/admin/switches/:key { enabled }`): off, every route below answers 404 and the dossier answers
-  carry no state. **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
+  25 October 2026; migration `20261027100000_assistant_proposed_marks`; D8: `docs/superpowers/specs/2026-10-29-d8-glosses-design.md`,
+  migration `20261030100000_assistant_glosses`). **Since D8 no application proposes coloured passages**: highlighting is
+  the user's gesture (owners, 29 October 2026). `POST /dossiers/:id/items/:itemId/passages` answers **410** with the reason
+  in Italian, whatever it is sent and with either switch, and reads and stores nothing (kept in the delegated table at one
+  point, given back, so an application is told in words rather than with a bare 403). The coloured proposals saved before
+  stay as they are: readable, validatable, movable and removable through the web app's routes below, never converted. Their
+  colours meant (owner, 25 October 2026) `giallo` the central point, `verde` a condition or a premise, `blu` a definition or
+  an exception. **A gloss** is a `Highlight` of `kind` `gloss` (every other row is a `mark`): an assistant's note on a
+  passage, with **no colour** (`color` null; the migration's CHECKs: a mark has a colour and a gloss none; a gloss has a
+  connection, a state and a shown note that is not empty), anchored by `(startOffset, text)` as every highlight (root rule
+  23), with the same original position, boundary move and note states as a proposal. The general gloss on a norm is the
+  dossier note about the whole article (`POST /dossiers/:id/notes` with `aboutItemId`), unchanged. Two runtime switches
+  (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET /api/features` is public, mounted before every
+  limiter, and answers `{ assistantPassages, assistantGlosses, lingoCourses, articleParts }` from five seconds' memory, which an admin's change clears;
+  an admin switches them with `PUT /api/admin/switches/:key { enabled }`): `assistant_passages` is the web app's side (off,
+  its routes below answer 404 and the dossier answers carry no state); `assistant_glosses` is the connected application's
+  side of glosses (off, the glosses route answers 404 and the MCP does not list `omnilex_glossa_voce`). An entry's text is
+  behind no switch: it is how an application quotes it verbatim (G-372). The glosses route needs **both** switches (a
+  gloss written while the web's side is off is one the user could neither see nor remove), and `assistant_glosses` is
+  switched on only once the web shows glosses: today's web draws an unknown colour as yellow. `article_parts` (G-387 (a),
+  spec 2026-10-29): a part of an article Normattiva splits as an entry of its own; on, a reference's comma reaches the
+  API and the part that holds it is stored (`parte`, below); off, the article is stored as before. Switched on only once
+  the web opens parts (3c).
+  **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
   table): `GET /dossiers/:id/items/:itemId/text?parte=` (`dossier:text`, a point and a page of the
   counter `text`) gives a norm's or a decision's text in pages of 20,000 characters cut at a line end,
-  `in_vigore`, and the proposals still open as the model wrote them (never the user's marks, a state, a
-  comment, an edit or moved boundaries); `POST /dossiers/:id/items/:itemId/passages { passaggi }`
-  (`dossier:write` **and** `dossier:text`, an exchanged token only; 1–10 passages, two points and one of
-  the counter `passage` each, the refused ones given back) finds each quote in the text the reader
+  `in_vigore`, for a norm Normattiva's update notes after `testo` on every page (G-386: `note_aggiornamento`, the Python
+  API's list, unless the text already holds them, `note_nel_testo`; `avviso_note` «note di aggiornamento non lette:
+  verificare su Normattiva» when some could not be read; `assistant/entryText.ts` `updateNotesOf`, a malformed note
+  counted as not read), `avviso_testo_parziale` when the text is one part of an article Normattiva splits («testo
+  parziale: commi 1-100 di 1364 (diviso in 14 parti)», G-387, `partialNoticeOf`; for a part stored as an entry, the part
+  served: «commi 701-800 di 1364»), and the glosses this application proposed still `proposed`, as the model wrote them (`glosse: [{ testo,
+  nota }]`; never the user's marks, a saved coloured proposal, a state, a comment, an edit or moved boundaries);
+  `POST /dossiers/:id/items/:itemId/glosses { glosse }` (`dossier:write` **and** `dossier:text`, an exchanged token only;
+  1–10 glosses `{ testo 15–2000, nota 1–1500 UTF-16 units, prima?, dopo? }`, no colour, two points and one of the counter
+  `passage` each, the refused ones given back) finds each quote in the text the reader
   reads (`assistant/locateQuote.ts`: whitespace runs match whitespace runs or nothing, every other
   character as written; `prima`/`dopo` choose among occurrences), stores the projection's own slice at
-  its offset (root rule 23), and answers one outcome per passage. The text is fetched once per call
-  from the Python API as the web fetches it (`assistant/entryText.ts`: ports of `buildItemKey`,
+  its offset (root rule 23), and answers one outcome per gloss (`proposta` with its id, or `rifiutata` with the reason; no
+  text). A gloss repeats only the same application's gloss where the model put it (never another application's: the answer
+  must not tell what it glossed); a user's mark or a saved coloured proposal on the same words
+  stays beside it, unread. The text is fetched once per call
+  from the Python API as the web fetches it (a text marked `text_source: "akn"`, scan A.7, is
+  `TextUnavailable`: anchors in it would not land) (`assistant/entryText.ts`: ports of `buildItemKey`,
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,
-  `decisionProjection`, pinned to the web's code by `tests/assistant/entryText.test.ts` and
-  `ruleTwentyThree.test.ts`, which proposes on the web's fixtures and finds the marks in the web's
-  renderer); a text the reader shows read-only is refused (400), an article or a decision the source says is
+  `decisionProjection`, pinned to cases the web shares, so neither side imports the other:
+  `tests/assistant/entryText.test.ts` reads `conventions/sources/norm-keys.json`, and
+  `ruleTwentyThree.test.ts` checks that `conventions/contract/anchors.json` is what the server computes from its
+  frozen texts (`tests/assistant/anchorsContract.ts`; the web's `anchorsContract.test.ts` draws each passage there);
+  a part of a split article, `parte` in the content, is read as that part and keyed with one more
+  segment, `…--1--c701-800` and `1~c701-800`, as the spec says the web writes it from 3c; a part the article no
+  longer has (Normattiva split it again, G-389 Q3) is a 400 in the API's words, never a 503 to try again; every
+  reader takes `parte` through `norms/parts.ts` `partOf` (the API's shape, «701-800»); the watcher reads a
+  watched part as that part; a Forum proposal keeps a `parte` of the form «701-800»; LingoLex anchors and the
+  MERL-T graph keep the article, one per article, G-389 Q4); a text the reader shows read-only is refused (400), an article or a decision the source says is
   not there is a 400, a source that cannot answer now is a 503, an entry changed while its text was read a 409.
-  The dossier's row lock holds at most 30 open proposals per entry (a mark with no note, or a note not
-  validated). **A proposal** is a `Highlight` with the connection's mark, its entry
-  (`dossier_item_id`, no foreign key), where the model put it (`assistant_text`,
+  The dossier's row lock holds at most 30 open proposals per entry, glosses and saved marks together (a mark with no note,
+  or a note not validated). **A proposal** (a saved coloured mark or a gloss) is a `Highlight` with the connection's mark,
+  its entry (`dossier_item_id`, no foreign key), where the model put it (`assistant_text`,
   `assistant_start_offset`, never changed) and, with a note, the model's original (`assistant_note`,
   never changed; `note` is the one shown), its state (`note_state`: `proposed`, `validated`, `review`)
   and the review comment (kept after the state changes, for the second cut). The state belongs to the
-  note: a mark with no note has none. **An assistant's mark shows only on its entry, in every state**:
+  note: a mark with no note has none. **An assistant's row shows only on its entry, in every state**:
   `GET /highlights` and the generic `PUT`/`DELETE /highlights/:id` leave out every row with a
   connection, so Study Mode, the Forum, environments and the PDF never receive one. **The web app's
-  side** (`routes/assistantProposals.ts`, session only): `GET …/items/:itemId/proposals`, `PUT
+  side** (`routes/assistantProposals.ts`, session only): `GET …/items/:itemId/proposals` (each with its `kind`; a gloss's
+  `color` is null), `PUT
   …/proposals/:pid/state { state, comment? }` (comment ≤ 500, read only with `review`), `PUT
-  …/proposals/:pid/note { text }` (stamps the edit and validates), `PUT …/proposals/:pid/range {
+  …/proposals/:pid/note { text }` (stamps the edit and validates; a mark's note may be emptied, a gloss's may not: 400),
+  `PUT …/proposals/:pid/range {
   startOffset, text }` (the user's new boundaries, not checked against the source, as the user's own
   highlights; the state never changes) and `DELETE …/proposals/:pid` (for good: the web delays it behind
   «Annulla»). A note entry an assistant writes (`POST /dossiers/:id/notes` through an exchanged token)
   has the same three states on `dossier_items` (`PUT …/items/:itemId/state`, `PUT …/items/:itemId/text`;
   the generic item `PUT` never changes an assistant's note's text or state: the web sends the content back
   with a star); the migration made every older one `proposed`, and one in the trash then comes back so. Every
-  item answer of the user's session carries `assistant_notes` (a norm's or decision's counts by state,
+  item answer of the user's session carries `assistant_notes` (a norm's or decision's counts by state, glosses included,
   for the light on its row) and `assistant_note` (a note entry's state), both null for an exchanged token
-  and with the switch off. The trash takes an entry's proposals with it (`proposals` in the payload) and
-  brings them back with their ids and state. `assistant_note_versions` is for the second cut (the
+  and with `assistant_passages` off. The trash takes an entry's proposals and glosses with it (`proposals` in the payload)
+  and brings them back with their ids, kind and state (a payload stored before D8 has no kind: a mark).
+  `assistant_note_versions` is for the second cut (the
   versions an assistant replaced); nothing writes it yet. The scope `dossier:text` is worded on the
-  consent page and in «Applicazioni collegate» (`SCOPE_LABELS`); a grant made before it has it only once
-  the user connects again.
+  consent page and in «Applicazioni collegate» (`SCOPE_LABELS`): the texts of norms and decisions and, since G-381 (b)
+  (owners, 29 October 2026), the user's notes, and since LC56 (16 November 2026) the text of the acts uploaded to a
+  case. **A note's content reaches a connected application only** through a token
+  with `dossier:text` whose grant was approved with those words: approving a request for `dossier:text` stores
+  `TEXT_CONSENT_VERSION` (`oauth/config.ts`, now 2) on the grant (`oauth_grants.text_consent_version`), `delegatedAuth`
+  reads it live into `req.delegation.readsNotes` (version ≥ 1, `NOTES_CONSENT_VERSION`) and `readsActs` (≥ 2: the
+  act text route answers a lower one 403 «… va ricollegata: il permesso «Leggere i testi» ora comprende anche gli
+  atti.»), and `serializeItem` answers a note's `content` null otherwise (a
+  norm's or a decision's never). The migration gave version 1 to the grants that already held `dossier:text` (G-385,
+  owners, 29 October 2026: no active users yet); widening the words means raising the version, and a grant with a lower
+  one reads no note until the user connects again. A grant made before `dossier:text` existed has it only
+  once the user connects again.
+- **Recitals in a dossier** (spec `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §6, G-538): a
+  recital of an EU regulation or directive is a `norm` item whose content has the key `considerando`, with no
+  kind of its own and no migration. The key decides: such a content is checked by `schemas/recitalEntry.ts`
+  (the act's type, number and date, the recital's number, the web's star; anything else refused,
+  `numero_articolo` first; cases shared with the web in `conventions/sources/recital-entries.json`) on
+  `POST /items` and `PUT /items/:itemId`, and titled with its citation («considerando 26, reg. (UE)
+  2016/679», `norms/recital.ts`); a PUT never turns an article into a recital or back. Every reader of a
+  `norm` item reads the key (§6.3 of the spec): `citeStoredItem` cites it; `rebuildNormEntry` keeps it for
+  published content (environments, the study import, the recovery, «Aggiungi ai miei dossier»); Forum
+  suggestions and course citations refuse it in words; the assistant's text (`RecitalHasNoText`), the
+  add-by-reference route and the saved-norm watcher leave it out. Marks on a recital use its identity
+  `celex:32016R0679~rct26` as `normaKey`, with an empty `articleId`.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
   and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most
@@ -234,7 +350,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
-  norm as the reader stores it), then existence once per act: the
+  norm as the reader stores it; the `comma` or `parte` the parser reads is sent
+  on only while `article_parts` is on, G-387 (a): then «art. 1, comma 773, l.
+  296/2006» stores part 8, `parte: "701-800"`, an entry apart from its article
+  (`normIdentity`), cited «art. 1, commi 701-800, l. 27 dicembre 2006, n. 296»;
+  a comma the article does not have is `does_not_exist` in the API's words. Off,
+  the article is stored as before), then existence once per act: the
   fingerprints for a single-part Normattiva act, the tree's (annex, article)
   pairs for an act with annexes, the article's own text for an EU act. Never
   the text alone for Normattiva: it answers a missing article with the act's
@@ -254,7 +375,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   30-second timeout. Outcomes: `added`, `already_present` (by the decision's key, against the
   dossier's `sentenza` items and earlier references: `POST /items` itself checks none),
   `not_recognised`, `court_not_supported` (with the `court` the words name), `ambiguous` (the
-  candidates' citations in `detail`, and what to add: the archive, a TAR's seat or the kind), `does_not_exist` (`non_trovata` with motivo `inesistente`;
+  candidates' citations in `detail`, and what to add: the archive, a TAR's seat or the kind; the same citations
+  as a list in `candidates`, which the MCP's one-call dossier names, D8 S1), `does_not_exist` (`non_trovata` with motivo `inesistente`;
   a penal suggestion in `detail`), `unavailable` (the source down, a timeout, and `fuori_archivio`
   or `anno_parziale`, which the source cannot verify). Each stored decision is what the item
   schema admits, labelled by the server; `citation` names it in the answer, and a TAR read at a
@@ -280,7 +402,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   The saved-norm notifications name the norm by its citation (`changeMessage`), the stored key
   only when the snapshot names no article.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
-  unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
+  unhandled throw. `AppError` carries its own, and an optional `code` answered as `error` beside the
+  Italian `detail` (a stable name the web can act on, e.g. `own_contribution`); a Zod `ZodError` becomes **400**
   naming the offending fields; the JSON parser's own refusals (a malformed or too large body) keep
   their 4xx with a fixed `detail`, logged by type only — their error carries the raw body; everything
   else is a 500. Controllers therefore
@@ -288,6 +411,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
   string because `services/api.ts` renders it straight to the user.
+  The older controllers' free-text fields have a maximum length (`utils/bodyLimits.ts`: `boundedText`,
+  `boundedTags`, `parseBody`; item 14 of the security inventory): a text or a list over it is a 400
+  `{ detail: "Campo «nota»: al massimo 50.000 caratteri.", error: "too_long" }`, every other failure
+  as above. An error nobody caught (`utils/processGuards.ts`): a rejection is logged and the server keeps
+  running; an exception is logged, then the graceful shutdown ends the process; neither logs its message.
 - **The Forum's content** (`SharedEnvironment.content`; spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D6–D7). The server trusts
   none of it: `utils/publishedContent.ts` rebuilds every row from an allow-list — a dossier's
@@ -351,6 +479,26 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
   entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
   the controller maps Prisma P2002 to 409.
+- **A highlight's range can change in place** (G-417, the owner's decision of 3 November 2026): `PUT /highlights/:id`
+  takes `color` and `note` as before, and the range whole — `startOffset`, `endOffset` and `text`, all three or none,
+  `endOffset > startOffset` and `endOffset - startOffset` the text's length in UTF-16 units (as the web creates one),
+  else 400; not checked against the source's text, as a new highlight's is not. The row stays the same: its id, its
+  owner (the check is unchanged: the user's own rows with no connection, else 404) and its first author
+  (`originalAuthorId`, `sourceSuggestionId`, gotcha 21 of the web), so the web's highlighter can shrink a highlight taken
+  from the Forum when it cuts a piece out of it (A4) instead of recreating it without its author. Other keys (the owner,
+  the attribution, `kind`, an assistant's columns) are dropped by the schema, never written. Offsets are 0 to
+  2,147,483,647 (the column's integer), in `POST` too. `PUT`'s answer carries `originalAuthor` as `GET /highlights`
+  does. `tests/highlightsUpdate.test.ts`.
+- **A part of a highlight cut in the middle keeps its author** (G-418, the owner's decision of 3 November 2026): the
+  first part shrinks in place (`PUT`, above), the second is `POST /highlights` with `splitFrom`, the id of the highlight
+  cut, and takes its `originalAuthorId` and `sourceSuggestionId` (both halves of the attribution contract). Only the
+  user's own highlight with no connection, on the same `normaKey`: an unknown one or another user's is a 404 (the same
+  answer, as `PUT` and `DELETE`), another text or a value that is not an id a 400 — refused, never ignored, so no part
+  is made quietly without its author. The attribution is never taken from the body. When what it names goes between
+  the read and the create (the author's account deleted, the Forum copy's suggestions removed: P2003), it is read again
+  and the part created once more. A part's answer carries `originalAuthor`; a `POST` without `splitFrom` (or with it
+  null) is answered as before. The range is not required to lie inside the cut highlight's, which the web may shrink
+  first. `tests/highlightsSplit.test.ts`.
 - **No bulk delete of notes or highlights**: `DELETE /annotations` and `DELETE /highlights`
   (one request that wiped all of a user's notes, for good) went with environments' «Sostituisci»,
   their only caller (spec `2026-10-13-environments-into-forum`, D10; the owner's answer 185).
@@ -379,22 +527,26 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and the two ping-pong false notifications forever, because each stores
   `norma_data` in its own shape. A stored snapshot with no text
   (metadata-only, from before this contract) is a `baseline`: the snapshot
-  is replaced and nothing is notified.
+  is replaced and nothing is notified. A text the API marks `text_source:
+  "akn"` (the AKN export served when Normattiva's HTML could not be read, scan
+  A.7) is neither compared nor stored, by either writer: the endpoint takes the
+  field, and for a client that does not send it (today's web) reads the
+  export's «### » heading, which the HTML extractor never writes.
 - **`utils/normaWatcher.ts`** — started from `index.ts`. Every
   `NORMA_WATCH_INTERVAL_MS` (6 h, floor 1 min) it refetches up to 100
   watches through the Python API — `LEGAL_API_URL` is the **base** URL,
   `/fetch_article_text` is appended — and notifies on a text change.
   `NORMA_WATCH_ENABLED=false` turns it off. A malformed answer (no
-  `norma_data`, empty text) is a no-op, never a fallback to the stored data.
+  `norma_data`, empty text) or an AKN fallback text (`text_source: "akn"`) is a no-op, never a fallback to the stored data.
   A run that fails outright (database unreachable as it starts) is logged by
   the scheduler. **Nothing in the backend handles rejections globally**, so
   any fire-and-forget promise (`void f()`) that rejects crashes the whole
   server: catch it where it is fired.
 - **Article discussions** (`routes/articleDiscussions.ts`): threads anchored
-  on `{normaKey, articleId, version}` with comments, toggled votes and
+  on `{normaKey, articleId, version}` with comments, votes up and down and
   reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
   `requireAdmin`. `sort=recent|active|popular` orders by `createdAt`,
-  `updatedAt`, vote count. A thread may carry a `passage` (quotation, plain-text
+  `lastActivityAt` (set at creation and by a reply, by nothing else), score. A thread may carry a `passage` (quotation, plain-text
   offset, 32-char prefix and suffix), `articleUrn` and `textHash` (SHA-256 of the plain
   projection when the thread was opened); the title is optional only for passage
   threads; `GET /article-discussions/passages` lists an article's passage threads
@@ -419,7 +571,144 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   sets `passage_released_by` null and keeps the release (the CHECK allows it).
   Every discussion route answers its 400s and 404s in Italian (`parseItalian`,
   not the global handler's English prefix); moderation on a missing thread is a
-  404 «Discussione non trovata».
+  404 «Glossa non trovata».
+- **The Forum's Community** (spec `docs/superpowers/specs/2026-10-20-forum-community-glosse-design.md`,
+  G-304, G-392): discussion on someone's glossa, built on the tables above. Pull request 1 (migrations
+  `20261031100000_community_licence_key`, `20261031100001_forum_community`) holds the data: a glossa, a
+  reply or a comment **outlives its author's account** (`user_id` SET NULL; every view says «utente
+  cancellato» and a null author is nobody's own, G-307); a report names its item by a **plain id, no
+  foreign key**, and keeps `reported_text` (the item as reported) for the moderators until 90 days after
+  it is closed (G-308; `forum/sweep.ts`, once a day, awaited by the writing routes and checked hourly by
+  a timer `index.ts` starts, also deletes notifications read 90 days ago, and erases a closed report's
+  `details` and `resolution_note` 12 months after it was closed, G-503, and turns a moderation log
+  entry's `reason` into «(tolto dopo 12 mesi)» 12 months after it was written, G-550, and names a
+  deleted account «utente cancellato» in the log's `user` targets, G-504); `article_comment_reports`, `forum_notifications`,
+  `forum_moderation_log`, `users.forum_moderator`; accepted answer, edit/delete marks (emptied text is
+  `''`, a CHECK), lock, `materia`, `licence_text_id` (the version of `CONTRIBUTO_COMMUNITY` a row was
+  written under). `GET /auth/export` adds the user's votes, reports (never their copy, who closed them or
+  why) and notifications, drops `lockedById`, and counts anonymous replies among the others'. The closed lists (report reasons and hiding categories, `forum/reportReasons.ts`;
+  statuses; notification kinds; log actions) are CHECKs. **Pending PR2c** (the reader's panel cannot
+  meet them yet): a free report reason is read as `altro` with its text in `details`; no licence check
+  (`licence_text_id` stays null); releasing a quotation needs no reason.
+  Pull request 2, the routes (`controllers/communityController.ts`, `forumModerationController.ts`,
+  `forumNotificationController.ts`, `routes/forumCommunity.ts`; helpers in `src/forum/`):
+  `GET /article-discussions/feed` (every listed glossa: `sort=active` by default |recent|popular|unanswered;
+  `kind`, `act`, `normaKey`, `court`, `materia`, `mine`, `participated`, `accepted`; pages of 1–50) and
+  `GET /article-discussions/:threadId` (replies with their comments nested, a stored third level flattened;
+  the accepted reply first, then votes, then the oldest), both carried over from #205 and withholding a
+  decision's quotation (`forum/views.ts` `isPassageWithheld`); `PATCH`/`DELETE` on a glossa and on
+  `/article-discussion-comments/:id` (the author; a deletion is `deleted` when nothing of anyone else's,
+  hidden included, hangs on it, else `emptied`); `POST …/:threadId/accept { commentId | null }`;
+  `POST /article-discussion-comments/:id/report`; replies at **two levels** (400 under a comment, a
+  comment 1–2,000 characters), 409 on a locked glossa. **Every write that adds under a glossa or decides
+  about what hangs on it locks the glossa, then the reply** (`forum/locks.ts`, `SELECT … FOR UPDATE`),
+  in that order. Visible = not hidden, not emptied (`VISIBLE`); a list shows an emptied glossa only while
+  something visible hangs on it (`LISTED_THREAD`), without its author's name. Moderation (moderators =
+  `users.forum_moderator` or admins, read from the database on every call, `forum/roles.ts`):
+  `GET /moderation/reports?status=` (one row per item, its text even hidden, its anchor whole, each
+  report's copy, `deleted` when gone for good; reporters not named), `POST /moderation/reports/:kind/:itemId/resolve
+  { action: hide|dismiss, category?, reason }` (one decision closes every pending report of the item; hiding
+  something gone is a 409), `PATCH /moderation/threads/:id { hidden?, locked?, category?, reason }`,
+  `PATCH /moderation/comments/:id { hidden, category?, reason }`, `POST /moderation/:kind/:itemId/empty
+  { reason }` (admins, anonymous contributions only); each act in `forum_moderation_log`. The admin route
+  `PATCH /admin/article-discussions/:id` no longer hides (400) and logs releases. `PUT /admin/users/:id
+  { forumModerator, reason }` appoints and revokes, with a required reason, logged. Notifications
+  (`forum/notify.ts`, in the event's transaction, never one's own act, never naming who acted):
+  `GET /forum/notifications`, `POST /forum/notifications/read { ids | all }`; the Forum's badge
+  (`/notifications/forum-unread-count`) adds `community` to its total, and `pendingReports` (items, not in
+  the total) for moderators. Daily per-user limits (`forum/limits.ts`, 24 hours from the first write:
+  `FORUM_DAILY_GLOSSE` 10, `FORUM_DAILY_REPLIES` 60, `FORUM_DAILY_REPORTS` 20, `FORUM_DAILY_EDITS` 60,
+  `FORUM_DAILY_VOTES` 300; an Italian 429; a refused write gives its point back; fail-open). None of these
+  routes is in `oauth/delegatedRoutes.ts`: a connected application can neither read nor write the Community.
+  **Votes up and down** (spec `docs/superpowers/specs/2026-11-14-forum-community-server-design.md` §A, D-248;
+  migration `20261116100000_forum_votes_up_down`; `forum/votes.ts`): `PUT /article-discussions/:threadId/vote`
+  and `PUT /article-discussion-comments/:commentId/vote` `{ value: 1 | -1 | 0 }` → `{ value, score, upvotes,
+  downvotes }`, one vote per person per item (`value` SMALLINT, a CHECK), locking the glossa then the reply.
+  Never on one's own contribution: **403 with `error: 'own_contribution'`**, on the old toggle too; on a
+  comment only `0` (400 otherwise); 404 on what is hidden, emptied or under a hidden glossa; a locked glossa
+  can still be voted. The old `POST …/vote` stays for the reader's panel as a toggle of the up vote (none →
+  up, up → none, down → up), answering `{ voted, voteCount }`. `article_threads.score` and
+  `article_comments.score` are **kept by a database trigger** on the votes (cascades included), never
+  written by the server. Every glossa, reply and comment in an answer carries `score`, `upvotes`,
+  `downvotes`, `userVote`, and the legacy `voteCount` (= up votes) and `userVoted`; every author object
+  carries the author's **personal score** (`forum/votes.ts` `personalScores`: the sum over their visible
+  glosses, replies and comments, those under a hidden glossa left out; `null` without an author).
+  `popular` and a glossa's replies (after the accepted one) order by `score`. Deleting an account first
+  locks every glossa and then every reply the deletion writes (the ones the person voted, wrote, locked or
+  released), each by id, then deletes the votes (`lingo/deleteUserAccount.ts`): left to the cascade and
+  the SET NULLs, the rows would be locked in any order, a reply before its glossa, and could deadlock with
+  a reply being written or voted. In the same transaction the moderation log keeps every act on the person
+  and names them «utente cancellato» (`target_id` of kind `user` and `profile`, and `profile:<id>` on
+  report rows; G-504); the sweep repairs the `user` rows of accounts deleted any other way, never the
+  profile rows, since a profile takes a new id on a move to a pseudonym.
+  **The minimal profile** (spec §B, D-246, D-247, D-249, G-477, G-479; migration
+  `20261116100001_forum_profiles`; `forum/profiles.ts`, `controllers/forumProfileController.ts`):
+  `forum_profiles`, one per person, deleted with the account, under the real name **or** a pseudonym, never
+  both (CHECKs); a declared qualification (closed list) and real name, nothing records a check; the subjects
+  (`LingoMateria[]`). Its `id` is the person's **public id in the Forum**: every author object in the
+  Community's answers and the reader's lists is `{ id: <profile id or null>, name, identity: real_name |
+  pseudonym | username | withdrawn | deleted, qualification, score, username }` (`username` repeats `name`
+  for the reader's panel) and never carries the account's id, which the published dossiers show with the
+  username. `GET`/`PUT /forum/profile` (one's own: `profile`, `required`, `canWrite`, `canSign`, `score`,
+  `contributions` not emptied, hidden included, `nameWithdrawn`), `GET /forum/profiles/:profileId` (name,
+  identity, qualification, subjects, score: nothing else). **A pseudonym never relabels what others read
+  under another name**: refused (409) while any glossa, reply or comment not emptied stands under the real
+  name or the username; leaving the real name renews the public id; unique against pseudonyms and usernames
+  without regard to case (an index on `lower(pseudonym)`; the check is an exact `lower() =`, never Prisma's
+  case-blind `equals`, an ILIKE where `_` is a wildcard); never one's own username (the published dossiers
+  show it); Latin letters only, in a real name too (no lookalike letter of another alphabet), counted in
+  characters as the CHECKs count them; reserved words. A pseudonym never signs a glossa;
+  the app switch **`forum_identity`** (off) makes a glossa need the real name and a reply any profile.
+  `requireWriter` runs inside each create and edit, after the glossa's and the reply's locks, holding the
+  account row for share; `PUT` holds it for update, so no write lands between the check and a change of name.
+  Writing refusals carry codes: `real_name_required`, `profile_required`, `name_withdrawn`.
+  **«Non è chi dice di essere»** (G-479): `POST /forum/profiles/:profileId/report { details? }`
+  (`forum_profile_reports`, the profile by a plain id, one pending per reporter, the `report` counter);
+  the owners (admins) alone: `GET /moderation/profile-reports?status=`, `POST
+  /moderation/profile-reports/:profileId/resolve { action: confirm | dismiss, reason }` (confirm withdraws
+  the name: «nome ritirato» everywhere, no writing, no change of profile) and `…/restore { reason }`; logged
+  as `withdraw_name`, `restore_name` (target `profile`) or `dismiss` (target `report`, `profile:<id>`). The
+  sweep erases a closed report's details after 90 days, and the owners' note after 12 months (G-503). The export carries the profile and the reports one
+  made.
+  **Communities by subject** (spec §C, D-214, D-267, G-478; migration `20261116100002_forum_communities`;
+  `controllers/forumCommunitiesController.ts`, `forum/roles.ts`, `forum/validation.ts`, `forum/appeals.ts`,
+  `forum/reportQueue.ts`): a community is one of Learn's five subjects, a glossa's `materia` places it;
+  `GET /forum/communities` (listed glosse, `members` = profiles following the subject, moderators and
+  validators by their profiles, `withoutSubject`). **Roles per subject** (`forum_subject_roles`): `PUT
+  /admin/users/:id/forum-roles { materia, role: moderator | validator, granted, reason }`, owners only,
+  logged with the subject (`forum_moderation_log.materia`); a validator needs a real-name profile, a
+  moderator any profile; the person's account row held for update, as a change of profile holds it. A
+  **subject's moderator** has the whole Community moderators' acts on the glosse of their subject alone:
+  every moderation route reads the subject **after** locking the glossa (`requireModeratorOf`), the queue
+  and the badge's `pendingReports` hold their subject's items (`readReportGroups`; an item whose glossa is
+  gone is the whole Community moderators'), the queue never shows them the account's username (`author`
+  null; `authorName`, `authorId` = profile id), and a glossa's page shows them hidden items only in their
+  subject. **Validation** (`forum_validations`, one per validator per glossa or reply, `ON DELETE SET NULL`
+  on the validator: it still counts, «utente cancellato»): `POST`/`DELETE /forum/validations/:kind/:itemId`,
+  a validator of the glossa's subject, under the real name, on someone else's visible glossa or reply (not a
+  comment, not a glossa without a subject, 409; the validation under the `edit` counter, the withdrawal under
+  none); the author told once (`validated`, as long as that notification lives: the sweep deletes it 90 days
+  after it is read) when the item reaches the **threshold**, `FORUM_SOGLIA_VALIDAZIONI` in `lingo_impostazioni`
+  (1–5, default 2; `GET`/`PUT /admin/forum/validation-threshold`, logged in `lingo_impostazioni_log`, read at
+  every request: nothing is stored per item). The migration adds the enum value and compares the key as
+  text in the CHECK: Postgres refuses to use a new enum value in the transaction that added it. Validation
+  **never hides or holds back** anything (G-478): every item carries `validation` (`count`, `threshold`,
+  `validated`, `validatedAt`, `validators`) or null; a glossa's replies order validated first (more
+  validations, then the earliest to reach it), then the accepted one, then score, then the oldest; the feed
+  carries `validated` and `validatedReplies` and takes `validated=true|false`. A new text withdraws the
+  item's validations, a new subject the glossa's and its replies' (`validationsWithdrawn` in the edit's
+  answer); emptying an item, by its author or the owners, withdraws its validations. A validator, or whoever
+  gave validations, cannot take a pseudonym. **Appeals to the owners**
+  (`forum_appeals`, the item by a plain id; `hidden_at` on threads and comments, set by every hiding and
+  cleared when shown): `POST /forum/appeals { kind, itemId, text }` by the author of a hidden item, once per
+  hiding (the `report` counter); the owners' `GET /moderation/appeals` and `POST /moderation/appeals/:id/decide
+  { action: uphold | reject, reason }` (uphold shows the item, logged `unhide`; reject logged
+  `appeal_rejected`; the author told, `appeal`; the queue's `hidingReason` is the log's, so after 12 months
+  it reads «(tolto dopo 12 mesi)» and only the category is left, G-550); showing an item by any route closes its pending appeal as
+  upheld with a fixed note, never the moderator's free reason (it may name who reported); the author's deletion of the item deletes its appeals; the hidden notice carries `appeal`
+  (`pending` | `rejected` | null). The profiles carry `roles` (public) and `validatedCount`; `GET
+  /forum/profiles/:profileId/validated` lists the visible contributions at the threshold. The export
+  carries the roles, the validations given and the appeals, never who appointed or decided.
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing
@@ -507,7 +796,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   must name that version's id and the acceptance is stored with the proposal; otherwise 409
   `{ detail, richiedeTesto }` with the current version, nothing written. The card records the
   version in `propostaTestoId`. `POST /:id/ritira`: proposed → draft at any time, deleting the
-  card's votes and clearing `propostaTestoId`. `routes/lingoValidazione.ts`:
+  card's votes and clearing `propostaTestoId`. `POST /:id/togli` (G-556, session only): the author
+  removes a validated or under-review card — deleted when nobody else uses it (no one else has it in
+  review, and it is in no course someone else wrote or follows) and answered `{ esito: "cancellata" }`,
+  otherwise its author becomes null and the answer is `{ esito: "senza_nome", detail }`; another state is
+  a 409, another person's card a 404; the card row is locked first
+  (`lingo/removeOwnContributions.ts`). `DELETE /api/lingo/validazione/:cardId/motivazione` (G-557,
+  session only): the validator erases the reason of their vote, the judgement stays; a remark whose
+  reason was erased reaches the card's author as `motivazione: ""`. `routes/lingoValidazione.ts`:
   `GET /api/lingo/validazione/coda?materia=&limit=` (1–20) and `POST /api/lingo/validazione/:cardId
   { giudizio, motivazione? }` (reason 1–2,000 characters, required unless `APPROVATA`), for
   validators only: `User.lingoValidatore`, set by an administrator through `PUT /admin/users/:id`
@@ -538,16 +834,18 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   carry `lingo_validatore`.
 - **Card review** (`routes/lingoSrs.ts`, `/api/lingo/srs`, session only — not in the
   delegated table, so every path is a 403 for an exchanged token; Studia spec decisions
-  7–9, 17, 18): `GET /sessione?materia=&istituto=` (`istituto` only with `materia`, else 400; exact match on the values `/percorso` returns, so a stop round-trips; a session narrowed this way never marks the day's queue finished) answers `{ conteggi: { dovute, nuove }, cards }`,
+  7–9, 17, 18): `GET /sessione?materia=&istituto=` (`istituto` only with `materia`, else 400; exact match on the values `/percorso` returns, so a stop round-trips; a session narrowed this way never marks the day's queue finished; `?corso=` alone narrows to one course, below) answers `{ conteggi: { dovute, nuove }, cards }`,
   the due cards first (earliest `dueAt`, at most 500 fetched, `dovute` exact), then the
   new ones (oldest first) up to the daily goal minus the cards introduced today — state
   rows with `reps = 1` reviewed today, since only a day's first grade is recorded — so
   the goal holds across devices, and across subjects: a session narrowed to one subject
   still counts the day's new cards of every subject; each card carries `nuova`, `comunita` and `anteprima`
   (the days each grade would give, `previewIntervals`). `lingo/reviewQueue.ts`
-  `reviewScope` is decision 8: the user's own drafts, proposals and validated cards, and
-  the community's validated cards in the subjects switched on — never `autoreId != me`,
-  which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
+  `reviewScope(userId, materieComunita, courseDay, materia?, istituto?)` is decision 8: the user's own drafts, proposals
+  and validated cards (a course card only from the Rome day after its module was done by the user's enrolment, and
+  not once withdrawn: `courseCardModuleDone`; none at all while `lingo_courses` is off, `courseDay` null — read it
+  with `courseDayFor`), and the community's validated cards in the subjects switched on —
+  never `autoreId != me`, which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
   rating, durataMs? }`: one transaction serialised on the pair by
   `pg_advisory_xact_lock` (a first review has no state row to lock), the card row held
   `FOR KEY SHARE` (a grade racing the trash waits, then answers 404; a P2003 is a 404 too), the scope checked
@@ -594,7 +892,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
 - **Gymnasium XP and levels** (spec `docs/superpowers/specs/2026-10-20-gymnasium-xp-levels-design.md`,
   plan `docs/superpowers/plans/2026-10-20-gymnasium-xp-levels.md`; migration `20261026100000_lingo_xp_ledger`).
   `LingoCreditoXp` (`lingo_crediti_xp`) is an append-only ledger: one row per mission credited per period
-  (`G:<day>`, `S:<Monday>` for the week, `U` once), its points at the time, the kind and id of the event
+  (`G:<day>`, `S:<Monday>` for the week, `U` once; `M:<module id>` and `C:<course id>` for the courses' two missions), its points at the time, the kind and id of the event
   (`REVISIONE` the log row, `PROPOSTA` the card, `VOTO` the vote, `LETTURA` none) and the subject where one
   applies. `@@unique([utenteId, missione, periodo])` makes a mission pay once per period, `@@unique([missione,
   fonteId])` makes a card earn «scrivi» once in its life; the CHECKs (points 1–1000, the period's shape by
@@ -604,12 +902,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   transaction, under `SAVEPOINT xp` with `SET LOCAL lock_timeout = '1s'` (an error or a long wait rolls back to
   the savepoint, logs the error's name only, and answers no credit: XP never fails the event), then the user's
   two-key advisory lock (`LINGO_XP_LOCK_CLASS`, `hashtext(user)`), then the daily safety net
-  (`XP_DAILY_CEILING` = 300, above the catalogue's 255). Each mission is decided from stored facts only (the
+  (`XP_DAILY_CEILING` = 450, above the catalogue's 255, two modules and a course passed: G-377 Q5). Each mission is decided from stored facts only (the
   stored day, the log, the review states, the scopes) in Rome days of the server's clock; the user's quota and
   goal cannot lower «Impara 5» or the goal's 10 reviews. Callers, all of the user's session and none in the
-  delegated table (`tests/lingoXp.security.test.ts` pins both): the grade (after `recordGradeDay`), the proposal,
+  delegated table (`tests/lingoXp.security.test.ts` pins both): the grade (after `recordGradeDay`, and for a course
+  card after «superato» is checked under the enrolment's lock), the proposal,
   the vote (after `countVoteDay`, before the card's state changes; `validationRule.ts` never reads XP, G-253,
-  G-318), `readProgress` and the unnarrowed session read when it marks the queue finished — the two reads in a
+  G-318), the courses' study writes and course page (`lingo/courseStudy.ts`, `lingo/coursePage.ts`, below),
+  `readProgress` and the unnarrowed session read when it marks the queue finished — the two reads in a
   transaction that takes `users` `FOR KEY SHARE` first, or the credit's insert deadlocks with an account
   deletion. Lock order: cards, today's day row, the XP lock. `lingo/levels.ts` is the curve (100 + 25·(n − 1),
   no ceiling, integers; only ever gentler after release); the level is never stored, `lingo/xpLedger.ts`
@@ -618,6 +918,99 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `GET /progressi` carries `livello`, `missioni` (never narrowed by `materia`; `convalida` only for a validator,
   `caso` always `in-arrivo`) and `crediti`, the credits that read wrote. The export carries the ledger as
   `data.lingoCreditiXp` without the events' ids. No MCP tool reads or writes XP.
+- **Gymnasium's courses, «Percorsi»** (A1; spec `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md`
+  §10; migrations `20261029100000_lingo_courses`, the thirteen tables, the two columns on `lingo_cards` and the
+  CHECKs, and `20261029100001_lingo_courses_declaration`, the ledger's `periodo` CHECK for `MODULO` (`M:<uuid>`)
+  and `PERCORSO` (`C:<uuid>`) and version 1 of `MATERIALE_STUDIO`). S1 holds the content side; S2 (no migration)
+  the study, mastery, the exam's attempts, the missions, the course page and `/oggi`, below. Content
+  (`LingoCorso` and the tables under it, the author's) is apart from progress (`LingoCorsoIscrizione` and under
+  it, one person's): content rows are never updated but for a course's title and `moduliPrevisti`, and a
+  correction is a new module naming the one it supersedes (`sostituisceId`). Behind the switch `lingo_courses`
+  (`app_switches`; `GET /api/features` answers `lingoCourses`): off, every `/api/lingo/corsi` route and `POST
+  /api/lingo/testi/MATERIALE_STUDIO/accetta` answer 404, the card route refuses a module, and the trash neither
+  lists, restores nor empties a `LINGO_CORSO` or `LINGO_CORSO_MODULO` entry (404; the sweep still expires it); the
+  rows stay. The admin's texts page still lists `MATERIALE_STUDIO`: admins are the owners. `GET
+  /api/lingo/srs/sessione` is strict: `?corso=` with a subject is a 400, with the switch off or a course not the
+  caller's a 404. Off also hides the course cards from the review (`reviewScope`), and nothing of a course is
+  credited: `evaluatePassed` and the courses' missions in `settleMissions` read the switch themselves.
+  `routes/lingoCorsi.ts` over `lingo/courses.ts`: `POST /` (course, competences C1… in the order given, the
+  author's enrolment with a study dossier of the user's, locked `FOR KEY SHARE`; 409 `{ detail, richiedeTesto,
+  link }` until the current `MATERIALE_STUDIO` is accepted; 30 a user), `POST /:id/moduli` (one module whole, the
+  course locked `FOR NO KEY UPDATE`, so two writes queue and the limits hold; a module past `moduliPrevisti` is a
+  409, a correction never) and `POST /:id/esami` are a connected application's only (the session gets 403;
+  `lingo:courses:write`, counters `corso` 3 and `modulo` 40 a day); `GET /` (session and `lingo:courses:read`)
+  lists the caller's courses; `GET /:id/struttura` (token only) gives the assistant the content with its keys
+  except an exam's not yet handed in, the flags and the judgements; `PATCH /:id { titolo?, moduliPrevisti?,
+  obiettivo?, dataEsame? }`, `DELETE /:id`, `DELETE /:id/moduli/:moduloId` (a module never opened; 409 once a state row exists) and `GET
+  /:id/export` are the session's. **The learner's goal and exam date** (G-488; migration
+  `20261117120000_lingo_course_goal`) sit on the enrolment, not the course: `obiettivo { tipo, nota }` (a kind of
+  `LingoCorsoObiettivo`, `ESAME_AVVOCATO`, `ESAME_MATERIA`, `AGGIORNAMENTO_NORMATIVO`, `ALTRO`, and a sentence of
+  1–200 characters, only with a kind: a CHECK; `''` is no sentence) and `dataEsame` (a Rome day, from today to
+  five years on when set, kept once it passes); null clears either, a goal replaces kind and sentence together.
+  `goalView` puts both on `GET /`, `GET /:id`, `/oggi` (in `corso`) and the PATCH's answer; the exports carry the
+  columns. Every read and write is scoped to the author: anything else is 404. The lesson
+  is a closed Markdown subset (`lingo/courseFormat.ts`): HTML, links but `[testo](#cN)`, images, code, other
+  heading levels, nested lists and every control character but `\n` are refused, never stripped; each `#cN`
+  names an entry of the enrolment's dossier, a norm or a decision, stored as a copy of its identity
+  (`rebuildNormEntry`, `rebuildDecisionEntry`) and its citation, with no call to the sources. The body limits are
+  `LIMITS` in `schemas/lingo/corso.ts` (a module's body measured first, 300,000 characters). An item's right key
+  is the column `corretta`, read only by an explicit `select` (`ITEM_SELECT`). `POST /api/lingo/cards` takes a
+  `moduloId` for the call and `competenze` (codes) per card: a token also needs `lingo:courses:write`, the module
+  must be the caller's (the user's row `FOR KEY SHARE`, then the module `FOR NO KEY UPDATE`), at most 20 cards a
+  module; such a card is `daPercorso` for good,
+  `POST /:id/proponi` refuses it (409, G-362), and `reviewScope` offers it from the Rome day after its module is
+  done. `GET /lingo/cards` and `/:id` carry `modulo: { id, corsoId, titolo, fatto } | null` (the session while the
+  switch is on; a token only with `lingo:courses:read` too). The trash takes a course (`LINGO_CORSO`: content, enrolments, states, outcomes, attempts,
+  cards with their review rows; the dossier stays, answered for the toast) and a module never opened
+  (`LINGO_CORSO_MODULO`, with its corrections' ids); a course card in the card trash keeps its competences and
+  comes back detached when its module is gone; a dossier's trash records the enrolments that pointed at it and
+  links them again; a restore holds the limits again (30 courses, the programme, 40 and 60 modules: 409). The
+  account export carries `data.lingoCorsi` (the user's courses with their own enrolment, the keys of an exam not
+  handed in left out) and each card's `moduloId`, `daPercorso` and codes. Everything cascades from `User`;
+  `deleteUserAccount` locks the person's courses before their cards, the order the course trash takes (course,
+  modules, cards), and `createCourse` takes the user's row `FOR KEY SHARE` first, so neither deadlocks with it.
+  **Studying (S2)**, the user's session only (a token gets 403; none is in the delegated table, so no token ever
+  settles XP): `lingo/courseStudy.ts` — `GET /:id/moduli/:moduloId` (the lesson; an item carries its key,
+  explanations and the caller's outcome only once answered), `POST …/apri`, `POST …/risposte { domandaId, scelta }`
+  (graded on the server; one outcome per item, a retry answers the stored one with `registrata: false`; the first
+  answer opens the module), `GET`/`POST …/aperta` (the model answer and rubric once the quiz is whole and, under 70%,
+  the hybrid's choice graded; the ticks sit on the open question's row, never scored, Q6), `POST …/fine` (the whole
+  quiz; `quizPercentuale` floored; idempotent), `POST /:id/domande/:domandaId/segnala` (an answered item; changes no
+  score, Q7), `POST …/ritira` (opened, and a live correction supersedes it), `POST /:id/esami/:esameId/inizia` (once
+  every counting module is done; one attempt per exam, never a key before the hand-in) and `…/consegna { risposte,
+  aperta? }` (graded at once: 70% overall and 60% on each competence, an item left blank is wrong; idempotent), then
+  `…/aperta { spuntate }` (the opinion's ticks once handed in, when the rubric is shown; never scored). Every
+  study write locks the course `FOR KEY SHARE` (the course and module trash take it `FOR UPDATE` first), then the
+  user's row `FOR KEY SHARE` (an account's deletion locks courses before it deletes the user), then the enrolment
+  `FOR NO KEY UPDATE`; the XP lock last. `lingo/courseMastery.ts` is mastery as a pure function (§4: five answers in
+  a Rome day make a session; «acquisita» at two sessions of 80% seven days apart; «da riprendere» at a fall under
+  60% after an acquisition); `lingo/courseProgress.ts` reads its answers (module and exam items whose choice was
+  graded, a course card's first grade of each Rome day from the log, «Bene» or «Facile» right, a withdrawn module's
+  items and cards left out) and writes «superato» (`evaluatePassed`, once, under the enrolment's lock: at an answer,
+  the end, a withdrawal, a hand-in, a course card's grade, the course page). `lingo/coursePage.ts`: `GET /:id` (the
+  competences' state and numbers, the modules, what «in preparazione» lacks, the exam's state with
+  `nuovoEsameDal`, the dossier, the cards `{ dovute, nuove, inAttesa, verifica }`; it settles credits left behind),
+  `GET /oggi` (per course: the module to suggest, none on a day one was done, and the due and check cards; writes
+  nothing), and the course's review: `GET /srs/sessione?corso=` adds **check cards** (`verifica: true`) for the
+  competences whose next session counts today, «da riprendere» first, never a new card or one graded today, none for a
+  competence whose reviewed cards cannot reach five answers today (they would be drilled daily), at most once every
+  seven Rome days (`wantsCheckCards`); after them an «acquisita» competence weekly from its last valid session, then
+  a «da iniziare» one with answers from the day after its first ones, then weekly (G-390: the constants
+  `CHECK_ACQUIRED` and `CHECK_UNSTARTED`, both on). **Missions:** «Completa un modulo» (30, at 70%, at
+  most two a Rome day, the rest credited by a later event or the course page) and «Supera un percorso» (100, for three
+  competences and three counting modules at least), settled in `settleMissions` with the events `modulo`, `esame`,
+  `corso` and a course card's `revisione`; neither is in «Le missioni di oggi».
+- **The short lesson** (LC63; migrations `20261117100000_lingo_lessons`, `20261117100001_lingo_lessons_period`).
+  `routes/lingoLezioni.ts` over `lingo/lessons.ts`, session only (in no delegated row, so a token gets 403).
+  `POST /api/lingo/lezioni { materia }` builds 5–8 exercises from the subject's cards in `reviewScope` (at least
+  `LESSON_MIN_CARDS` = 4, else 409 with the reason; at most `LESSONS_PER_DAY` = 20 a Rome day, else 429): multiple
+  choice, true or false, article ↔ institute, a word taken out of a card's answer — the cards' own words, no sentence
+  of its own. `LingoLezione` (`lingo_lezioni`, cascade from `User`) stores them with their keys; the answer carries
+  none. `POST /:id/risposte { indice, risposta }` grades on the server, stores `{ indice, giusta }` and answers the
+  key; a second answer is `registrata: false`. The answer that completes the lesson sets `finitaIl` and, in its
+  transaction, `settleMissions` with `{ tipo: 'lezione' }` credits «Lezione» (`LESSON_MISSION`: 10, at most three a
+  Rome day, `L:<lesson id>`, fonte `LEZIONE`; not in «Le missioni di oggi»). The export carries `data.lingoLezioni`
+  without the exercises' words (cards' texts, often other people's).
 - **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
   subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own
@@ -650,7 +1043,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   finishes before the states are read (plan, decision 14). Their votes outlive them, anonymous
   (`LingoValidazioneCard.utenteId` `SET NULL`), as do the text versions they wrote
   (`autoreId` `SET NULL`); their acceptances go. A card's votes go with the card: one
-  restored from the trash comes back without them. `GET /auth/export` includes the user's cards
+  restored from the trash comes back without them. Before leaving, the person can remove
+  everything they wrote for others at once (G-558): `POST /auth/contributions/remove { password }`,
+  session only, one transaction (`account/removeAllContributions.ts`) — their glosse, then their
+  replies and comments, newest first, by the author's own delete rule (`deleteOwnThreadIn`,
+  `deleteOwnCommentIn` in `controllers/communityController.ts`); the Forum validations they gave;
+  their proposed cards withdrawn; their validated or under-review cards by G-556; their votes' reasons
+  erased (G-557). It answers `{ glosse: {cancellate, svuotate}, risposte: {cancellate, svuotate},
+  validazioniForum, schede: {ritirate, cancellate, senzaNome}, motivazioni }`; a wrong password is a
+  400 and changes nothing. `GET /auth/export` includes the user's cards
   as `data.lingoCards`, their votes as `data.lingoValidazioni` (card id, verdict, reason, time)
   and their acceptances as `data.lingoAccettazioni` (key, version, time). Review data is personal: `LingoStatoRipasso`
   (`lingo_stato_ripasso`, one row per user and card, indexed by `(utente_id, due_at)`),
@@ -685,7 +1086,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
   the tick's body is the occurrence seen, required for a repeating task (400 without), a stale one
   409, so a double tick never moves it twice. Any other tick closes the task and its open
-  subtasks at one instant, and reopening reopens what closed at that instant. Routes
+  subtasks at one instant, and reopening reopens what closed at that instant. `{ forever: true }`
+  («Completa per sempre») closes a repeating task that way too, with its rule cleared and no next
+  occurrence; its origin and kept day stay stored, so `reopen { recurrence }` puts the rule back in
+  the same transaction and the series resumes from its kept day. Routes
   (`routes/tasks.ts`, `/api/tasks`, session only — not in the delegated table): `GET
   ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
   `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT
@@ -710,6 +1114,38 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (days 'YYYY-MM-DD', times 'HH:MM'), never `assigneeId` (another person's id from wave 4) — the
   export's rule, no other person's id, name or text. They cascade with the account, and a task
   assigned to a deleted account loses its assignee.
+- **A case's act files** (LC50, server part; testing only, no real client files until the volume has a
+  backup off the host). `routes/praticaFiles.ts`, mounted at `/api/dossiers` before the dossier routes;
+  the user's session, except the three LC56 routes below. `GET /:dossierId/files` (originals with
+  `versioni`, and `cestino`), `POST /:dossierId/files` and `/:dossierId/files/:fileId/versions` (multipart
+  `file`; 25 MB a file, 500 MB a case, 2 GB a user, the trash counted; PDF, DOCX, DOC, ODT, RTF, TXT,
+  JPG, PNG, the extension agreeing with the first bytes, 415 otherwise; 413 over a ceiling),
+  `GET /:dossierId/files/:fileId/content`, `POST …/trash` and `…/restore` (an original takes its
+  versions), `DELETE /:dossierId/files/:fileId` (only from the trash: rows and disk), `GET|PUT
+  /:dossierId/istruzioni { testo }` (Markdown, at most 20,000 characters). Another user's dossier or file
+  is a 404. `pratica/fileStore.ts`: AES-256-GCM, a random key per file wrapped with `PRATICA_FILES_KEY`
+  (32 bytes, base64), the file id as AAD of both; the blob at
+  `PRATICA_FILES_DIR/<userId>/<dossierId>/<fileId>`, the wrapped key in `pratica_files.chiave_cifrata`.
+  Both read per call: without a valid key the file routes answer 503 (the instructions still work).
+  A download is decrypted whole and its tag verified before a byte goes out; a tag that fails (the key
+  changed: there is no rotation) is a 500 that says so. `scripts/datakit` backs up the `pratica_files`
+  volume with the others; the key is never in a backup. `pratica_file_accessi`
+  logs each listing, download, deposit, trash, restore and deletion (user, client, file, time; no
+  foreign key to the file). No table has a foreign key to `dossiers`: a dossier in the trash keeps its
+  files (unreachable, the owner check finds no dossier) and gets them back on restore;
+  `purgeTrashEntry` and `sweepExpiredTrash` remove them (`removeDossierFiles`), and `deleteUserAccount`
+  removes the user's directory after its transaction. `readPraticaFileContent` is an internal reader no
+  route calls. `tests/praticaFiles.test.ts`.
+  **For an exchanged MCP token** (LC56, owner, 16 November 2026, the co-owner's review afterwards; testing only),
+  three rows of the delegated table, owner only (404 otherwise): `GET /:dossierId/contesto` (`dossier:read`; the
+  instructions and the live files, no trash, an `elenco` line), `GET /:dossierId/files/:fileId/text?parte=n`
+  (`dossier:text` and a grant approved with consent words version 2, else 403; the text extracted in parts of 50,000 characters,
+  a `scaricamento` line with the client; PDF, DOC, RTF and images answer `testo: null` and a `motivo`), `POST
+  /:dossierId/files/atto { nome, testo ≤ 500,000, versioneDi? }` (`dossier:write`; the text made a DOCX and stored
+  through the uploads' own `deposit`: ceilings, lock, `autore: claude`, the client, a `deposito` line; a version
+  beside the original, never over it). The raw file, uploads, trash, restore, deletion and the instructions' writing
+  stay 403 to a token. `pratica/docText.ts`: text out of DOCX (`word/document.xml`), ODT (`content.xml`) and TXT,
+  and a minimal DOCX in, with `node:zlib` only (no package reads PDF here). `tests/praticaFilesMcp.test.ts`.
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
@@ -730,8 +1166,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   tokens; the MERL-T consent and its history as `data.merltConsenso` and
   `data.merltConsensoStorico`, with the notice version of each choice) and
   `DELETE /auth/account` (password re-checked; every relation to
-  `User` cascades, except the community's study cards, which stay without an
-  author, and the validators' votes and the text versions an administrator wrote,
+  `User` cascades, except the community's study cards and the Community's glosse,
+  replies and comments, which stay without an author, the reports and moderation
+  acts, which stay without their person, and the validators' votes and the text versions an administrator wrote,
   which stay anonymous: see LingoLex cards). A person who ever gave MERL-T a
   consent also gets an erasure request in MERL-T, written in the deletion's
   transaction and retried until MERL-T confirms (`services/merlt/userData.ts`,
@@ -795,11 +1232,26 @@ schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 
 ## Tests
 
-Only through `npm test`: its setup runs `prisma migrate reset` and refuses a
-database whose name lacks "test". The per-test `TRUNCATE … users CASCADE` also empties
-`lingo_testi_versioni` (it references `users`), so the setup reads the versions the migrations
-wrote once and puts them back after each truncation: every test starts with version 1 of each
-text to accept, as a fresh database has. The suite's environment is `.env.test` and the setup's own
+Only through `npm test`: the setup refuses a database whose name lacks "test". The database is
+reset once per run (`tests/globalSetup.ts`, vitest's `globalSetup`: `prisma migrate reset`), and
+before every test `tests/setup.ts` empties every table of `public` but `_prisma_migrations` and
+puts back the text versions the migrations insert (`lingo_testi_versioni`, read once right after
+the reset): every test starts from empty tables plus version 1 of each text to accept, as a fresh
+database has. The seeded `lingo_impostazioni` rows are not put back: a missing row reads as the
+default, as it always has in the suite. The tables come from the catalog, so a new table is
+emptied with no change to the setup; one statement deletes them, each table after those that
+reference it (`tests/testDatabase.ts` `deletionOrder`; the two cycles among the keys, a dossier
+and its Forum copy, a glossa and its accepted reply, are broken at a `SET NULL` key). A `TRUNCATE`
+cost about 200 ms a test, the DELETEs a few. No table has a sequence or an identity column and
+the migrations create no trigger, so there is no counter to restart. Two differences remain. A
+`TRUNCATE` gave each test brand-new table files, so a read without `ORDER BY` usually came back
+in insertion order (a sequential scan of rows never updated); after DELETEs Postgres may put a new row in space freed earlier, so a test that
+compares a list in order must ask for one. And a schema change a test leaves behind (a `CHECK`
+added for a moment, undone in a `finally`) would reach the next files: each file compares the
+schema with the one the run started from (`SCHEMA_FINGERPRINT`) and refuses to run when it
+differs. Under `npm run test:watch` the reset runs once, at start: restart it after adding a
+migration. The global setup builds a Prisma client in vitest's main process, whose environment the
+test processes inherit, and takes out what it loads at once, as below. The suite's environment is `.env.test` and the setup's own
 values, never a development `.env`: `dotenv` is mocked in the setup (so `src/config.ts` reads
 nothing); `@prisma/client` is wrapped there too, because Prisma loads `apps/server/.env` (when the
 client was generated in a checkout that has one) at the import and again at every construction,
@@ -812,11 +1264,13 @@ port with another local process).
 
 ## Container image
 
-`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries only
-what `node dist/index.js` needs, on Debian slim with openssl for Prisma's query engine,
+`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries the
+production dependencies and `dist/`, on Debian slim with openssl for Prisma's query engine,
 as user `node`, with an exec-form `CMD` so SIGTERM reaches the graceful shutdown.
-`migrate` is a one-shot (`prisma migrate deploy`) and exists because `prisma` and `tsx`
-are development dependencies. `.dockerignore` excludes every `.env*`: a secret never
+`migrate` is a one-shot (`prisma migrate deploy`) from the build stage, which has the
+`prisma/` folder (schema and migrations) the runtime does not. `prisma` is a production
+dependency since G-555, so the blocking `npm audit` covers the CLI that writes to the
+production database; the runtime therefore holds it too, unused. `.dockerignore` excludes every `.env*`: a secret never
 enters an image. The admin seed runs compiled: `node dist/utils/seed.js`.
 
 Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it shares with
@@ -835,6 +1289,8 @@ volume and the root filesystem is read-only.
 saved-norm watcher (see the Node backend section); all three have defaults.
 `SCRAPE_QUOTA_POINTS` / `SCRAPE_QUOTA_WINDOW_SECONDS` / `SCRAPE_IP_POINTS` (defaults
 300, 60, 1200) size the quota behind `GET /api/auth/verify`.
+`PRATICA_FILES_KEY` (32 bytes, base64; `openssl rand -base64 32`) and `PRATICA_FILES_DIR` drive a
+case's act files (no default for either: without them the file routes answer 503).
 `OAUTH_*` configure the authorization server (see `.env.example`);
 `tests/setup.ts` lifts its per-address limits for the suite and sets a test
 `OAUTH_MCP_CLIENT_SECRET`.

@@ -75,11 +75,11 @@ services/merlt/
 |---|---|
 | `app.py` | the FastAPI app (`merlt.app:app`), the lifespan boot sequence, `/health`, the router list |
 | `api/` | the routers (below), `engine_bootstrap.py` (builds the orchestrator, also used by "Riavvia motore"), `auth.py` (`verify_api_key`, `require_role`), `api_key_seed.py`, `models/` (Pydantic DTOs) |
-| `experts/` | `orchestrator.py`, the four experts, `base.py`, `react_mixin.py`, `synthesizer.py` (`AdaptiveSynthesizer`), `router.py`, `gating.py`, `neural_gating/` (gating MLP, `HybridExpertRouter`, tool selector), `models.py` (`QATrace`, `QAFeedback`, `ApiKey`), `llm/` |
+| `experts/` | `orchestrator.py`, the four experts, `base.py`, `react_mixin.py`, `synthesizer.py` (`AdaptiveSynthesizer`), `router.py`, `gating.py`, `neural_gating/` (gating MLP, `HybridExpertRouter`, tool selector), `models.py` (`QATrace`, `QAFeedback`, `ApiKey`) |
 | `tools/` | the tools the experts call (`search.py`, `mcp_legal_adapter.py` for mcp-legal-it, `registry.py`, …) |
 | `rlcf/` | `training_scheduler.py` (buffer, `add_experience`, persistence), `replay_buffer.py`, `buffer_rehydration.py`, `policy_gradient.py` (REINFORCE, `GRAPH_TO_POLICY_RELATION`), `policy_manager.py` (loads `*_latest.pt`), `authority.py`, `domain_authority.py`, `authority_sync.py`, `aggregation.py`, `devils_advocate.py`, `quarantine_service.py`, `ai_service.py` (`OpenRouterService`), and more |
 | `weights/` | `store.py` (`WeightStore`, `weight_versions`), `learner.py`, `experiment.py`, `config/` |
-| `pipeline/` | `document_parser.py` (notes → staging, relation endpoint resolution), `provisional_writer.py`, `promotion.py`, `hygiene.py`, `mechanical_ingestion/` (parser, conflict report, promote), `massimario/` (the Massimario's annual reviews: portal links to URNs, paragraphs, citation grammar, volume assembly, promotion, vectors, the reader), `ingestion.py`, `enrichment/`, `semantic_chunking/`, `live_enrichment.py`, `multivigenza.py` |
+| `pipeline/` | `document_parser.py` (notes → staging, relation endpoint resolution), `provisional_writer.py`, `promotion.py`, `hygiene.py`, `mechanical_ingestion/` (parser, conflict report, promote), `massimario/` (the Massimario's annual reviews: portal links to URNs, paragraphs, citation grammar, volume assembly, promotion, vectors, the reader; the parsing modules have a twin in the Python API, `visualex_api/services/massimario/`, which serves the reader since the web reads `/fetch_rassegne` (PR 2): until this adapter reads the API's records, a grammar fix lands in both — design 2026-10-30-rassegne-without-merlt), `ingestion.py`, `enrichment/`, `semantic_chunking/`, `live_enrichment.py`, `multivigenza.py` |
 | `storage/` | `graph/` (FalkorDB client and config, `entity_writer.py`, `relation_endpoints.py`), `vectors/` (embeddings, `collection.py`), `retriever/`, `bridge/`, `trace/`, `temporal/`, `enrichment/` (SQLAlchemy models, `database.py`, `consensus_triggers.py`, `schema_additions.py`, `deduplication.py`), `migrations/` (plain SQL for the `create_tables()` stack) |
 | `worker/` | RQ tasks: `tasks.py` (article ingest), `extraction_tasks.py` (`extract_to_staging`), `mechanical_ingest_tasks.py`, `massimario_tasks.py` (a promoted Massimario batch's vectors and bridge rows, 100 paragraphs a job, chained on `merlt_bulk`), `ner_training_tasks.py` |
 | `ner/` | spaCy model, feedback buffer, training data conversion |
@@ -110,7 +110,6 @@ router is mounted with `prefix="/api/v1"` plus its own prefix:
 | `profile_router` | `/profile` |
 | `rlcf_router` | `/rlcf` |
 | `expert_metrics_router` | `/expert-metrics` |
-| `ws_router` | `/ws` |
 | `tracking_router` | `/tracking` |
 | `policy_evolution_router` | `/policy-evolution` |
 | `export_router` | `/export` |
@@ -122,20 +121,28 @@ router is mounted with `prefix="/api/v1"` plus its own prefix:
 | `api_keys_router` | `/api-keys` |
 | `ner_router` | `/ner` |
 | `ingestion_mechanical_router` | `/ingestion/mechanical` |
-| `rassegne_router` | `/rassegne` (`GET /by-norma`: the review paragraphs citing a norm, by year) |
+| `rassegne_router` | `/rassegne` (`GET /by-norma`: the review paragraphs citing a norm, by year; no caller since the web reads the Python API's store, removed in PR 3 of design 2026-10-30-rassegne-without-merlt) |
 | `user_data_router` | `/user-data` (`GET` and `DELETE /{user_id}`: a person's data, for the BFF only; see Personal data) |
 
-**Auth.** `app.py` sets `app.dependency_overrides[verify_api_key] = optional_api_key`,
-so a route that declares only `verify_api_key` accepts requests without a key.
-Only `require_role("admin")` checks the key.
+**Auth (scan A.2).** Every route needs the API key: `app.py` includes every
+router with `dependencies=KEY_REQUIRED` (`verify_api_key`), and only `/health`
+(the containers' probe) and `/` stay open. A missing, unknown, inactive or
+expired key is a 401; `require_role("admin")` adds a 403 for a key that is not
+admin. There is no open mode: with no key configured every route answers 401.
 
-- Among the routes the BFF uses, those are `/rlcf/training/{start,stop}` and
-  `/ingestion/mechanical/*`.
-- `/admin/*` and `/ner/*` are therefore open at this layer. Never expose :8000,
-  and design every new sensitive route assuming `verify_api_key` filters
-  nothing.
-- The admin key is seeded at boot from `MERLT_ADMIN_API_KEY`
-  (`api/api_key_seed.py`).
+- The one key is seeded at boot from `MERLT_ADMIN_API_KEY` (`api/api_key_seed.py`;
+  compose passes the server's `MERLT_API_KEY`). The seed deactivates every other
+  active key (kept, not deleted), so a key created through `/api-keys` lasts until
+  the next boot. No route hands out a key.
+- `/health` reports `api_key: missing` when the seed left no usable key.
+- `verify_api_key` writes the key's `last_used_at` at most every five minutes.
+- `/docs`, `/redoc` and `/openapi.json` are off unless `MERLT_DOCS=true`.
+- In development, set `MERLT_API_KEY` in `apps/server/.env` (any long random
+  string): `start.sh` passes it to MERL-T as `MERLT_ADMIN_API_KEY`.
+- A new router is covered by `tests/api/test_every_route_needs_the_key.py`, which
+  reads the app's OpenAPI schema (FastAPI 0.164 no longer lists included routes in
+  `app.routes`): a websocket or a route with `include_in_schema=False` escapes it,
+  so a new one needs its own test.
 
 **Callbacks to the BFF.** They carry `X-Internal-Secret` (`MERLT_INTERNAL_SECRET`):
 
@@ -189,6 +196,32 @@ BFF checks (`merlt_user_preferences`). `merlt/privacy/` holds the obligations:
   does not relay it; do not add a field that carries it.
 - `api/user_data_router.py`: `GET`/`DELETE /api/v1/user-data/{user_id}`, admin
   key only (`require_role("admin")`).
+- **The language models** (G-456: only providers that neither keep nor train on
+  the text, asked on every call). Every call goes through `OpenRouterService`
+  (`rlcf/ai_service.py`) and carries `OPENROUTER_PROVIDER_RULE`:
+  `provider.data_collection: "deny"` and `provider.zdr: true`. The model is chosen
+  at run time, so the rule rides on the request, not on a list of models; a model
+  with no zero-retention endpoint is refused by OpenRouter, so a model chosen for
+  MERL-T must have one. Do not add a client that calls a model another way: the
+  unused multi-provider package `experts/llm/` was removed for that reason.
+  Every model MERL-T picks by itself (defaults, fallbacks, the admin's choices) is
+  on `ZERO_RETENTION_MODELS` in `merlt/config/llm_models.py` (G-575), with the two
+  defaults `DEFAULT_FAST_MODEL` and `DEFAULT_EXPERT_MODEL`;
+  `tests/unit/test_default_models_zero_retention.py` fails on any other model id
+  (OpenRouter's `provider/model` form, for the providers it lists) written in a
+  Python or YAML file of `merlt/` or `scripts/`. When an id loses its zero-retention endpoint,
+  remove it there and pick another.
+
+**Logs carry lengths, never text.** A question, a search someone typed, a proposed
+entity, the search strings an expert builds, the model's «thought» and answer, and a
+provider's raw error stay out of the logs; log `query_chars=len(query)` and the like.
+`tests/unit/test_logs_carry_no_user_text.py` reads every log call in `merlt/` and
+fails when one carries a name of its `TEXT` list other than as `len(...)`: a new name
+for a person's text must be added there. Its `ALLOWED` names the few expressions kept
+on purpose, each with its reason. A provider error is logged as its status,
+OpenRouter's code and its short message (`ai_service._provider_error`), never the
+error's metadata. uvicorn's access log drops query strings (`api/access_log.py`,
+installed in `app.py`): a search sent as `?q=` stays out of the logs.
 
 Never call the user id «anonymous», «opaque» or «pseudonymous», and never log
 it next to a payload. The research export (`export_router`) pseudonymises with a
@@ -239,16 +272,17 @@ services use their container ports (FalkorDB and Redis on 6379, Qdrant on 6333).
 
 ## Tests
 
-CI (`.github/workflows/ci.yml`, job `merlt`, on `develop` and on pull requests
-into it) is the reference run. On Python 3.11 it:
+CI (`.github/workflows/ci.yml`, job `merlt`, on `main`, `develop` and pull
+requests into them) is the reference run. On Python 3.11 it:
 
 1. installs CPU torch, then `pip install -e ".[dev]"`;
 2. bootstraps a Postgres service with `init_db()`, `create_tables()` and
-   `ensure_schema_additions()`;
-3. runs `python -m pytest tests/ -q`;
-4. runs `python -m pytest tests/ -q -m integration` against a FalkorDB service
-   (the image `infra/compose.yml` pins), with `FALKORDB_HOST` and
-   `FALKORDB_PORT` set for that step only.
+   `ensure_schema_additions()` — a database thrown away with the job, so it
+   runs with `fsync`, `synchronous_commit` and `full_page_writes` off;
+3. runs `python -m pytest tests/ -q -p no:cacheprovider`;
+4. runs `python -m pytest tests/ -q -p no:cacheprovider -m integration`
+   against a FalkorDB service (the image `infra/compose.yml` pins), with
+   `FALKORDB_HOST` and `FALKORDB_PORT` set for that step only.
 
 Tests marked `integration` need a live FalkorDB: `pyproject.toml` `addopts`
 excludes them from a plain run. Run them with `-m integration` against a
@@ -335,6 +369,25 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   contract test fails on `labels(x)[0]` in Cypher.
 - Do not change the authority algorithm or the synthesizer's contract without
   the owner's approval.
+- Normattiva's update notes («AGGIORNAMENTO (N)», G-386) are never part of an
+  article's text. VisuaLex answers them beside it (`note_aggiornamento`,
+  `note_non_lette`, `note_nel_testo`); `clients/visualex_client.py` carries them in
+  `ArticleResult` (`get_article`) and `update_notes_block` labels them for a model;
+  likewise `parti` / `testo_parziale` for an article Normattiva splits into parts
+  (G-387), whose notice `partial_text_notice` writes («testo parziale: commi 1-100
+  di 1364 (diviso in 14 parti)»; for a part asked as such, the part served, «commi
+  701-800 di 1364»). `fetch_article_text` takes `parte` («701-800») or `comma`
+  («773»), G-387 (a); the graph keeps one node per article and ingestion reads
+  the first part, as before (G-389 Q4).
+  `get_document` still gives the text alone, which is what ingestion stores; it
+  raises on a text VisuaLex marks `text_source: "akn"` (the AKN export served when
+  Normattiva's HTML could not be read, scan A.7: not the article's text), and the
+  mechanical ingestion's `VisualexTreeAdapter` skips such an article as unread. Only
+  `tools/search.ArticleFetchTool` puts the notice and the block after the text it
+  hands an expert (its `oltre_il_testo`, read by
+  `react_mixin._extract_sources_from_result`), and that tool is **not wired**
+  (`api/engine_bootstrap.py`): the experts read articles through mcp-legal-it's
+  `fetch_law_article`, whose notes come with the submodule at 3.0.x.
 - Brocardi is no longer a source (D-078). MERL-T does not fetch from it: the
   VisuaLex client's `fetch_brocardi_info` returns nothing without a call,
   `include_brocardi` defaults to False, no expert is granted `cerca_brocardi`

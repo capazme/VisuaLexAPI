@@ -44,7 +44,8 @@ class TestNothingWasLost:
 
 class TestNewTables:
     def test_atti_noti_size(self):
-        assert len(ATTI_NOTI) >= 63
+        # 64 until the three names of the TUIR moved to dated_names.DATED_NAMES (G-577).
+        assert len(ATTI_NOTI) >= 61
 
     def test_atti_denominati_size(self):
         assert len(ATTI_DENOMINATI) >= 200
