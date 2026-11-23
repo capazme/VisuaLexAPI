@@ -158,7 +158,8 @@ preview could not go back to the release.
 
 1. The fix lands first in the repository that holds the code, as a hotfix there (from its `main`,
    back to its `main` and `develop`, tagged); the web's hotfix always carries the Italian note
-   `app/src/content/novita/X.Y.Z.md` of the product's new version. Then here:
+   `app/src/content/novita/X.Y.Z.md` of the product's new version, so a hotfix of the core alone
+   (the server, the API) still needs one of lexcraft-web carrying the note (G-604). Then here:
    `git switch -c hotfix/thing origin/main`, move the submodule to that tag, raise the patch number
    in `version.txt`, add its section to `CHANGELOG.md`; pull request into `main`.
 2. Merge it, then tag and release on `main` as in "Release", steps 5 and 6.

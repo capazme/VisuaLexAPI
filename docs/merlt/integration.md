@@ -179,7 +179,7 @@ possono sovrascrivere.
 
 ### Frontend
 
-`VITE_FEATURE_MERLT` e `VITE_FEATURE_MERLT_GRAPH` sono accesi quando assenti; `false`, `0` o `""` li spengono. Non compaiono in `apps/web/.env.example`. Spegnerli nasconde le superfici FE, ma i sotto-flag del BFF restano indipendenti.
+`VITE_FEATURE_MERLT` e `VITE_FEATURE_MERLT_GRAPH` sono accesi quando assenti; `false`, `0` o `""` li spengono. Non compaiono in `apps/web/app/.env.example`. Spegnerli nasconde le superfici FE, ma i sotto-flag del BFF restano indipendenti.
 
 ## 5. Modalità sviluppatore locale (`MERLT_API_IN_DOCKER=false`)
 

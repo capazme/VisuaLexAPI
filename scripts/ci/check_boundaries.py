@@ -3,6 +3,10 @@
 
 Two rules, read on the files git tracks:
 
+Since the split apps/web and apps/mcp are submodules (lexcraft-web, lexcraft-mcp), whose files
+git ls-files does not list: the first rule below then checks nothing here, and the second keeps the
+core from reading them.
+
 * a file under ``apps/web/`` or ``apps/mcp/`` reaches nothing outside its own app folder, except
   ``conventions/`` (the folder every repository will hold at the same path);
 * a file under ``apps/server/``, ``services/``, ``tools/``, ``scripts/`` or ``infra/ingress/*.mjs``

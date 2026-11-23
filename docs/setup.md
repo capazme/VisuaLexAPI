@@ -51,11 +51,11 @@ model answers).
 The first `./start.sh` installs what is missing, and skips each step once its
 result exists: the venv (`services/visualex/.venv`, made with the first of
 `python3.14`, `python3.13`, `python3.12` or `python3` that is 3.12 or newer),
-the Python packages, `npm ci` in `apps/server`, `apps/web` and `apps/mcp`, and Playwright's
+the Python packages, `npm ci` in `apps/server` and in the web app's and the MCP server's folders (below), and Playwright's
 Chromium. By hand, from the repository root:
 
 ```bash
-npm ci --prefix apps/web
+npm ci --prefix apps/web/app
 npm ci --prefix apps/server
 npm ci --prefix apps/mcp
 python3 -m venv services/visualex/.venv
@@ -75,12 +75,22 @@ minutes), creates the databases and applies the migrations. Open
 `http://localhost:5173`. Ctrl+C stops everything; the data stays in Docker's
 volumes.
 
-The web app and the MCP server are the folders `apps/web` and `apps/mcp` of the
-checkout. To run either from a working clone of its own repository, point
-`start.sh` at it: `LEXCRAFT_WEB_DIR=~/code/lexcraft-web ./start.sh` (and
-`LEXCRAFT_MCP_DIR` for the MCP server). A folder that is not there stops it with
-a message. A submodule of the checkout that is not initialised is initialised
-first; one that is, is never updated, so work inside it is safe.
+The web app and the MCP server live in their own repositories, lexcraft-web and
+lexcraft-mcp. `start.sh` takes them, in this order:
+
+1. `LEXCRAFT_WEB_DIR` / `LEXCRAFT_MCP_DIR` when set. For the web it names the
+   **`app/` folder** of a clone: `LEXCRAFT_WEB_DIR=~/code/lexcraft-web/app ./start.sh`.
+2. A clone beside this checkout: `../lexcraft-web/app`, `../lexcraft-mcp`. Clone them
+   there to work on them.
+3. The versions this checkout pins: the submodules' folders `apps/web/app` and
+   `apps/mcp`, to read, not to change.
+
+It prints which folders and which commit it uses. To run exactly the pinned versions
+while clones sit beside it (a hotfix, a bug of a release), name them:
+`LEXCRAFT_WEB_DIR=apps/web/app LEXCRAFT_MCP_DIR=apps/mcp ./start.sh`. A folder
+without its `package.json` stops it with a message. A submodule of the checkout that
+is not initialised is initialised first; one that is, is never updated, so work
+inside it is safe.
 
 `./start.sh --prod` is not for this machine: it builds and runs the whole stack
 as containers on the deployment host (design:
@@ -104,12 +114,12 @@ encrypted and delete them when you are done.
 ## 7. Check that everything works
 
 ```bash
-npm --prefix apps/web run test -- --run && npm --prefix apps/web run build && npm --prefix apps/web run lint
 npm --prefix apps/server run build && npm --prefix apps/server test
-npm --prefix apps/mcp run build && npm --prefix apps/mcp test
 (cd services/visualex && .venv/bin/python -m pytest tests/ -q)
 node --test '.claude/hooks/*.test.mjs'
 ```
+
+The web's and the MCP server's suites run in their repositories (their `CLAUDE.md`).
 
 ## 8. Claude Code on your VisuaLex account (the MCP server)
 

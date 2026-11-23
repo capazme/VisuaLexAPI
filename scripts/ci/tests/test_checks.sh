@@ -67,4 +67,7 @@ expect 1 "a web pinned at a commit that is no release tag fails" check_pins
 gp "$pins/core/apps/web" checkout -q v1.0.0; gp "$pins/core" add apps/web
 gp "$pins/core/conventions" commit -q --allow-empty -m "a newer contract"; gp "$pins/core" add conventions
 expect 1 "a web whose contract is not the core's fails" check_pins
+mkrepo "$pins/mcp"; gp "$pins/mcp" tag v1.0.0
+gp "$pins/core" submodule add -q "$pins/mcp" apps/mcp; gp "$pins/core" commit -q -m "the MCP server"
+expect 0 "a component at a tag with no contract of its own passes (a release from before the split)" sh "$pins/core/scripts/ci/check_pins.sh" apps/mcp
 exit $fail

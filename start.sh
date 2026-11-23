@@ -6,12 +6,12 @@
 #                             mcp-legal-it, merlt-api, merlt-worker too with MERLT_ENABLED=true.
 #                           Host: Python API (services/visualex, :5000 or VISUALEX_API_PORT), server (apps/server, :3001),
 #                             web (lexcraft-web's app, :5173), MCP server (lexcraft-mcp, :3002).
-#                           The web app and the MCP server are taken from LEXCRAFT_WEB_DIR and
-#                             LEXCRAFT_MCP_DIR when set (a working clone of their repositories,
-#                             wherever it is), else from a clone beside this checkout
-#                             (../lexcraft-web/app, ../lexcraft-mcp), else from the versions the
-#                             core pins (the submodules apps/web/app and apps/mcp, to be read, not
-#                             changed). A submodule of the checkout that is not initialised is
+#                           The web app and the MCP server are taken from LEXCRAFT_WEB_DIR (the
+#                             app/ folder of a clone of lexcraft-web) and LEXCRAFT_MCP_DIR (a
+#                             clone of lexcraft-mcp) when set, else from clones beside this
+#                             checkout (../lexcraft-web/app, ../lexcraft-mcp), else from the
+#                             versions the core pins (the app/ of the submodule apps/web, and
+#                             the submodule apps/mcp: to be read, not changed). A submodule of the checkout that is not initialised is
 #                             initialised here; one that is, is never updated: someone may be
 #                             working in it.
 #                           MERLT_API_IN_DOCKER=false runs the MERL-T api and worker on the host
@@ -157,7 +157,8 @@ require_dir "$MCP_DIR" LEXCRAFT_MCP_DIR "MCP server"
 # Absolute from here on: the dev servers are started after a cd into apps/server.
 WEB_DIR="$(cd "$WEB_DIR" && pwd)"
 MCP_DIR="$(cd "$MCP_DIR" && pwd)"
-echo -e "${YELLOW}Web app: $(shown "$WEB_DIR") · MCP server: $(shown "$MCP_DIR")${NC}"
+version_of() { git -C "$1" describe --tags --always --dirty 2>/dev/null || echo "not a git checkout"; }
+echo -e "${YELLOW}Web app: $(shown "$WEB_DIR") ($(version_of "$WEB_DIR")) · MCP server: $(shown "$MCP_DIR") ($(version_of "$MCP_DIR"))${NC}"
 
 # First run on a fresh checkout: the two env files the stack and the server read, from their
 # examples. Never overwritten. The JWT secret is generated here, not left as the example's.

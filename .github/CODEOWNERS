@@ -22,6 +22,8 @@
 # What the core pins: the web, the MCP server and the contract (G-603); their own files are reviewed
 # in their repositories (lexcraft-mcp's CODEOWNERS names src/auth.ts).
 /.gitmodules                                   @capazme @LP-legal
+/apps/web                                      @capazme @LP-legal
+/apps/mcp                                      @capazme @LP-legal
 /conventions                                   @capazme @LP-legal
 
 # CI, the stack, the data scripts, the shared Claude Code rules
