@@ -3,15 +3,17 @@
 Status: proposed on 26 November 2026 under G-612 («the server of today on SQLite, rewriting what SQLite cannot do»),
 G-613 («the database encrypted already in the first version, even if it takes longer»), G-614 (the porting line is
 one owner's) and G-615 (the local mode is built in this repository first; the app's own repository is created once
-it is merged, public like the others). This document designs the first milestone, **M1, the local mode in the
+it is merged, public like the others). On the same day the owners set the platforms: Apple Silicon and Windows x64
+from the first version, Windows on ARM and Intel Macs optional. This document designs the first milestone, **M1, the local mode in the
 core**, and places it among the milestones that lead to the first desktop app. The plan is
 `docs/superpowers/plans/2026-11-26-desktop-local-mode.md`. The decisions still open for the owners are in
 «Decisions for the owners».
 
 The numbers below come from a throwaway trial run outside the repository on 26 November 2026, on an Apple Silicon
 Mac, with invented data: today's `apps/server` (develop at be48927f), bundled with the pieces this document
-describes, behind the Tauri shell of an earlier trial. Each is marked **[measured]** there, **[read]** in a source
-listed at the end, or **[estimated]**.
+describes, behind the Tauri shell of an earlier trial. The stack was then probed on GitHub-hosted Windows x64,
+Windows on ARM and macOS runners (§10.1). Each number is marked **[measured]** there, **[read]** in a source listed
+at the end, or **[estimated]**.
 
 ## Why
 
@@ -30,20 +32,21 @@ The trial of 26 November shows a road through both, at a moderate cost.
 
 ## What the lawyer gets, and what the first version leaves out
 
-**The first internal app** (M1 + M2 below): the app opens on the lawyer's Mac without a password (G-514: a local
-profile). It shows the practices, their entries, notes, highlights and tasks, reads the texts already kept on the
-computer, and writes everything into one encrypted file whose key lives in the system keychain. The sections that
+**The first internal app** (M1 + M2 below): the app opens on the lawyer's Mac (Apple Silicon) or Windows PC (x64)
+without a password (G-514: a local profile). It shows the practices, their entries, notes, highlights and tasks, reads the texts already kept on the
+computer, and writes everything into one encrypted file whose key lives in the system's credential store (the
+macOS keychain, Windows Credential Manager). The sections that
 need the community or the online services (Forum, Learn, the interpretive experts) say they are online.
 
 **The first distributable version** (M1–M5) adds:
 
 - reading new texts and the online sections through the local server (G-515), with the lawyer's account;
 - encrypted backups that can be restored on another computer;
-- a signed, notarized build that updates itself (G-573).
+- a signed build for each platform (notarized on macOS) that updates itself (G-573).
 
 **Left out of the first version, to make it early:**
 
-- Windows and Intel Macs (M8);
+- Windows on ARM and Intel Macs, which are optional (§10.9 gives their cost);
 - the local MCP server (G-516), which follows right after (M6);
 - the practices-as-folders and the local deadline register, designed separately (M7 is their slot);
 - Learn, the Forum and the experts without a network: they stay online;
@@ -55,7 +58,7 @@ need the community or the online services (Forum, Learn, the interpretive expert
 ## The road, in one picture
 
 ```
-Tauri 2 window (WebKit)                          system keychain: the database key (32 random bytes)
+Tauri 2 window (WebKit / WebView2)     keychain / Credential Manager: the database key (32 random bytes)
    │  http://127.0.0.1:<port>  (the built web app, same origin as /api)        │
    ▼                                                                          │ stdin, at launch
 Node sidecar: apps/server in local mode  ◄──────────────────────────────────────┘
@@ -64,7 +67,7 @@ Node sidecar: apps/server in local mode  ◄────────────
    ▼
 better-sqlite3-multiple-ciphers 13.2.0 (SQLite3MultipleCiphers 2.7.1, SQLite 3.54.1)
    ▼
-lexcraft.db — ChaCha20-Poly1305, WAL, synchronous=FULL, fullfsync (macOS)
+lexcraft.db — ChaCha20-Poly1305, WAL, synchronous=FULL (+ fullfsync on macOS)
 ```
 
 The online server keeps Postgres; it moves to Prisma 7 with `@prisma/adapter-pg`, so both read the same code with
@@ -158,8 +161,8 @@ A script (`apps/server/scripts/local-schema.ts`) reads `prisma/schema.prisma` an
 
   The database, its journal and its WAL are encrypted; temporary files are not **[read]**, so the local client sets
   `temp_store=MEMORY`.
-- **The key.** 32 random bytes made at first launch and kept in the system keychain. The shell reads it (the
-  `keyring` crate) and writes it to the sidecar's stdin, beside the launch secret it already sends. The sidecar holds
+- **The key.** 32 random bytes made at first launch and kept in the system's credential store: the keychain on
+  macOS, Credential Manager on Windows (§10.2). The shell reads it (the `keyring` crate) and writes it to the sidecar's stdin, beside the launch secret it already sends. The sidecar holds
   it in memory only, passes it as a raw key (`PRAGMA key="x'…'"`: no key derivation at open) and never writes it to
   a file, a log or an environment its children inherit.
   - In the trial the key came from the keychain in 8–18 ms, and the database opened and checked in 32–78 ms
@@ -169,8 +172,9 @@ A script (`apps/server/scripts/local-schema.ts`) reads `prisma/schema.prisma` an
   1. it sets the cipher and the key first;
   2. it sets `locking_mode=EXCLUSIVE` (section 4);
   3. it checks the key with a read;
-  4. it sets `journal_mode=WAL`, `synchronous=FULL`, `fullfsync=ON`, `checkpoint_fullfsync=ON`, `foreign_keys=ON`
-     (SQLite's default is off: no cascade otherwise), `temp_store=MEMORY` and `busy_timeout`;
+  4. it sets `journal_mode=WAL`, `synchronous=FULL`, `foreign_keys=ON` (SQLite's default is off: no cascade
+     otherwise), `temp_store=MEMORY` and `busy_timeout`, and on macOS only `fullfsync=ON` and
+     `checkpoint_fullfsync=ON`;
   5. it wraps the adapter in the connection lock below.
 - **One connection, one lock.** `@prisma/adapter-better-sqlite3` 7.10.1 queues interactive transactions behind its
   own mutex, but a plain query does not wait for it **[read]**. On the single connection, a query from another
@@ -315,8 +319,8 @@ the 17 November trial, whose port checks all passed.
 
 ### 8. Tests and CI
 
-- **A new CI job, «local».** It generates the local client, creates an encrypted file with a test key, and runs on
-  it:
+- **A new CI job, «local», on macOS and on Windows** (§10.7). It generates the local client, creates an encrypted
+  file with a test key, and runs on it:
   - the Work test files (dossiers, entries, notes, highlights, trash, tasks, act files, the assistant's proposals);
   - the tests of this design.
 
@@ -356,6 +360,176 @@ the 17 November trial, whose port checks all passed.
   deletions going to the trash.
 - **No secret in the repository**; the test key is generated per run.
 
+### 10. Two platforms from the first version: Apple Silicon and Windows x64
+
+The first internal app and the first distributable version run on Apple Silicon Macs and on Windows x64 PCs.
+Windows on ARM and Intel Macs are optional (§10.9).
+
+#### 10.1 The encrypted stack on Windows, measured
+
+One probe ran unchanged on GitHub-hosted runners on 26 November 2026 (three runs; the table gives their ranges), from a throwaway branch with a read-only
+token. It covered the stack of §3: Prisma 7.10.1, the better-sqlite3 adapter, SQLite3MultipleCiphers 2.7.1,
+ChaCha20, the connection lock, the OS credential store, and the server's schema derived for SQLite **[measured]**:
+
+| | Windows x64 (`windows-latest`) | Windows on ARM (`windows-11-arm`) | macOS, Apple Silicon (`macos-latest`) |
+|---|---|---|---|
+| Prebuilt addon loads (Node 24.22.3) | yes, 2.3 MB | yes, 2.2 MB | yes, 2.2 MB |
+| Key in the credential store: set / read / delete | 8–16 ms / 0.5–0.9 ms / ok | 15–35 ms / 0.9–1.1 ms / ok | 247–315 ms / 1.5–2.6 ms / ok |
+| Readable text in the file; wrong key | none; refused | none; refused | none; refused |
+| A flipped bit refused | 5 / 5 | 5 / 5 | 5 / 5 |
+| The server's 82 tables through Prisma 7 | yes | yes | yes |
+| Big practice (200 entries, 600 highlights), median | 6.0–10.4 ms | 13.6–13.9 ms | 5.6–10.6 ms |
+| Bytes round-trip; foreign-key cascade | ok; ok | ok; ok | ok; ok |
+| A second process on the open file | refused | refused | refused |
+| Two requests at once, without / with the lock | write lost / kept | write lost / kept | write lost / kept |
+| Process killed during writes, 15 rounds (5 per run) | 0 lost of 565–13,682 acknowledged per round | 0 lost of 21–344 | 0 lost of 149–2,650 |
+| Commit with `synchronous=FULL` | 0.09–0.19 ms | 4.5–13.1 ms | 0.15–0.17 ms (1.2–1.3 ms with `fullfsync`) |
+| Shell killed: the sidecar exits through its stdin's end (third run) | 7.8 ms | 8.9 ms | 103–107 ms |
+
+- The runners are cloud virtual machines. Their disks decide the cost of a commit, so 0.09 ms on Windows x64 says
+  nothing about a laptop's drive.
+- **Node.** The probe ran on Node 24.22.3, the major the server's CI and image use. The local macOS trial also ran
+  on Node 26.5.0 **[measured]**; the addon on Node 26 under Windows is untested. The sidecar ships the Node the CI
+  tests (24 today), and moves to 26 with a CI matrix that covers both platforms.
+- `fullfsync` is macOS-only **[read]**; on Windows `synchronous=FULL` alone is the setting.
+- `windows-latest` is Windows Server 2025, not Windows 11 **[read]**: the desktop pass of §10.8 stays necessary.
+
+#### 10.2 The key on Windows
+
+- **The store.** The shell keeps the key in Windows Credential Manager through the same `keyring` crate (4.2.0)
+  as on macOS: its Windows store holds a generic credential of at most 2,560 bytes, far above a 32-byte key **[read]**.
+- **What protects it.** Windows encrypts the credential with the user's logon session key; DPAPI lets «only a user
+  with the same logon credential» decrypt **[read]**.
+  - As on macOS, a program running as the same user can read it while the user is logged in. No Microsoft page says
+    so in those words; it follows from the per-user scope.
+  - Credential Guard does not cover generic credentials **[read]**.
+- **Roaming.** The crate's default persistence («Enterprise») roams with a roaming profile **[read]**. The local
+  mode picks a persistence that stays on the PC, if the store offers one; M2 checks it **[estimated]**.
+
+#### 10.3 The Node sidecar on Windows
+
+- **The binary.** Tauri names the sidecar `node-x86_64-pc-windows-msvc.exe` (and `-aarch64-pc-windows-msvc.exe` on
+  ARM) **[read]**. The official `node.exe` of Node 26.13.1 weighs 100 MB on x64 and 88 MB on ARM **[read]**; Node
+  24's is of the same order **[estimated]**.
+- **When the shell dies.** The shell plugin kills only children spawned from its JavaScript API, or a Rust child
+  with `kill_on_drop`. A Windows job object does not end its processes when it is closed **[read]**. So if the shell
+  is killed, the sidecar would survive unless it watches for that itself.
+  - The design's contract (§6) is that the sidecar exits when its stdin closes. The probe killed a stand-in shell
+    (TerminateProcess on Windows). In the third run the sidecar saw its stdin close and exited through its own
+    handler **[measured]**: after 7.8 ms on Windows x64, 8.9 ms on Windows on ARM and 107 ms on macOS (103 ms in
+    the second run).
+    - The stand-in shell is a Node process. On Windows Node puts its children in a job object that kills them with
+      it, which a Rust shell does not do: in the second run the job object, not the contract, ended the sidecar on
+      both Windows runners. The third run starts the stand-in sidecar detached, so only the stdin contract could
+      end it.
+  - The shell also sets `kill_on_drop` for a normal exit.
+- **Paths and the port.** The data folder is the app's data directory that Tauri resolves per platform. The port
+  checks of §6 do not depend on the platform.
+
+#### 10.4 WebView2 and WebKit
+
+- **WebView2 is Chromium and updates itself; WebKit updates only with macOS** **[read]**.
+- **Installing WebView2.** Microsoft preinstalls the Evergreen runtime on all Windows 11 devices and installed it on
+  eligible Windows 10 devices, but «a small number» lack it and Microsoft advises shipping it anyway **[read]**.
+  - The installer embeds the bootstrapper (`embedBootstrapper`, about 1.8 MB), which installs the runtime when it
+    is missing.
+  - The updater's bundles always use the downloading bootstrapper **[read]**.
+- **What differs, as Microsoft and Tauri state it** **[read]**:
+  - Push notifications, the Web Payment API and Periodic Background Sync do not exist in WebView2;
+  - downloads are WebView2's own, and Tauri's download handler sets where they go (on macOS the finished path
+    comes back empty);
+  - `window.print()` works on both;
+  - zoom keys are native on Windows and need a polyfill on macOS;
+  - the user data folder is not removed when the app is uninstalled.
+
+  What the web needs to do about it is in §10.10.
+- **Accessibility.** No Microsoft page states screen-reader support for WebView2 in so many words; Edge exposes its
+  content through UI Automation **[read]**. The release checks include a pass with Narrator and NVDA (§10.8).
+
+#### 10.5 Installer and updates on Windows
+
+- **NSIS, per user.** The NSIS installer in `currentUser` mode needs no administrator and installs under the user's
+  local application data **[read]**. The MSI installs per machine and is built only on Windows **[read]**.
+- **Updates.** With `createUpdaterArtifacts`, the updater reuses the signed `-setup.exe` with its `.sig`; the
+  default `passive` mode shows progress and needs no clicks **[read]**. One `latest.json` lists both platforms,
+  each entry checked against the updater key (§ «After M1», M5).
+
+#### 10.6 Signing on Windows
+
+| Option | Who can enrol | Cost per year | Delay to first signature | From CI |
+|---|---|---|---|---|
+| **Azure Artifact Signing** (formerly Trusted Signing), Basic | organisations in the EU, Italy included; individuals only in the US and Canada | about US$120 (US$9.99 a month, 5,000 signatures) plus a paid Azure subscription | 1–30 working days of identity validation | yes, on Windows runners only |
+| OV certificate with cloud signing | registered organisations | SSL.com US$129 plus eSigner from US$15 a month; Certum cloud from €209; DigiCert KeyLocker US$996 | 1–5 days | yes, with the vendor's tool |
+| EV certificate | registered organisations | from US$349 | 3–7 days | as OV |
+
+All **[read]**.
+
+- **Why EV is not worth it.** Microsoft: «EV certificates no longer bypass SmartScreen… Paying a premium for EV
+  solely to avoid SmartScreen warnings is no longer justified». Reputation builds over downloads either way **[read]**.
+- **Hardware keys and CI.** Since 1 June 2023 a code-signing key must live in a hardware module or a cloud signing
+  service, so a GitHub-hosted runner signs through a cloud service, never a USB token **[read]**.
+- **What Artifact Signing involves.**
+  - Its certificates last 72 hours, so every signature is timestamped.
+  - Validation needs the organisation's legal name and identifier, the legal representative's identity check, and
+    documents issued within the last 12 months.
+  - Free and sponsored Azure subscriptions are not accepted **[read]**.
+  - Whether it validates an Italian association without an entry in a public register is not stated **[read]**.
+
+  The identity is a decision for the owners (D3).
+
+#### 10.7 CI for both platforms
+
+GitHub's hosted runners are free for public repositories **[read]**:
+
+| Runner | What runs there |
+|---|---|
+| `macos-latest` (Apple Silicon) | the local job, the app's build, signing and notarization |
+| `windows-latest` (x64) | the local job, the app's build, signing (Artifact Signing runs only on Windows), and the automated UI smoke test |
+| `windows-11-arm` | optional (§10.9) |
+
+- **Automated UI tests.** Tauri's WebDriver tool works on Windows and Linux, not on macOS («macOS has no WKWebView
+  driver tool») **[read]**. Windows therefore carries the automated UI smoke test: launch, the local profile, open
+  a practice, highlight, close. macOS gets the scripted flow of §8 against the sidecar, and the manual pass.
+
+#### 10.8 A manual pass on a real Windows machine
+
+The owners work on Apple Silicon Macs. The options:
+
+| Option | What it tests | Limits |
+|---|---|---|
+| (a) A real Windows 11 x64 PC kept for testing (an owner's, or a small dedicated one) | the x64 build on x64 hardware, WebView2, Credential Manager, SmartScreen, the installer, a screen reader | one more machine to keep updated |
+| (b) Windows 11 on Arm in Parallels Desktop on a Mac | the ARM OS; the x64 build under Prism emulation | Microsoft names Parallels 18–20 on M1–M3 as authorized, each VM needs its own licence, and M4/M5 Macs are not mentioned **[read]** |
+| (c) CI only | the automated smoke test on Windows Server 2025 | no desktop session, no human eye |
+
+Which one is a decision for the owners (D4); the recommendation there is (a) for each release and (b) day to day.
+
+#### 10.9 Windows on ARM and Intel Macs: optional
+
+| Target | What it adds | Cost **[estimated]** |
+|---|---|---|
+| Windows on ARM | the `aarch64-pc-windows-msvc` build; `node.exe` for ARM (88 MB); the same installer and signing. The encrypted stack already passed on `windows-11-arm` **[measured]** | 1–2 days, then one more CI job per release |
+| Intel Macs | an `x86_64-apple-darwin` build, or a universal one carrying both Node binaries (about 100 MB more); the addon's package carries a `darwin-x64` build **[measured]**; no Intel Mac to test on | 2–3 days, and a test machine or a hosted Intel runner |
+
+#### 10.10 For the web owner
+
+Nothing here blocks M1, and nothing changes lexcraft-web for M1. Before the first distributable version, the web
+needs these, built by the porting line and approved by the web owner:
+
+1. **Downloads.** Every download goes through one function, so the shell can open a save dialog on both platforms.
+   WebView2 handles downloads itself; on macOS the finished path comes back empty.
+2. **External links.** They go through one function, which the shell hands to the system browser.
+3. **Printing.** Use `window.print()`, which works in both views.
+4. **Missing features.** Nothing may depend on push notifications, the Web Payment API or background sync, which
+   WebView2 lacks.
+5. **Without a network.** The online sections show a «senza rete» message when there is no network.
+6. **Undo before closing.** Deletions with «Annulla» are sent before the window closes.
+7. **The engine's version.** Checked at start: an old WebKit asks to update macOS, an old WebView2 asks to update
+   Windows.
+8. **Memory.** The view's growth between practices, measured in WebKit (§ «Measured in the trial»), is measured
+   in WebView2 too.
+9. **One pass on each platform before each release.** Fonts, zoom, keyboard shortcuts (⌘ on macOS, Ctrl on
+   Windows), the spell checker, which no official page documents, and a screen reader.
+
 ## Measured in the trial
 
 Final configuration: SQLite3MC 2.7.1, ChaCha20, the connection lock, the «small» compiler. All **[measured]**
@@ -387,25 +561,31 @@ session runs 394–446 MB.
 
 ## After M1: the milestones to the first app
 
-Times are working days of one line of sessions, with tests and a review after each task **[estimated]**.
+Times are working days of one line of sessions, with tests and a review after each task, for both platforms
+**[estimated]**:
 
 | Milestone | What | Days |
 |---|---|---|
-| **M1** | The local mode in the core (this document) | 10–14 |
-| **M2** | The app's repository and shell; **first internal app** (G-615: the repository is created once M1 is merged) | 4–6 |
+| **M1** | The local mode in the core (this document), its CI job on macOS and Windows | 11–15 |
+| **M2** | The app's repository and shell on both platforms; **first internal app** (G-615: the repository is created once M1 is merged) | 7–10 |
 | **M3** | Online through the local server (G-515): sources and online sections, the account, the byte-exact text copy | 6–9 |
 | **M4** | Encrypted backups and their restore | 2–3 |
-| **M5** | Signed, notarized, self-updating release; one release for web and app (G-573, G-517); accessibility checks | 4–6, plus Apple's lead time |
-| M6 | The local MCP server (G-516) | 3–4 |
+| **M5** | Signed releases for both platforms (notarized on macOS), self-updating, one release for web and app (G-573, G-517); the Windows desktop pass and the accessibility checks | 7–10, plus Apple's and Microsoft's lead times |
+| M6 | The local MCP server (G-516), on both platforms | 4–5 |
 | M7 | Slot for the practices-as-folders and the local deadline register | set by their design |
-| M8 | Windows and Intel Macs | 4–6 |
+| M8 | Optional: Windows on ARM, Intel Macs (§10.9) | 1–2 and 2–3 |
 
-- **First internal app:** M1 + M2, 14–20 days.
-- **First distributable version:** M1–M5, 26–38 days, plus the time Apple takes to issue a Developer ID.
+- **First internal app:** M1 + M2, 18–25 days, against 14–20 for macOS alone.
+- **First distributable version:** M1–M5, 33–47 days, against 26–38.
+- **Lead times outside the work**, which run in parallel:
+  - the Apple Developer account (G-616), with its D-U-N-S number;
+  - Microsoft's identity validation for Artifact Signing (D3), 1–30 working days.
 
 How each milestone follows current practice, with its source:
 
 - **M2, the shell.**
+  - The specifics of Windows are in §10.2–10.5: Credential Manager, `node.exe`, WebView2's bootstrapper, the NSIS
+    installer per user, and the sidecar's exit when the shell dies.
   - Tauri 2.12 (crate 2.12.7, CLI 2.12.6). The sidecar ships through `bundle.externalBin` with the target-triple
     naming, and is spawned through the shell plugin's sidecar API under a capability that allows only it **[read]**.
   - Node ships as the official binary. Its single-executable form (SEA) is still «Active development», and it
@@ -439,8 +619,9 @@ How each milestone follows current practice, with its source:
 - **M6, the local MCP.**
   - The specification (revision 2026-07-28) recommends stdio for a local server, «to limit access to just the MCP
     client» **[read]**.
-  - A small stdio program inside the app speaks to the local server over a socket in the app's private folder, with
-    a key per client that the lawyer creates and revokes. The server's rules apply to it unchanged.
+  - A small stdio program inside the app speaks to the local server over a private channel, with a key per client
+    that the lawyer creates and revokes. The channel is a Unix socket in the app's private folder on macOS, and a
+    named pipe or the loopback port with that key on Windows, to be chosen in M6 **[estimated]**. The server's rules apply to it unchanged.
   - Claude Code adds it with `claude mcp add`; Claude Desktop installs it as an MCP Bundle (`.mcpb`) **[read]**.
 
 ## Decisions for the owners
@@ -464,6 +645,26 @@ sign-in 467–620 MB, mostly in WebKit.
   first distributable version. M2 removes the sign-in form (G-514), which should remove the worst case measured **[estimated]**.
 - (b) 400 MB for the session too: the web view's growth between practices is chased first, in lexcraft-web.
 - **Recommendation: (a).**
+
+**D3 · The identity that signs the Windows build.** G-517 puts the signing certificates in the association's
+name. The options are in §10.6.
+
+- (a) **Azure Artifact Signing, Basic**, in the association's name: about US$120 a year plus a paid Azure
+  subscription. The legal representative goes through an identity check, with documents issued in the last 12
+  months; validation takes 1–30 working days. Signing runs in CI on Windows runners.
+- (b) An OV certificate with cloud signing (for example SSL.com with eSigner, about US$129 a year plus from US$15 a
+  month), in the association's name, in 1–5 days.
+- (c) EV: dearer, and Microsoft says it no longer bypasses SmartScreen.
+- **Recommendation: (a)**, started now because of its lead time, with (b) as the fallback if Microsoft's
+  validation stalls (for instance if it wants a public register entry the association lacks).
+
+**D4 · The Windows machine for the manual pass** (§10.8).
+
+- (a) A real Windows 11 x64 PC kept for testing, an owner's or a small dedicated one.
+- (b) Windows 11 on Arm in Parallels on a Mac: x64 runs under emulation, and Microsoft's page names M1–M3 only.
+- (c) CI only.
+- **Recommendation: (a) before each release, (b) day to day.** The automated UI test runs on Windows in CI either
+  way.
 
 **The Apple Developer account** (G-616) is already with the owners: M5 depends on it, and the keychain behaviour of
 section 9 too.
@@ -517,3 +718,33 @@ section 9 too.
   - WCAG 2.2: https://www.w3.org/TR/WCAG22/
   - the European Accessibility Act: https://eur-lex.europa.eu/eli/dir/2019/882/oj/eng
 - **OAuth for native apps (RFC 8252):** https://www.rfc-editor.org/rfc/rfc8252
+- **Windows, WebView2 and Tauri:**
+  - the Evergreen runtime: https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/evergreen-vs-fixed-version
+  - distributing WebView2: https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution
+  - what WebView2 lacks: https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/browser-features
+  - its user data folder: https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/user-data-folder
+  - the Windows installer: https://v2.tauri.app/distribute/windows-installer/
+  - the webview versions: https://v2.tauri.app/reference/webview-versions/
+  - the configuration reference: https://v2.tauri.app/reference/config/
+  - WebDriver tests: https://v2.tauri.app/develop/tests/webdriver/
+  - Windows signing: https://v2.tauri.app/distribute/sign/windows/
+  - the shell plugin's child processes: https://docs.rs/tauri-plugin-shell/latest/tauri_plugin_shell/process/struct.Command.html
+- **Credentials on Windows:**
+  - the credential structure and its size limit: https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw
+  - handling passwords: https://learn.microsoft.com/en-us/windows/win32/secbp/handling-passwords
+  - DPAPI: https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata
+  - Credential Guard's limits: https://learn.microsoft.com/en-us/windows/security/identity-protection/credential-guard/considerations-known-issues
+  - the keyring crate's Windows store: https://docs.rs/windows-native-keyring-store/latest/windows_native_keyring_store/
+- **Node for Windows:** https://nodejs.org/dist/v26.13.1/win-x64/ and https://nodejs.org/dist/v26.13.1/win-arm64/
+- **Signing on Windows:**
+  - Artifact Signing, overview: https://learn.microsoft.com/en-us/azure/artifact-signing/overview
+  - quickstart: https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart
+  - FAQ: https://learn.microsoft.com/en-us/azure/artifact-signing/faq
+  - certificate management: https://learn.microsoft.com/en-us/azure/artifact-signing/concept-certificate-management
+  - pricing: https://azure.microsoft.com/en-us/pricing/details/artifact-signing/
+  - SmartScreen reputation: https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation
+  - the CA/Browser Forum's code-signing requirements: https://cabforum.org/working-groups/code-signing/requirements/
+  - OV and EV certificates: https://www.ssl.com/products/software-integrity/code-signing/ov/ , https://www.ssl.com/products/software-integrity/code-signing/ev/ and https://www.certum.eu/en/code-signing-certificates/
+- **GitHub-hosted runners:** https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+- **Windows 11 on Apple Silicon Macs:** https://support.microsoft.com/en-us/windows/experience/platform-variants/options-for-using-windows-11-with-mac-computers-with-apple-m1-m2-and-m3-chips
+  and Prism: https://learn.microsoft.com/en-us/windows/arm/apps-on-arm-x86-emulation

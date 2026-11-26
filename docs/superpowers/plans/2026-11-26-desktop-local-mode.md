@@ -4,8 +4,8 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
 > tracking.
 
-**Goal:** today's server runs on the lawyer's computer, on one encrypted SQLite file whose key lives in the system
-keychain. Same routes, same rules, same tests. The online server keeps Postgres, on the same ORM version.
+**Goal:** today's server runs on the lawyer's computer, an Apple Silicon Mac or a Windows x64 PC, on one encrypted
+SQLite file whose key lives in the system's credential store (the macOS keychain, Windows Credential Manager). Same routes, same rules, same tests. The online server keeps Postgres, on the same ORM version.
 
 **Architecture:**
 - Prisma 7.10.1 on both sides. Online: `@prisma/adapter-pg`. Local: `@prisma/adapter-better-sqlite3` over
@@ -17,26 +17,34 @@ keychain. Same routes, same rules, same tests. The online server keeps Postgres,
   local profile with no password (G-514). Online sections answer 503.
 
 **Tech Stack:** Node 24 / Express / Prisma 7.10.1 / zod / Vitest (apps/server); SQLite3MultipleCiphers via
-better-sqlite3-multiple-ciphers; GitHub Actions.
+better-sqlite3-multiple-ciphers; GitHub Actions on `macos-latest` and `windows-latest`.
 
 **Spec:** `docs/superpowers/specs/2026-11-26-desktop-local-mode-design.md`. § numbers below are the spec's.
 
 **Decided:** the road and the encryption (G-612, G-613); the line (G-614); M1 in this repository first, the app's
-repository after it is merged (G-615). **Open:** D1 (the backup key) and D2 (the session's memory threshold) touch
-M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
+repository after it is merged (G-615); Apple Silicon and Windows x64 from the first version (26 November). The test
+harness creates a fresh test database per run (PR 1b), and AI sessions run the server suite in CI only until it is
+in: Prisma 7 refuses its database reset when an AI agent runs it, and that safeguard is never worked around. **Status (26 November 2026):** PR 1 is open (#757) and waits for this spec to be accepted.
+
+**Open:** D1 (the backup key), D2 (the session's memory threshold), D3 (the Windows signing identity) and D4 (the
+Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
 
 ## Global Constraints
 
-- **Six pull requests into `develop`**, in this order, each merging on its own:
+- **Seven pull requests into `develop`**, in this order, each merging on its own:
   1. Prisma 7 online (Task 1). **It touches the online server; it ships in a release of its own** before PR 2
      merges.
+  1b. The test harness creates a fresh test database per run (Task 1b).
   2. The local schema (Tasks 2–3).
   3. The encrypted client and its migrations (Tasks 4–5).
   4. The dialect seam (Task 6).
   5. The local entry point (Task 7).
   6. The local CI job (Task 8).
 
-  Branches `feat/local-mode-<piece>`; PR 1 is `chore/prisma-7`.
+  Branches `feat/local-mode-<piece>`; PR 1 is `chore/prisma-7`, PR 1b `fix/test-db-per-run`.
+- **Both platforms from M1.** Every local test (`tests/local/`) and the Work files the local job runs pass on
+  `macos-latest` and on `windows-latest`. Nothing in `src/local/` assumes a POSIX path, a Unix socket or a signal
+  Windows lacks.
 - **Shared and reviewed areas.**
   - `.github/workflows/ci.yml` changes in PR 1, PR 2 and PR 6. Each is reserved in the owners' coordination register
     before its branch touches the file.
@@ -44,8 +52,8 @@ M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
     `prisma/local/` in PRs 2, 3 and 5) and `.github/`. The Dockerfile is not covered; PR 1 asks for that review
     anyway, since it changes the image. The author merges at green CI.
   - **No Postgres migration** in M1. The online database does not change.
-- **Never run `prisma migrate dev` or `prisma migrate reset` by hand** (the shared hook refuses them). The test
-  setup's own reset runs in CI and against a throwaway test database only.
+- **Never run `prisma migrate dev` or `prisma migrate reset` by hand** (the shared hook refuses them). Until PR 1b,
+  the test setup's own reset runs in CI and in a person's local run; from PR 1b the setup runs no reset at all.
 - **Locally, the targeted test files; the whole suite runs in CI.**
 - **Pins, exact:**
   - `prisma` and `@prisma/client` 7.10.1;
@@ -125,14 +133,51 @@ M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
 - [ ] **Step 4: Type-check through the build** (not a bare `tsc --noEmit`, which misses the project references).
   - Run: `npm --prefix apps/server run build`
   - Expected: no error.
-- [ ] **Step 5: Run the targeted files locally**: `prisma7.test.ts`, `trash.test.ts`, `tasks.routes.test.ts`,
-  `praticaFiles.test.ts`, `dossierNotes.test.ts`, against a throwaway test database. Expected: PASS.
+- [ ] **Step 5: Run the targeted files**: `prisma7.test.ts`, `trash.test.ts`, `tasks.routes.test.ts`,
+  `praticaFiles.test.ts`, `dossierNotes.test.ts`. A person runs them locally against a throwaway test database; an AI
+  session leaves them to CI until PR 1b. Expected: PASS.
 - [ ] **Step 6: Push; CI runs the whole server suite on Postgres 16.** Expected: green, every job.
 - [ ] **Step 7: Build both targets of the server image**: `docker build apps/server` and
   `docker build --target migrate apps/server`. Run `migrate` and then the runtime against a throwaway test
   database. Expected: the migrations apply, `/api/health` answers 200, and a sign-in works.
 - [ ] **Step 8: Commit** `chore(server): Prisma 7.10.1 with the pg adapter (G-612)`. The pull request says it
   touches the online server, and ships in a release of its own.
+
+---
+
+## PR 1b — A fresh test database per run (`fix/test-db-per-run`)
+
+### Task 1b: The global setup creates the run's database, migrates it with `migrate deploy`, and drops it at the end
+
+**Files:**
+- Modify: `apps/server/tests/globalSetup.ts`, which no longer resets a database; `apps/server/tests/testDatabase.ts`
+  (the guard and the name)
+- Modify: `apps/server/tests/setup.ts`. It assigns `process.env.DATABASE_URL` from `inject('testDatabase')`
+  before it constructs its client, so every reader of the variable uses the run's database: `src/lib/prisma.ts`,
+  `src/config.ts`, `tests/helpers.ts` and `tests/lingoCardGoneMidRead.test.ts`.
+- Test: `apps/server/tests/testDatabase.test.ts`
+
+**Interfaces:**
+- Produces: the run's database `<name in DATABASE_URL>_run_<pid>_<random>`. It is created on the server
+  `DATABASE_URL` names. `npx prisma migrate deploy` applies the migrations, run as a child process with
+  `DATABASE_URL` set to the run's URL. That URL goes to the test files through vitest's `provide`, and the teardown
+  drops the database.
+- Keeps: the guard. A `DATABASE_URL` whose database name lacks «test» is refused before anything is created; the
+  teardown drops only a database whose name has the run's prefix and was created by this run.
+- No Prisma command that drops data runs at all, so Prisma 7's safeguard for AI agents is never met, and never
+  worked around.
+
+- [ ] **Step 1: Write the failing tests**
+  - `a DATABASE_URL without "test" is refused before any database is created`;
+  - `the run's database name carries the prefix and the run's id`;
+  - `the teardown drops only the database this run created`.
+- [ ] **Step 2: Run them; they fail.**
+- [ ] **Step 3: Implement.** The `CREATE DATABASE` and the `DROP DATABASE` go through a plain `pg` client on the
+  server's `postgres` database.
+- [ ] **Step 4: Run two files locally**, then the whole suite in CI. Expected: PASS, with no database left behind.
+  The role in `DATABASE_URL` must be allowed to create databases: the CI service's is; a developer's may need
+  `CREATEDB`.
+- [ ] **Step 5: Commit** `fix(tests): each run creates its own test database and drops it at the end`
 
 ---
 
@@ -226,14 +271,16 @@ M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
   - `the file is not readable without the key`: no `SQLite format 3` header, no inserted text in the bytes;
   - `a wrong key is refused with "file is not a database"`;
   - `a flipped bit in a data page is refused`;
-  - `the pragmas are set`: `journal_mode` is `wal`, `synchronous` 2, `fullfsync` 1, `foreign_keys` 1,
-    `temp_store` 2;
+  - `the pragmas are set`: `journal_mode` is `wal`, `synchronous` 2, `foreign_keys` 1, `temp_store` 2, and on
+    macOS `fullfsync` 1;
   - `a plain write during an open transaction waits, and survives the transaction's rollback`: the trial's case,
     A fails after 200 ms and B writes meanwhile;
   - `a plain read during an open transaction does not see its uncommitted rows`;
   - `a transaction whose BEGIN fails releases the lock`: the next query and the next transaction both run;
   - `savepoints inside a transaction work` (`tx.$transaction` nesting as the server uses it);
   - `the key is not in process.env after setLocalKey`.
+
+  All of them run on macOS and Windows (Task 8).
 - [ ] **Step 2: Run them; they fail** (no module yet).
 - [ ] **Step 3: Implement** `database.ts` (from the trial's `prisma-local.ts`).
 - [ ] **Step 4: Run them.** Expected: PASS. Then run the Work test files on the local client by hand once
@@ -342,7 +389,11 @@ M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
   - `POST /api/auth/login answers 403 with "Nell'app sul computer non serve accedere."`;
   - `GET /api/forum/... answers 503 with the online copy, without touching the database`;
   - `a source not kept locally: 503 "Per questo testo serve la rete."`;
-  - `closing stdin stops the process within 3 s, and the file reopens`.
+  - `closing stdin stops the process within 3 s, and the file reopens`;
+  - `a killed parent leaves no sidecar running`: a stand-in parent starts the entry point **detached** (on Windows
+    Node would otherwise put it in a job object that kills it with the parent, which hides the contract), the
+    parent is killed (TerminateProcess on Windows), and the test asserts that the entry point ran its own
+    stdin-end handler, by a marker it writes, as the trial's probe did (spec §10.3).
 - [ ] **Step 2: Run them; they fail.**
 - [ ] **Step 3: Implement**, from the trial's sidecar (`main.ts`, `shell.ts`), minus its trial-only parts.
 - [ ] **Step 4: Run them.** Expected: PASS.
@@ -357,8 +408,8 @@ M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
 ### Task 8: Work's tests on an encrypted file, in CI
 
 **Files:**
-- Modify: `.github/workflows/ci.yml`. A job `local`, on Ubuntu and macOS (the `fullfsync` path is macOS-only), with
-  no Postgres service. It runs `npm ci`, `npm run local:generate`, the Work test files and `tests/local/` with
+- Modify: `.github/workflows/ci.yml`. A job `local`, on `macos-latest` and `windows-latest` (spec §10.7), with no
+  Postgres service. Third-party actions are pinned to a full commit SHA. It runs `npm ci`, `npm run local:generate`, the Work test files and `tests/local/` with
   `LEXCRAFT_TEST_DB=local`, then the bundle and the flow script.
 - Modify: `apps/server/tests/globalSetup.ts`, `apps/server/tests/setup.ts`, `apps/server/tests/testDatabase.ts`. With
   `LEXCRAFT_TEST_DB=local`: a fresh encrypted file per run under the OS temp folder, a random key, and the guard's
@@ -369,12 +420,12 @@ M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
 - [ ] **Step 1: Make the setup's local branch** and run `tests/local/` with it locally. Expected: PASS.
 - [ ] **Step 2: Run the listed Work files locally**, one at a time, on the local branch. Each that fails for a
   reason outside M1 is written in the list with its reason and skipped by name, never silently.
-- [ ] **Step 3: Push.** Expected: the new job is green on both systems, and the server job is unchanged.
+- [ ] **Step 3: Push.** Expected: the new job is green on macOS and on Windows, and the server job is unchanged.
 - [ ] **Step 4: Commit** `ci: Work's tests and the local flow on an encrypted SQLite file (spec §8)`
 
 ---
 
 ## After M1
 
-M2 (the app's repository and shell) starts once M1 is merged (G-615); its plan is written then, in that
-repository. M3–M8 are outlined in the spec's «After M1».
+M2 (the app's repository and shell, on both platforms) starts once M1 is merged (G-615); its plan is written then,
+in that repository. M3–M8 are outlined in the spec's «After M1».
