@@ -1271,9 +1271,8 @@ differs. Under `npm run test:watch` the reset runs once, at start: restart it af
 migration. The global setup builds a Prisma client in vitest's main process, whose environment the
 test processes inherit, and takes out what it loads at once, as below. The suite's environment is `.env.test` and the setup's own
 values, never a development `.env`: `dotenv` is mocked in the setup (so `src/config.ts` reads
-nothing); `@prisma/client` is wrapped there too, because Prisma loads `apps/server/.env` (when the
-client was generated in a checkout that has one) at the import and again at every construction,
-and whatever it adds is taken out at once; and every `OAUTH_*` / `MERLT_*` that `.env.test` does
+nothing); Prisma 7 loads no `.env` of its own (G-612), so nothing else needs wrapping; and every
+`OAUTH_*` / `MERLT_*` that `.env.test` does
 not name is dropped, a shell export too — `tests/devEnvGuard.ts`. A development MCP secret once made the whole
 OAuth suite answer `invalid_client` in the main checkout only. nock is replaced by a fetch shim (vitest
 alias) because nock 14 corrupted supertest's sockets, and the suite shares one
@@ -1283,12 +1282,14 @@ port with another local process).
 ## Container image
 
 `apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries the
-production dependencies and `dist/`, on Debian slim with openssl for Prisma's query engine,
-as user `node`, with an exec-form `CMD` so SIGTERM reaches the graceful shutdown.
+production dependencies and `dist/` (the generated Prisma client inside it), on Debian slim,
+as user `node`, with an exec-form `CMD` so SIGTERM reaches the graceful shutdown. Prisma 7 has
+no query engine binary; openssl stays for the CLI's schema engine in the `migrate` target.
 `migrate` is a one-shot (`prisma migrate deploy`) from the build stage, which has the
 `prisma/` folder (schema and migrations) the runtime does not. `prisma` is a production
 dependency since G-555, so the blocking `npm audit` covers the CLI that writes to the
-production database; the runtime therefore holds it too, unused. `.dockerignore` excludes every `.env*`: a secret never
+production database; the runtime takes it out again (`npm uninstall --no-save prisma`), since
+from Prisma 7 it brings about 200 MB the server never loads (G-612). `.dockerignore` excludes every `.env*`: a secret never
 enters an image. The admin seed runs compiled: `node dist/utils/seed.js`.
 
 Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it shares with
