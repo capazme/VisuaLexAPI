@@ -1256,7 +1256,11 @@ migrations to it with `prisma migrate deploy` and drops it at the end (`tests/gl
 vitest's `globalSetup`); `tests/setup.ts` points `DATABASE_URL` at it before anything reads the
 variable. No Prisma command that drops data runs: Prisma 7 refuses its reset when an AI agent runs
 it, a safeguard never worked around (G-542). The role in `DATABASE_URL` must be allowed to create
-databases (the CI service's is; locally it may need `CREATEDB`). Before every test
+databases (the CI service's is; locally it may need `CREATEDB`). A run stopped with Ctrl-C or killed
+skips the teardown and leaves its database behind: list them with
+`SELECT datname FROM pg_database WHERE datname LIKE '%\_run\_%'` on the test server and drop the
+ones no run is using. Nothing drops them automatically, since two runs on one server cannot tell an
+orphan from a live one. Before every test
 `tests/setup.ts` empties every table of `public` but `_prisma_migrations` and puts back the text
 versions the migrations insert (`lingo_testi_versioni`, read once right after the migrations):
 every test starts from empty tables plus version 1 of each text to accept, as a fresh database

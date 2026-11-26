@@ -95,7 +95,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
       await prisma.$disconnect();
     }
   } catch (error) {
-    await dropRunDatabase();
+    // The setup's own error is the one to see: a failed drop is only reported beside it.
+    await dropRunDatabase().catch((dropError: unknown) => {
+      console.error(`[globalSetup] could not drop ${name} after the failure below:`, dropError);
+    });
     throw error;
   }
   return dropRunDatabase;

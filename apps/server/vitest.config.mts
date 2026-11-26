@@ -19,7 +19,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
-    // The reset, once per run; then, in every file, the tables emptied before each test.
+    // Once per run, a database of the run's own, migrated and dropped at the end; then, in every file,
+    // the tables emptied before each test (tests/globalSetup.ts, tests/setup.ts).
     globalSetup: ['./tests/globalSetup.ts'],
     setupFiles: ['./tests/setup.ts'],
     testTimeout: 30_000,
