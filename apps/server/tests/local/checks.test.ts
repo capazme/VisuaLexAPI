@@ -31,6 +31,7 @@ const VALID: Record<string, Record<string, unknown>> = {
   search_history: { act_type: 'codice civile', decision_key: null },
   assistant_note_versions: { highlight_id: 'h-1', dossier_item_id: null },
 };
+// One row per constraint that breaks it alone (the names must cover checks.sql), and below the boundaries.
 const BREAKS: Record<string, Record<string, unknown>> = {
   tasks_priority_check: { priority: 5 },
   tasks_planned_time_check: { planned_time: '10:00', planned_date: null },
@@ -92,5 +93,35 @@ describe('the local file refuses a row that breaks a CHECK', () => {
   it.each(checks.map((c) => [c.name, c.table]))('refuses a row that breaks %s', (name, table) => {
     const row = { ...baseRow(db, table), ...VALID[table], ...BREAKS[name] };
     expect(() => insert(db, table, row)).toThrow(new RegExp(`CHECK constraint failed: ${name}`));
+  });
+
+  // The edges of each rule, both sides, so a twin that drops half a condition fails here too.
+  const EDGES: Array<[string, string, Record<string, unknown>, string | null]> = [
+    ['priority 0', 'tasks', { priority: 0 }, 'tasks_priority_check'],
+    ['priority 1', 'tasks', { priority: 1 }, null],
+    ['priority 4', 'tasks', { priority: 4 }, null],
+    ['recurrence day 0', 'tasks', { recurrence_day: 0 }, 'tasks_recurrence_day_check'],
+    ['recurrence day 1', 'tasks', { recurrence_day: 1 }, null],
+    ['recurrence day 31', 'tasks', { recurrence_day: 31 }, null],
+    ['duration 1', 'tasks', { duration_minutes: 1 }, null],
+    ['a planned time with its date', 'tasks', { planned_time: '10:00', planned_date: '2026-11-26T00:00:00.000+00:00' }, null],
+    ['a review comment of 500 characters', 'highlights', { review_comment: 'x'.repeat(500) }, null],
+    ['a review comment with a NUL', 'highlights', { review_comment: 'a\u0000b' }, 'highlights_review_comment_check'],
+    ['an assistant mark without its text', 'highlights', { created_by_client_id: 'client-1', dossier_item_id: 'item-1', assistant_text: null, assistant_start_offset: 3 }, 'highlights_assistant_mark_check'],
+    ['an assistant mark without its offset', 'highlights', { created_by_client_id: 'client-1', dossier_item_id: 'item-1', assistant_text: 'passo', assistant_start_offset: null }, 'highlights_assistant_mark_check'],
+    ['a whole assistant mark', 'highlights', { created_by_client_id: 'client-1', dossier_item_id: 'item-1', assistant_text: 'passo', assistant_start_offset: 3 }, null],
+    ['an assistant note without its state', 'highlights', { created_by_client_id: 'client-1', dossier_item_id: 'item-1', assistant_text: 'passo', assistant_start_offset: 3, assistant_note: 'nota', note_state: null }, 'highlights_assistant_note_check'],
+    ['a gloss with a blank note', 'highlights', { kind: 'gloss', color: null, created_by_client_id: 'client-1', dossier_item_id: 'item-1', assistant_text: 'passo', assistant_start_offset: 3, note_state: 'proposed', assistant_note: 'n', note: '   ' }, 'highlights_gloss_note_check'],
+    ['a whole gloss', 'highlights', { kind: 'gloss', color: null, created_by_client_id: 'client-1', dossier_item_id: 'item-1', assistant_text: 'passo', assistant_start_offset: 3, note_state: 'proposed', assistant_note: 'n', note: 'glossa' }, null],
+    ['an assistant note on a norm entry', 'dossier_items', { item_type: 'norm', note_state: 'proposed', assistant_note: 'n', created_by_client_id: 'client-1' }, 'dossier_items_assistant_note_check'],
+    ['an assistant note on a note entry, from a client', 'dossier_items', { item_type: 'note', note_state: 'proposed', assistant_note: 'n', created_by_client_id: 'client-1' }, null],
+    ['an assistant note on a note entry, from no client', 'dossier_items', { item_type: 'note', note_state: 'proposed', assistant_note: 'n', created_by_client_id: null }, 'dossier_items_assistant_note_check'],
+    ['a search of both kinds', 'search_history', { act_type: 'codice civile', decision_key: 'cass-1' }, 'search_history_one_kind'],
+    ['a version of both targets', 'assistant_note_versions', { highlight_id: 'h-1', dossier_item_id: 'item-1' }, 'assistant_note_versions_target_check'],
+  ];
+  it.each(EDGES)('%s', (_label, table, change, refusedBy) => {
+    const row = { ...baseRow(db, table), ...VALID[table], ...change };
+    if (refusedBy) expect(() => insert(db, table, row)).toThrow(new RegExp(`CHECK constraint failed: ${refusedBy}`));
+    else expect(() => insert(db, table, row)).not.toThrow();
   });
 });

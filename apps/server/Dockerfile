@@ -44,8 +44,12 @@ COPY package.json package-lock.json ./
 # pages: the server reads their text and never loads it, so it is removed here and nothing else optional is dropped.
 # The Prisma CLI goes too (see the top): `npm uninstall --no-save` removes it with what only it needs, leaving
 # @prisma/client, the pg adapter and node-postgres, which is all the server loads (G-612).
+# better-sqlite3 (SQLite3MultipleCiphers, ~34 MB) is the desktop app's local database, a development dependency of the
+# server; npm still installs it here as the Prisma CLI's optional peer, and node-addon-api with it. The server never
+# loads either.
 RUN npm ci --omit=dev && npm uninstall --no-save --omit=dev prisma \
-    && rm -rf node_modules/@napi-rs/canvas node_modules/@napi-rs/canvas-* && npm cache clean --force
+    && rm -rf node_modules/@napi-rs/canvas node_modules/@napi-rs/canvas-* \
+       node_modules/better-sqlite3 node_modules/node-addon-api && npm cache clean --force
 # The generated client is part of dist/ (src/generated/prisma, compiled), so nothing else comes from the build stage.
 COPY --from=build /app/dist ./dist
 # The MERL-T dead-letter log (NDJSON, capped at 50 MB) is written under ./logs

@@ -247,7 +247,7 @@ CREATE TABLE "highlights" (
     CONSTRAINT "highlights_assistant_note_check" CHECK (("assistant_note" IS NULL OR "created_by_client_id" IS NOT NULL) AND (("note_state" IS NULL) = ("assistant_note" IS NULL))),
     CONSTRAINT "highlights_gloss_colour_check" CHECK (("kind" = 'gloss') = ("color" IS NULL)),
     CONSTRAINT "highlights_gloss_note_check" CHECK ("kind" <> 'gloss' OR ("created_by_client_id" IS NOT NULL AND "note_state" IS NOT NULL AND "note" IS NOT NULL AND length(trim("note")) > 0)),
-    CONSTRAINT "highlights_review_comment_check" CHECK ("review_comment" IS NULL OR length("review_comment") <= 500)
+    CONSTRAINT "highlights_review_comment_check" CHECK ("review_comment" IS NULL OR (length("review_comment") <= 500 AND instr("review_comment", char(0)) = 0))
 );
 
 -- CreateTable
@@ -305,7 +305,7 @@ CREATE TABLE "dossier_items" (
     "note_edited_by" TEXT,
     CONSTRAINT "dossier_items_dossier_id_fkey" FOREIGN KEY ("dossier_id") REFERENCES "dossiers" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "dossier_items_assistant_note_check" CHECK ((("note_state" IS NULL) = ("assistant_note" IS NULL)) AND ("note_state" IS NULL OR ("item_type" = 'note' AND "created_by_client_id" IS NOT NULL))),
-    CONSTRAINT "dossier_items_review_comment_check" CHECK ("review_comment" IS NULL OR length("review_comment") <= 500)
+    CONSTRAINT "dossier_items_review_comment_check" CHECK ("review_comment" IS NULL OR (length("review_comment") <= 500 AND instr("review_comment", char(0)) = 0))
 );
 
 -- CreateTable
