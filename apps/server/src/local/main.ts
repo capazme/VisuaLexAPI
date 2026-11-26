@@ -85,6 +85,8 @@ function listen(server: http.Server, first: number): Promise<number> {
 }
 
 async function main(): Promise<void> {
+  // First of all: the configuration reads no `.env` in local mode (src/config.ts), and no source is reached.
+  process.env.LEXCRAFT_MODE = 'local';
   const dataDir = path.resolve(process.env.LEXCRAFT_DATA_DIR || fail('LEXCRAFT_DATA_DIR is not set'));
   const webDir = path.resolve(process.env.LEXCRAFT_WEB_DIR || fail('LEXCRAFT_WEB_DIR is not set'));
   const sqlDir = path.resolve(process.env.LEXCRAFT_SQL_DIR || path.join(__dirname, '../../prisma/local'));
@@ -105,6 +107,8 @@ async function main(): Promise<void> {
   process.stdin.resume();
 
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+  // The process's folder is the data folder, which only this user can write, whatever folder the shell started it in.
+  process.chdir(dataDir);
   const file = path.join(dataDir, 'lexcraft.db');
   const filesDir = path.join(dataDir, 'pratica-files');
   fs.mkdirSync(filesDir, { recursive: true, mode: 0o700 });
@@ -128,6 +132,10 @@ async function main(): Promise<void> {
     JWT_SECRET: jwtSecret,
     ALLOWED_ORIGINS: origin,
     SESSION_COOKIE_SECURE: 'false',
+    // The window's session lasts as long as the launch: each launch ends the earlier ones (src/local/profile.ts), and
+    // locally there is no sign-in to make a new one, so it must not expire while the app is open.
+    SESSION_IDLE_DAYS: '3650',
+    SESSION_MAX_DAYS: '3650',
     REDIS_ENABLED: 'false',
     MERLT_ENABLED: 'false',
     NORMA_WATCH_ENABLED: 'false',

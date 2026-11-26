@@ -74,6 +74,9 @@ export async function postLegalApi(
   body: unknown,
   options: { signal?: AbortSignal } = {},
 ): Promise<{ status: number; data: Record<string, unknown> }> {
+  // The desktop app's first version reaches no source (spec §6): not the Python API, nor whatever answers on its
+  // default address, which another program on the computer could be.
+  if (process.env.LEXCRAFT_MODE === 'local') throw new SourceUnavailable('Per questo testo serve la rete.');
   let response: Response;
   try {
     response = await fetch(`${apiBase()}${path}`, {

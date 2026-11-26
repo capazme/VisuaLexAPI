@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { connect } from 'node:net';
@@ -48,11 +50,17 @@ function newLaunch(): Launch {
   };
 }
 
+/**
+ * A stand-in for the Python API, named in LEGAL_API_URL for every launch: the local mode must never call it (nor any
+ * other source) in this version.
+ */
+const legalApi = { url: '', hits: 0, server: http.createServer() };
+
 /** The arguments and environment that start the entry point for a launch. */
 function command(launch: Launch): { args: string[]; env: NodeJS.ProcessEnv; cwd: string } {
   return {
     args: [TSX, '--tsconfig', TSCONFIG, MAIN],
-    env: { ...baseEnv(), LEXCRAFT_DATA_DIR: launch.dataDir, LEXCRAFT_WEB_DIR: launch.webDir, LEXCRAFT_PORT: String(launch.port) },
+    env: { ...baseEnv(), LEXCRAFT_DATA_DIR: launch.dataDir, LEXCRAFT_WEB_DIR: launch.webDir, LEXCRAFT_PORT: String(launch.port), LEGAL_API_URL: legalApi.url },
     cwd: path.dirname(launch.dataDir),
   };
 }
@@ -94,6 +102,9 @@ let running: Running;
 let window: string;
 
 beforeAll(async () => {
+  legalApi.server.on('request', (_req, res) => { legalApi.hits += 1; res.writeHead(500).end(); });
+  await new Promise<void>((resolve) => legalApi.server.listen(0, '127.0.0.1', resolve));
+  legalApi.url = `http://127.0.0.1:${(legalApi.server.address() as AddressInfo).port}`;
   running = await start(launch);
   window = await openWindow(running, launch);
 }, 120_000);
@@ -104,6 +115,7 @@ afterAll(async () => {
     await running.exited;
   }
   rmSync(path.dirname(launch.dataDir), { recursive: true, force: true });
+  await new Promise<void>((resolve) => legalApi.server.close(() => resolve()));
 });
 
 describe('the local entry point', () => {
@@ -187,6 +199,16 @@ describe('the local entry point', () => {
     }
   });
 
+  it('reaches no source, not even the one LEGAL_API_URL names: a norm added by reference is unavailable', async () => {
+    const web = { cookie: window, 'x-visualex-client': 'web', origin: `http://127.0.0.1:${running.port}` };
+    const created = await call(running.port, { method: 'POST', path: '/api/dossiers', headers: web, body: { name: 'Riferimenti' } });
+    const id = (JSON.parse(created.text) as { id: string }).id;
+    const norms = await call(running.port, { method: 'POST', path: `/api/dossiers/${id}/norms`, headers: web, body: { references: ['art. 2043 c.c.'] } });
+    expect(norms.status).toBe(200);
+    expect(JSON.parse(norms.text)).toMatchObject({ results: [{ reference: 'art. 2043 c.c.', outcome: 'unavailable' }] });
+    expect(legalApi.hits).toBe(0);
+  });
+
   it('a source needs the network; the version answers', async () => {
     const text = await call(running.port, { method: 'POST', path: '/fetch_article_text', headers: { cookie: window }, body: { act_type: 'codice civile', article: '1453' } });
     expect(text.status).toBe(503);
@@ -226,6 +248,24 @@ describe('the local entry point', () => {
       await again.exited;
     }
   }, 120_000);
+});
+
+describe('the configuration in local mode', () => {
+  it('reads no .env from the folder the process started in', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'lexcraft-dotenv-'));
+    try {
+      writeFileSync(path.join(dir, '.env'), 'LEXCRAFT_PROBE=read\n');
+      writeFileSync(path.join(dir, 'probe.ts'), `require(${JSON.stringify(path.join(SERVER, 'src/config.ts'))}); process.stdout.write(process.env.LEXCRAFT_PROBE ?? 'unset');`);
+      const run = (extra: NodeJS.ProcessEnv) => execFileSync(process.execPath, [TSX, '--tsconfig', TSCONFIG, path.join(dir, 'probe.ts')], {
+        cwd: dir,
+        env: { ...baseEnv(), JWT_SECRET: 'x', DATABASE_URL: 'file:x', ...extra },
+      }).toString();
+      expect(run({})).toBe('read');
+      expect(run({ LEXCRAFT_MODE: 'local' })).toBe('unset');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
 
 describe('a shell gone during start-up', () => {
