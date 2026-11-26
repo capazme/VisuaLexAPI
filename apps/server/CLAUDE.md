@@ -44,6 +44,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `better-sqlite3-multiple-ciphers` (SQLite3MultipleCiphers) through
   `overrides`: a development dependency of the server, and the one the Prisma
   CLI's own `better-sqlite3` resolves to; the runtime image carries neither.
+- Hand-written SQL in the parts the desktop app runs (Work: dossiers, notes,
+  tasks, Atti, the trash, the assistant) is SQL both Postgres and SQLite take.
+  Row locks and advisory locks go through `src/lib/sqlDialect.ts`
+  (`forUpdate()`, `forNoKeyUpdate()`, `advisoryXactLock()`), which writes them on
+  Postgres and nothing on SQLite (spec §5); `tests/local/dialect.test.ts` fails
+  on a lock clause written anywhere else, but in the files of the sections that
+  stay online (Learn, the Forum).
 - `src/index.ts` — graceful shutdown on SIGTERM/SIGINT: clear the MERL-T
   watchdog's and the saved-norm watcher's intervals, `server.close()`, drop each
   keep-alive socket as soon as it goes idle, `prisma.$disconnect()`, exit; a
