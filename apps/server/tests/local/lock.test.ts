@@ -75,6 +75,35 @@ describe('the connection lock', () => {
     expect(calls).toEqual(['BEGIN', 'query', 'BEGIN']);
   });
 
+  it('a rollback after a failed COMMIT closes the transaction SQLite kept open, before the lock goes', async () => {
+    const calls: string[] = [];
+    const client = { inTransaction: false };
+    const fake = {
+      provider: 'sqlite' as const,
+      adapterName: 'fake',
+      client,
+      queryRaw: async () => ({ columnNames: [], columnTypes: [], rows: [] }),
+      executeRaw: async ({ sql }: { sql: string }) => {
+        calls.push(sql);
+        if (sql === 'BEGIN') client.inTransaction = true;
+        if (sql === 'COMMIT') throw new Error('disk full');
+        if (sql === 'ROLLBACK') client.inTransaction = false;
+        return 0;
+      },
+      executeScript: async () => undefined,
+      startTransaction: async () => { throw new Error('never'); },
+      dispose: async () => undefined,
+    };
+    const adapter = serialize(fake as never);
+    const tx = await adapter.startTransaction();
+    await expect(tx.executeRaw({ sql: 'COMMIT', args: [], argTypes: [] })).rejects.toThrow('disk full');
+    await tx.rollback();
+    expect(client.inTransaction).toBe(false);
+    expect(calls).toEqual(['BEGIN', 'COMMIT', 'ROLLBACK']);
+    const next = await Promise.race([adapter.queryRaw({ sql: 'SELECT 1', args: [], argTypes: [] }).then(() => 'ran'), sleep(500).then(() => 'hung')]);
+    expect(next).toBe('ran');
+  });
+
   it('refuses an isolation level SQLite does not offer', async () => {
     const fake = { provider: 'sqlite', adapterName: 'fake', queryRaw: async () => ({}), executeRaw: async () => 0, executeScript: async () => undefined, startTransaction: async () => ({}), dispose: async () => undefined };
     await expect(serialize(fake as never).startTransaction('READ COMMITTED')).rejects.toThrow(/not supported/);

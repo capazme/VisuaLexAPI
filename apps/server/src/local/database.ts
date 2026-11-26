@@ -90,6 +90,8 @@ const statement = (sql: string): SqlQuery => ({ sql, args: [], argTypes: [] });
  */
 export function serialize(adapter: SqlDriverAdapter): SqlDriverAdapter {
   const lock = new Lock();
+  // The driver under the adapter, to see whether a transaction is still open (better-sqlite3's `inTransaction`).
+  const driver = (adapter as unknown as { client?: { inTransaction?: boolean } }).client;
   const queryRaw = adapter.queryRaw.bind(adapter);
   const executeRaw = adapter.executeRaw.bind(adapter);
   const executeScript = adapter.executeScript.bind(adapter);
@@ -111,6 +113,13 @@ export function serialize(adapter: SqlDriverAdapter): SqlDriverAdapter {
         release();
       }
     };
+    // When COMMIT itself fails (a full disk, an I/O error), Prisma calls rollback() without sending ROLLBACK, and
+    // SQLite may keep the transaction open: roll it back here before the lock goes, or the next request would run
+    // inside it.
+    const rollback = async () => {
+      if (open && driver?.inTransaction) await executeRaw(statement('ROLLBACK')).catch(() => undefined);
+      await end();
+    };
     try {
       await executeRaw(statement('BEGIN'));
     } catch (error) {
@@ -124,7 +133,7 @@ export function serialize(adapter: SqlDriverAdapter): SqlDriverAdapter {
       queryRaw,
       executeRaw,
       commit: end,
-      rollback: end,
+      rollback,
       createSavepoint: async (name: string) => { await executeRaw(statement(`SAVEPOINT ${name}`)); },
       rollbackToSavepoint: async (name: string) => { await executeRaw(statement(`ROLLBACK TO ${name}`)); },
       releaseSavepoint: async (name: string) => { await executeRaw(statement(`RELEASE SAVEPOINT ${name}`)); },

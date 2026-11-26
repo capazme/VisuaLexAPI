@@ -22,7 +22,13 @@ const SERVER = path.resolve(__dirname, '..');
 if (require.main === module) {
   const name = process.argv[2];
   if (!name || !/^[a-z0-9_]+$/.test(name)) throw new Error('usage: npm run local:migration -- <name in [a-z0-9_]>');
-  const previous = execFileSync('git', ['show', 'HEAD:./prisma/local/schema.prisma'], { cwd: SERVER, encoding: 'utf8' });
+  // The local schema the branch started from: the merge base with develop, so a regenerated schema already
+  // committed on this branch still yields its migration. Without the remote, the last commit, said aloud.
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: SERVER, encoding: 'utf8' }).trim();
+  let base = 'HEAD';
+  try { base = git('merge-base', 'HEAD', 'origin/develop'); } catch { console.warn('no origin/develop: diffing from the last commit'); }
+  console.log(`local schema of ${base.slice(0, 12)} -> the working tree`);
+  const previous = git('show', `${base}:./prisma/local/schema.prisma`);
   const dir = mkdtempSync(path.join(tmpdir(), 'local-migration-'));
   try {
     const from = path.join(dir, 'previous.prisma');

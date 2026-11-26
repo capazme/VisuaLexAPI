@@ -77,6 +77,20 @@ describe('local migrations', () => {
     expect(recorded.n).toBe(shippedMigrations(SQL_DIR).length);
   });
 
+  it('a first start that failed half-way is made again at the next start, not taken for a migrated file', () => {
+    const broken = sqlCopy();
+    writeFileSync(path.join(broken, 'init.sql'), 'CREATE TABLE "a" ("id" TEXT PRIMARY KEY);\nCREATE TABLE "broken" (');
+    const local = localPaths(broken);
+    cleanups.push(() => local.remove());
+    expect(() => migrateLocal(local)).toThrow();
+    expect(readFileSync(local.file).length).toBeGreaterThan(0);
+    const good = { ...local, sqlDir: SQL_DIR };
+    expect(migrateLocal(good).created).toBe(true);
+    const db = open(local);
+    expect((db.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE type='table'`).get() as { n: number }).n).toBe(82 + 2);
+    db.close();
+  });
+
   it('applies a pending migration once, after an encrypted backup, and records it', () => {
     const sqlDir = sqlCopy();
     const local = newFile(sqlDir);

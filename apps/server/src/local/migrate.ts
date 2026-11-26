@@ -53,11 +53,14 @@ export function backupLocal(db: Database.Database, backupsDir: string, label: st
 }
 
 export function migrateLocal({ file, keyHex, sqlDir, backupsDir }: LocalPaths): MigrationResult {
-  const fresh = !fs.existsSync(file) || fs.statSync(file).size === 0;
   const shipped = shippedMigrations(sqlDir);
   const db = new Database(file);
   try {
     configure(db, keyHex);
+    // New means no table yet, not an empty file: entering WAL writes the header at once, so a first start that
+    // failed half-way leaves a non-empty file with no table, which must be made again, not migrated.
+    const tables = db.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).get() as { n: number };
+    const fresh = tables.n === 0;
     const now = () => new Date().toISOString();
     if (fresh) {
       db.exec('BEGIN');
