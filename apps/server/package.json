@@ -17,7 +17,8 @@
     "test:watch": "dotenv -e .env.test -- vitest",
     "local:schema": "tsx scripts/local-schema.ts",
     "local:generate": "prisma generate --config prisma.local.config.ts",
-    "pretest": "prisma generate --config prisma.local.config.ts"
+    "pretest": "prisma generate --config prisma.local.config.ts",
+    "local:migration": "tsx scripts/local-migration.ts"
   },
   "keywords": [
     "visualex",
