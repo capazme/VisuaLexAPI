@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import express, { type Express } from 'express';
 import app from '../app';
@@ -40,6 +41,9 @@ export interface LocalServerOptions {
  */
 export function buildLocalServer({ port, webDir, launchSecret, profileId, version = 'local' }: LocalServerOptions): Express {
   const windowToken = crypto.randomBytes(32).toString('base64url');
+  // The page for every path the web routes itself, read once: a launch without the built web fails here, and no
+  // request reads the disk for it.
+  const indexHtml = fs.readFileSync(path.join(webDir, 'index.html'));
   const local = express();
   local.disable('x-powered-by');
   local.set('trust proxy', false);
@@ -67,7 +71,7 @@ export function buildLocalServer({ port, webDir, launchSecret, profileId, versio
   local.get(/.*/, (_req, res) => {
     res.setHeader('Content-Security-Policy', CSP);
     res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(webDir, 'index.html'));
+    res.type('html').send(indexHtml);
   });
   return local;
 }
