@@ -2,9 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import Database from 'better-sqlite3';
-import { applyKey, configure } from '../../src/local/database';
+import { configure } from '../../src/local/database';
 import { migrateLocal, shippedMigrations } from '../../src/local/migrate';
 import { SQL_DIR, localPaths, type LocalDatabase } from './client';
 
@@ -148,32 +148,44 @@ describe('local migrations', () => {
 });
 
 describe('one process on the file', () => {
-  it('a second process cannot read the file right after the app opened it', async () => {
+  const tsx = path.resolve(__dirname, '../../node_modules/tsx/dist/cli.mjs');
+  /** A process that migrates the file and opens it through the app's own client (tests/local/holder.ts). */
+  function startHolder(local: LocalDatabase) {
+    const child = spawn(process.execPath, [tsx, path.join(__dirname, 'holder.ts'), local.file, local.keyHex, local.sqlDir], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let output = '';
+    const settled = new Promise<string>((resolve) => {
+      child.stdout.on('data', (chunk) => { output += String(chunk); if (/READY|REFUSED/.test(output)) resolve(output.trim()); });
+      child.stderr.on('data', (chunk) => { output += String(chunk); });
+      child.once('exit', (code) => resolve(`${output.trim()} (exited ${code})`));
+    });
+    return { child, settled };
+  }
+
+  it('a second process is refused while the first holds the data folder, and opens it once the first is gone', async () => {
     const local = localPaths();
     cleanups.push(() => local.remove());
-    migrateLocal(local);
-    const holder = spawn(process.execPath, [path.resolve(__dirname, '../../node_modules/tsx/dist/cli.mjs'), path.join(__dirname, 'holder.ts'), local.file, local.keyHex], {
-      stdio: ['pipe', 'pipe', 'inherit'],
-    });
-    cleanups.push(() => holder.kill());
-    await new Promise<void>((resolve, reject) => {
-      holder.stdout.on('data', (chunk) => { if (String(chunk).includes('READY')) resolve(); });
-      holder.once('exit', (code) => reject(new Error(`holder exited ${code}`)));
-    });
-    const other = new Database(local.file);
-    try {
-      applyKey(other, local.keyHex);
-      other.pragma('busy_timeout=300');
-      // The outcome as text, so a failure says what the second process saw.
-      let outcome = 'read the file';
-      try { other.prepare('SELECT count(*) FROM users').get(); } catch (e) { outcome = (e as Error).message; }
-      expect(outcome).toMatch(/database is locked/);
-    } finally {
-      other.close();
+    const first = startHolder(local);
+    cleanups.push(() => first.child.kill());
+    expect(await first.settled).toMatch(/^READY/);
+
+    const second = startHolder(local);
+    cleanups.push(() => second.child.kill());
+    expect(await second.settled).toMatch(/REFUSED \[local\] another LexCraft process has this data folder open/);
+    expect(() => migrateLocal(local)).toThrow(/another LexCraft process has this data folder open/);
+
+    // The operating system's exclusion, twenty times over: a plain process trying the lock file's write lock.
+    const driver = path.dirname(require.resolve('better-sqlite3/package.json'));
+    const attempt = `const D=require(${JSON.stringify(driver)});const d=new D(${JSON.stringify(`${local.file}.lock`)});d.pragma('busy_timeout=0');`
+      + `try{d.pragma('locking_mode=EXCLUSIVE');d.prepare('INSERT OR REPLACE INTO "holder" ("id","pid","since") VALUES (1,0,?)').run('x');console.log('TOOK')}`
+      + `catch(e){console.log('REFUSED '+e.message)}finally{d.close()}`;
+    for (let i = 0; i < 20; i++) {
+      expect(execFileSync(process.execPath, ['-e', attempt]).toString().trim()).toMatch(/^REFUSED .*database is locked/);
     }
-    const exited = new Promise((resolve) => holder.once('exit', resolve));
-    holder.stdin.end();
+
+    const exited = new Promise((resolve) => first.child.once('exit', resolve));
+    first.child.stdin.end();
     await exited;
+    expect(migrateLocal(local)).toEqual({ created: false, applied: [], backup: null });
     const after = open(local);
     expect(after.prepare('SELECT count(*) AS n FROM users').get()).toEqual({ n: 0 });
     after.close();

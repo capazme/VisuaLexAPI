@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { configure } from './database';
+import { configure, holdInstanceLock } from './database';
 
 export type LocalPaths = {
   /** The encrypted database file. */
@@ -53,6 +53,8 @@ export function backupLocal(db: Database.Database, backupsDir: string, label: st
 }
 
 export function migrateLocal({ file, keyHex, sqlDir, backupsDir }: LocalPaths): MigrationResult {
+  // One process per data folder, before anything touches the file; kept for the life of the process.
+  holdInstanceLock(file);
   const shipped = shippedMigrations(sqlDir);
   const db = new Database(file);
   try {

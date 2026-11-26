@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { PrismaClient } from '../../src/generated/prisma-local/client';
-import { localAdapter } from '../../src/local/database';
+import { localAdapter, releaseInstanceLock } from '../../src/local/database';
 import { migrateLocal, type LocalPaths } from '../../src/local/migrate';
 
 /** The local SQL shipped with the server: prisma/local (init.sql, migrations/). */
@@ -20,7 +20,10 @@ export function localPaths(sqlDir = SQL_DIR): LocalDatabase {
     keyHex: randomBytes(32).toString('hex'),
     sqlDir,
     backupsDir: path.join(dir, 'backups'),
-    remove: () => rmSync(dir, { recursive: true, force: true }),
+    remove: () => {
+      releaseInstanceLock(path.join(dir, 'lexcraft.db'));
+      rmSync(dir, { recursive: true, force: true });
+    },
   };
 }
 

@@ -7,7 +7,7 @@
  * Loaded only in local mode (src/lib/prisma.ts), never by the online server, which does not install its driver.
  */
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
-import type Database from 'better-sqlite3';
+import Database from 'better-sqlite3';
 
 type SqlDriverAdapter = Awaited<ReturnType<PrismaBetterSqlite3['connect']>>;
 type Transaction = Awaited<ReturnType<SqlDriverAdapter['startTransaction']>>;
@@ -61,6 +61,44 @@ export function configure(db: Driver, keyHex: string): void {
   db.pragma('foreign_keys=ON');
   db.pragma('temp_store=MEMORY');
   db.pragma('busy_timeout=5000');
+}
+
+const instanceLocks = new Map<string, Database.Database>();
+
+/**
+ * One process per data folder (spec §4). A small SQLite file beside the database, `<file>.lock`, in rollback-journal
+ * mode with the exclusive locking mode, written once: SQLite then keeps the file's exclusive lock until this process
+ * closes it or ends, and the operating system releases it if the process crashes, so no stale lock is ever left.
+ * Another process finds it locked at once and is refused. (The database's own exclusive lock in WAL mode kept a
+ * second process out on macOS and Windows but not on Linux, measured; this works the same everywhere.)
+ * Taken by migrateLocal and by the client's connect; idempotent within the process. The file holds only a pid and a
+ * time, never data.
+ */
+export function holdInstanceLock(file: string): void {
+  const lockFile = `${file}.lock`;
+  if (instanceLocks.has(lockFile)) return;
+  const guard = new Database(lockFile);
+  try {
+    guard.pragma('busy_timeout=0');
+    guard.pragma('locking_mode=EXCLUSIVE');
+    guard.pragma('journal_mode=DELETE');
+    guard.exec('CREATE TABLE IF NOT EXISTS "holder" ("id" INTEGER PRIMARY KEY, "pid" INTEGER NOT NULL, "since" TEXT NOT NULL)');
+    guard.prepare('INSERT OR REPLACE INTO "holder" ("id", "pid", "since") VALUES (1, ?, ?)').run(process.pid, new Date().toISOString());
+  } catch (error) {
+    guard.close();
+    if (/database is locked|busy/i.test((error as Error).message)) {
+      throw new Error('[local] another LexCraft process has this data folder open');
+    }
+    throw error;
+  }
+  instanceLocks.set(lockFile, guard);
+}
+
+/** Lets the data folder go: at shutdown (the client's dispose) and in tests. */
+export function releaseInstanceLock(file: string): void {
+  const lockFile = `${file}.lock`;
+  instanceLocks.get(lockFile)?.close();
+  instanceLocks.delete(lockFile);
 }
 
 /** A FIFO lock: whoever holds it has the connection. */
@@ -151,17 +189,27 @@ export function serialize(adapter: SqlDriverAdapter): SqlDriverAdapter {
   };
 }
 
-/** The adapter for the local file: configured on connect, written to at once (the exclusive lock, §4), serialized. */
+/**
+ * The adapter for the local file: the data folder's instance lock taken first, then the connection configured,
+ * its opening time written, and the connection serialized. Its dispose lets the folder go.
+ */
 export function localAdapter({ file, keyHex }: { file: string; keyHex: string }): PrismaBetterSqlite3 {
   if (!KEY.test(keyHex)) throw new Error('[local] the database key must be 64 lower-case hex characters');
   class EncryptedSqlite extends PrismaBetterSqlite3 {
     async connect(): Promise<SqlDriverAdapter> {
+      holdInstanceLock(file);
       const adapter = await super.connect();
       const db = (adapter as unknown as { client: Driver }).client;
       configure(db, keyHex);
-      // A write at once, so this process holds the file's exclusive lock from start-up, not from the first request.
       db.prepare(`INSERT OR REPLACE INTO "_lexcraft_meta" ("key", "value") VALUES ('opened_at', ?)`).run(new Date().toISOString());
-      return serialize(adapter);
+      const serialized = serialize(adapter);
+      return {
+        ...serialized,
+        dispose: async () => {
+          await serialized.dispose();
+          releaseInstanceLock(file);
+        },
+      };
     }
   }
   return new EncryptedSqlite({ url: `file:${file}` });
