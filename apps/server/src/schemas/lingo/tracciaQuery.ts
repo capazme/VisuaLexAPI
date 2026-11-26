@@ -1,4 +1,4 @@
-import { LingoMateria, LingoTipoProva } from '@prisma/client';
+import { LingoMateria, LingoTipoProva } from '../../lib/db';
 import { z } from 'zod';
 import { SOTTO_TIPO_ATTO } from './traccia';
 

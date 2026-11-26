@@ -1,4 +1,4 @@
-import type { LingoCardStato, LingoMateria, Prisma } from '@prisma/client';
+import type { LingoCardStato, LingoMateria, Prisma } from '../src/lib/db';
 import jwt from 'jsonwebtoken';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';

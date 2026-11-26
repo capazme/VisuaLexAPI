@@ -1,4 +1,4 @@
-import type { LingoCardStato } from '@prisma/client';
+import type { LingoCardStato } from '../lib/db';
 
 /**
  * The lifecycle of a study card, as the specification draws it:

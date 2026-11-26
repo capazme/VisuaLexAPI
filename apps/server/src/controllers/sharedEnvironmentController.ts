@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Prisma, EnvironmentCategory, ReportReason } from '@prisma/client';
+import { Prisma, EnvironmentCategory, ReportReason } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';

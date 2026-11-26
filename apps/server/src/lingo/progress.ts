@@ -1,4 +1,4 @@
-import { LingoMateria, Prisma } from '@prisma/client';
+import { LingoMateria, Prisma } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { maturity } from './cardMaturity';
 import { readMissions, settleMissions, type MissioneLetta, type XpCredito } from './missions';

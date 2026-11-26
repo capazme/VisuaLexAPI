@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../src/lib/db';
 import { request, app, createTestUser, authHeader, prisma, type TestUser } from './helpers';
 
 const BASE = '/api/lingo/simulazioni/tracce';

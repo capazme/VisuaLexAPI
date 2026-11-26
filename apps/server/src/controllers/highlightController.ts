@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { boundedText, parseBody } from '../utils/bodyLimits';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../lib/db';
 import { AppError } from '../middleware/errorHandler';
 
 // An offset the column holds (`Int`, PostgreSQL's integer): a larger one was refused by the database with a 500.

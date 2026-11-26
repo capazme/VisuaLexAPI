@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { FeedbackType, FeedbackStatus } from '@prisma/client';
+import { FeedbackType, FeedbackStatus } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';

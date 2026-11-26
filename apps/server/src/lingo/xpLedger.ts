@@ -1,4 +1,4 @@
-import type { LingoFonteXp, LingoMateria, LingoMissione, Prisma } from '@prisma/client';
+import type { LingoFonteXp, LingoMateria, LingoMissione, Prisma } from '../lib/db';
 import { levelOf } from './levels';
 import { mondayOf } from './studyDay';
 

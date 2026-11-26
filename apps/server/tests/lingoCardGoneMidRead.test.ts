@@ -1,5 +1,6 @@
 import { createServer, connect, type Server, type Socket } from 'net';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/lib/db';
+import { createPgAdapter } from '../src/lib/pgAdapter';
 import express from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteUserAccount } from '../src/lingo/deleteUserAccount';
@@ -71,7 +72,7 @@ beforeEach(async () => {
   const url = new URL(target.toString());
   url.host = `127.0.0.1:${port}`;
   url.searchParams.set('sslmode', 'disable');
-  reader = new PrismaClient({ datasourceUrl: url.toString() });
+  reader = new PrismaClient({ adapter: createPgAdapter(url.toString()) });
   holds = 0;
 });
 afterEach(async () => {

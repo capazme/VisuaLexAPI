@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../lib/db';
 import { readPreferences } from './studyPreferences';
 import { queueFinished } from './todayQueue';
 

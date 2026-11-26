@@ -1,11 +1,17 @@
 // VisuaLex Platform Database Schema
+// Prisma 7 (G-612): the client is generated into src/generated/prisma, compiled with the rest of src/,
+// and reaches Postgres through @prisma/adapter-pg (src/lib/prisma.ts). The URL is in prisma.config.ts.
+// Imports without an extension, so tsc's CommonJS build, tsx and vitest all resolve them.
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  runtime             = "nodejs"
+  importFileExtension = ""
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============================================

@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import type { Prisma, User } from '@prisma/client';
+import type { Prisma, User } from '../lib/db';
 import { config } from '../config';
 import { prisma } from '../lib/prisma';
 import { randomSecret, sha256 } from '../oauth/hash';

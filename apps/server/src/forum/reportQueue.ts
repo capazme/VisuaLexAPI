@@ -1,4 +1,4 @@
-import type { LingoMateria, Prisma } from '@prisma/client';
+import type { LingoMateria, Prisma } from '../lib/db';
 import { moderatesSubject, type Roles } from './roles';
 
 export type ReportRow = {

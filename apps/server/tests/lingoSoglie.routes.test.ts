@@ -1,4 +1,4 @@
-import type { LingoCardStato, LingoGiudizio } from '@prisma/client';
+import type { LingoCardStato, LingoGiudizio } from '../src/lib/db';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
 import { stateAfterVotes } from '../src/lingo/validationRule';

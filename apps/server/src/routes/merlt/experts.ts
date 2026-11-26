@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../lib/db';
 import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { internalAuth } from '../../middleware/internalAuth';

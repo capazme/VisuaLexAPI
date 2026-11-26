@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 
 /**
  * The cards a validator may vote on (Studia screens spec decisions 13–15): proposed, not written by them, not

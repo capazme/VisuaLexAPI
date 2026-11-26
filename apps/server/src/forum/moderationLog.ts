@@ -1,4 +1,4 @@
-import type { LingoMateria, Prisma } from '@prisma/client';
+import type { LingoMateria, Prisma } from '../lib/db';
 
 export type ModerationAction =
   | 'hide' | 'unhide' | 'lock' | 'unlock' | 'dismiss' | 'release_passage' | 'withhold_passage'

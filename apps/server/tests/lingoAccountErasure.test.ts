@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { LingoCardStato } from '@prisma/client';
+import type { LingoCardStato } from '../src/lib/db';
 import { request, app, createTestUser, authHeader, prisma, type TestUser } from './helpers';
 import { createLingoCard } from '../src/lingo/cards';
 import { deleteUserAccount } from '../src/lingo/deleteUserAccount';

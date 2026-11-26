@@ -1,4 +1,4 @@
-import { LingoCardTipo, LingoMateria } from '@prisma/client';
+import { LingoCardTipo, LingoMateria } from '../../lib/db';
 import { z } from 'zod';
 
 /**

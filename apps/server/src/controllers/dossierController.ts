@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Prisma, DossierItemType } from '@prisma/client';
+import { Prisma, DossierItemType } from '../lib/db';
 import { createHash, randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';

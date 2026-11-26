@@ -1,4 +1,4 @@
-import { Prisma, type LingoCorsoTipoDomanda } from '@prisma/client';
+import { Prisma, type LingoCorsoTipoDomanda } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { countingModules, EXAM_PAUSE_DAYS, ITEM_SELECT, NOT_FOUND, serializeItem, type ItemForRead, type StoredOption } from './courses';

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../lib/db';
 import { isSwitchOn } from '../assistant/switches';
 import { courseMastery, type CompetenceMastery, type MasteryAnswer } from './courseMastery';
 import { dayToDate, dateToDay } from './studyDays';

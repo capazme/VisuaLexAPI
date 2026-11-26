@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { LingoMateria, LingoTipoProva } from '@prisma/client';
+import { LingoMateria, LingoTipoProva } from '../../lib/db';
 import { z } from 'zod';
 
 /**

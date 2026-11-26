@@ -1,4 +1,4 @@
-import { LingoCorsoObiettivo, LingoMateria } from '@prisma/client';
+import { LingoCorsoObiettivo, LingoMateria } from '../../lib/db';
 import { z } from 'zod';
 import { CITATION_MARKER } from '../../lingo/courseFormat';
 

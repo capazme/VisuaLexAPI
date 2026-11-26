@@ -1,4 +1,4 @@
-import type { LingoCardStato } from '@prisma/client';
+import type { LingoCardStato } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { attemptMerltErasureNow, everConsented, requestMerltErasure } from '../services/merlt/userData';
 import { removeUserFiles } from '../pratica/fileStore';

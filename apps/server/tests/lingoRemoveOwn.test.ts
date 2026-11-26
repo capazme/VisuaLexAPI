@@ -1,4 +1,4 @@
-import type { LingoCardStato } from '@prisma/client';
+import type { LingoCardStato } from '../src/lib/db';
 import { describe, expect, it } from 'vitest';
 import { app, authHeader, createTestUser, prisma, request, type TestUser } from './helpers';
 import { delegated } from './delegatedHelper';

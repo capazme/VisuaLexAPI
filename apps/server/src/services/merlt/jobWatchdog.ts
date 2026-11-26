@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../../lib/db';
 
 /**
  * Server-side safety net for the MERL-T worker → BFF callbacks.

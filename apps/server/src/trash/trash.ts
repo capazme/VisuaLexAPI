@@ -1,4 +1,4 @@
-import { Prisma, type TrashKind } from '@prisma/client';
+import { Prisma, type TrashKind } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { isSwitchOn } from '../assistant/switches';
 import { AppError } from '../middleware/errorHandler';

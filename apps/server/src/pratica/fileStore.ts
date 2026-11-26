@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 

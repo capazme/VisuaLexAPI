@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MCP_CLIENT_SECRET } from './oauthHelpers';
 
 // The helpers authenticate as the MCP server with a fixed test secret. A checkout with
-// `apps/server/.env` (loaded by @prisma/client on import, before the setup's assignments)
+// `apps/server/.env` (loaded by Prisma 5's client on import, before the setup's assignments)
 // once made the server expect the development secret instead: the whole OAuth suite
 // answered `invalid_client` there, and passed in a clean worktree.
 describe('the test environment', () => {

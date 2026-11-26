@@ -1,4 +1,4 @@
-import { LingoTestoChiave, Prisma } from '@prisma/client';
+import { LingoTestoChiave, Prisma } from '../lib/db';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';

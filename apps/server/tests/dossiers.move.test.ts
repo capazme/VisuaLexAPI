@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../src/lib/db';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
 
 /**

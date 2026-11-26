@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { type MerltConsentLevel } from '@prisma/client';
+import { type MerltConsentLevel } from '../../lib/db';
 import { prisma } from '../../lib/prisma';
 import {
   consentSetRequestSchema,

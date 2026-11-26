@@ -16,7 +16,7 @@
 import { randomUUID } from 'node:crypto';
 import { isRecitalContent, rebuildRecitalEntry } from '../schemas/recitalEntry';
 import { citeRecital } from '../norms/recital';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 import { RateLimiterRes, type RateLimiterAbstract } from 'rate-limiter-flexible';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';

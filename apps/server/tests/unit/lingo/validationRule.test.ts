@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { LingoCardStato, LingoGiudizio } from '@prisma/client';
+import type { LingoCardStato, LingoGiudizio } from '../../../src/lib/db';
 import { SOGLIE_PREDEFINITE, stateAfterVotes } from '../../../src/lingo/validationRule';
 
 const A: LingoGiudizio = 'APPROVATA';

@@ -1,4 +1,4 @@
-import type { LingoCardStato, LingoFonteXp, LingoMateria, LingoMissione } from '@prisma/client';
+import type { LingoCardStato, LingoFonteXp, LingoMateria, LingoMissione } from '../src/lib/db';
 import jwt from 'jsonwebtoken';
 import { vi } from 'vitest';
 import { request, app, prisma, createTestUser, type TestUser } from './helpers';

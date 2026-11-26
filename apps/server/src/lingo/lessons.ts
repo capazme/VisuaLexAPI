@@ -1,5 +1,5 @@
 import { randomInt } from 'crypto';
-import { Prisma, type LingoMateria } from '@prisma/client';
+import { Prisma, type LingoMateria } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { settleMissions, type XpEsito } from './missions';

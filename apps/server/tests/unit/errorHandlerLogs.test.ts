@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../src/lib/db';
 import { errorHandler } from '../../src/middleware/errorHandler';
 
 /**

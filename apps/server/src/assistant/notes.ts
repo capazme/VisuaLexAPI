@@ -1,4 +1,4 @@
-import type { AssistantNoteState, Highlight } from '@prisma/client';
+import type { AssistantNoteState, Highlight } from '../lib/db';
 import { z } from 'zod';
 import type { Request } from 'express';
 import { prisma } from '../lib/prisma';

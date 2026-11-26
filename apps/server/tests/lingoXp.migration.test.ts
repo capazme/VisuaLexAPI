@@ -1,4 +1,4 @@
-import type { LingoFonteXp, LingoMissione } from '@prisma/client';
+import type { LingoFonteXp, LingoMissione } from '../src/lib/db';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { prisma, createTestUser, type TestUser } from './helpers';
 

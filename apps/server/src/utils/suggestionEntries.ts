@@ -10,7 +10,7 @@
  * `rebuildNormEntry` (a known act type, fixed patterns), a decision through the dossier item
  * schema with its label recomputed (D9). A refusal names the entry, the field and why, in Italian.
  */
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 import { rebuildDecisionEntry } from '../schemas/decisionItem';
 import { isRecitalEntry, rebuildNormEntry } from '../schemas/normEntry';
 import { MAX_NOTE_LENGTH as MAX_NOTE } from '../controllers/dossierController';

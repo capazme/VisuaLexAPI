@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, inject, vi } from 'vitest';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/lib/db';
+import { createPgAdapter } from '../src/lib/pgAdapter';
 import { dropDevelopmentEnv } from './devEnvGuard';
 import { SCHEMA_FINGERPRINT, assertTestDatabase, type TestDatabase } from './testDatabase';
 
@@ -9,24 +10,8 @@ vi.mock('dotenv', () => {
   const config = () => ({ parsed: {} });
   return { default: { config }, config };
 });
-// Prisma loads that `.env` itself, at the import and at every construction (the clients of
-// `src/lib/prisma.ts` and `tests/helpers.ts` come after this file): whatever it adds goes at once.
-vi.mock('@prisma/client', async (importOriginal) => {
-  const { dropAddedSince } = await import('./devEnvGuard');
-  const before = new Set(Object.keys(process.env));
-  const actual = await importOriginal<typeof import('@prisma/client')>();
-  dropAddedSince(before);
-  class PrismaClient extends actual.PrismaClient {
-    constructor(...args: ConstructorParameters<typeof actual.PrismaClient>) {
-      const known = new Set(Object.keys(process.env));
-      super(...args);
-      dropAddedSince(known);
-    }
-  }
-  return { ...actual, PrismaClient };
-});
-
-const prisma = new PrismaClient();
+// Prisma 7 loads no `.env` of its own (its generated client has no dotenv): `dotenv` above is the only loader.
+const prisma = new PrismaClient({ adapter: createPgAdapter(process.env.DATABASE_URL ?? '') });
 // A guarded name exported by the shell, or anywhere else outside `.env.test`.
 dropDevelopmentEnv();
 
