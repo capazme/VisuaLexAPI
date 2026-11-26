@@ -1,11 +1,13 @@
 /**
- * The test database, shared by `tests/globalSetup.ts` (once per run: the reset, and what the
- * files need from the freshly migrated database) and `tests/setup.ts` (in every file: the guards,
- * and emptying the tables before each test).
+ * The test database, shared by `tests/globalSetup.ts` (once per run: a database of the run's own,
+ * migrated, and what the files need from it) and `tests/setup.ts` (in every file: the guards, and
+ * emptying the tables before each test).
  */
 
-/** What the global setup reads once, right after the reset, and hands to every test file. */
+/** What the global setup reads once, right after the migrations, and hands to every test file. */
 export type TestDatabase = {
+  /** The URL of the run's own database, which every test file uses as its DATABASE_URL. */
+  url: string;
   /** One statement that deletes every row of every table but `_prisma_migrations`. */
   emptyEveryTable: string;
   /** The text versions the migrations insert, as a JSON array of rows. */
@@ -20,22 +22,25 @@ declare module 'vitest' {
   }
 }
 
-// SAFETY GUARD: the global setup resets the database (drops everything) and every test
-// empties its tables. If vitest is run WITHOUT the `dotenv -e .env.test` wrapper (i.e.
-// `npx vitest` instead of `npm test`), Prisma loads `.env` and DATABASE_URL points at the DEV
-// database (visualex_platform) — the reset then wipes dev data. Refuse to run unless the
-// target DB name clearly looks like a test database. The name is the first segment of the
-// URL's path, the one Prisma connects to: never what follows a `/` in the query
-// (`?sslrootcert=/certs/test-ca.pem` names no database) or in a later segment
-// (`/visualex_platform/visualex_test` names `visualex_platform`).
-export function assertTestDatabase(): void {
-  const url = process.env.DATABASE_URL ?? '';
-  let dbName = '';
+/**
+ * The database a URL names: the first segment of its path, the one the driver connects to; never what
+ * follows a `/` in the query (`?sslrootcert=/certs/test-ca.pem` names no database) or in a later
+ * segment (`/visualex_platform/visualex_test` names `visualex_platform`). Empty when it is not a URL.
+ */
+export function databaseName(url: string): string {
   try {
-    dbName = decodeURIComponent(new URL(url).pathname.split('/')[1] ?? '');
+    return decodeURIComponent(new URL(url).pathname.split('/')[1] ?? '');
   } catch {
-    // Not a URL: no database name, refused below.
+    return '';
   }
+}
+
+// SAFETY GUARD: the global setup creates and drops a database next to the one DATABASE_URL names,
+// and every test empties its tables. If vitest is run WITHOUT the `dotenv -e .env.test` wrapper
+// (i.e. `npx vitest` instead of `npm test`), DATABASE_URL may point at the DEV database
+// (visualex_platform). Refuse to run unless the target DB name clearly looks like a test database.
+export function assertTestDatabase(url: string = process.env.DATABASE_URL ?? ''): void {
+  const dbName = databaseName(url);
   if (!/test/i.test(dbName)) {
     throw new Error(
       `Refusing to run tests: DATABASE_URL points at "${dbName || '(no database name)'}", ` +
@@ -46,8 +51,38 @@ export function assertTestDatabase(): void {
 }
 
 /**
+ * The run's own database: the test database's name, `_run_`, the process id and a random suffix,
+ * so two runs on one server never meet. It keeps «test» from the name it extends (the guard above),
+ * and only lower-case letters, digits and underscores, within Postgres' 63 characters.
+ */
+export function runDatabaseName(base: string, pid: number, random: string): string {
+  const name = `${base}_run_${pid}_${random}`.toLowerCase();
+  if (!/test/i.test(base) || !/^[a-z0-9_]+$/.test(name) || name.length > 63) {
+    throw new Error(`Refusing the run database name "${name}": it must extend a test database's name, in [a-z0-9_], within 63 characters.`);
+  }
+  return name;
+}
+
+/** Whether `name` is a run database made from `base` by `runDatabaseName`. */
+export function isRunDatabaseOf(name: string, base: string): boolean {
+  return /test/i.test(base) && name.startsWith(`${base.toLowerCase()}_run_`) && /^[a-z0-9_]+_run_\d+_[a-f0-9]+$/.test(name);
+}
+
+/** The same URL, naming another database. */
+export function withDatabase(url: string, name: string): string {
+  const next = new URL(url);
+  next.pathname = `/${encodeURIComponent(name)}`;
+  return next.toString();
+}
+
+/** A Postgres identifier, quoted. */
+export function quoteIdentifier(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+/**
  * One hash over the schema of `public`: every column with its type, nullability and default,
- * every constraint, index and trigger, every enum value. The reset no longer runs before each
+ * every constraint, index and trigger, every enum value. The database is not recreated before each
  * file, so a schema change a test leaves behind (a `CHECK` whose `finally` never ran because the
  * test timed out) would reach every later file; each file compares this with the run's start.
  */
