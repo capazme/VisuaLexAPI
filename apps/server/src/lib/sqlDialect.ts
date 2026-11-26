@@ -32,6 +32,14 @@ export async function advisoryXactLock(tx: Pick<Prisma.TransactionClient, '$exec
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
 }
 
+/**
+ * The current time in UTC, for a raw write to a datetime column: on Postgres `now() AT TIME ZONE 'UTC'` (a TIMESTAMP
+ * holding UTC, as Prisma writes it); on SQLite the driver adapter's own text format (spec §2).
+ */
+export function utcNow(): Prisma.Sql {
+  return local() ? Prisma.raw("strftime('%Y-%m-%dT%H:%M:%f+00:00','now')") : Prisma.raw("(now() AT TIME ZONE 'UTC')");
+}
+
 /** A Json column read by raw SQL: Postgres hands back the value, SQLite its text. */
 export function jsonValue<T>(value: unknown): T {
   return (typeof value === 'string' && local() ? JSON.parse(value) : value) as T;

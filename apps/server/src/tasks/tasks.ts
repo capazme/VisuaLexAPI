@@ -4,7 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { addDays, romeDay } from '../lingo/studyDay';
 import { dateToDay, dayToDate } from '../lingo/studyDays';
 import { dayOfMonth, landsOnDay, nextOccurrence, RECURRENCE_RULES, type RecurrenceRule } from './recurrence';
-import { advisoryXactLock, forUpdate } from '../lib/sqlDialect';
+import { advisoryXactLock, forUpdate, utcNow } from '../lib/sqlDialect';
 
 /**
  * The planner's tasks (wave 1; the answers on the task model, 1–4, 7, 11, 13). Every function takes
@@ -415,8 +415,8 @@ export async function reopenTask(userId: string, id: string, recurrence?: Recurr
 
 /**
  * Manual order within one list: the tasks named, all of the same dossier (or the inbox) and under the
- * same parent, take positions 0, 1, 2… in that order, in one transaction, at one instant. One that is not
- * the user's (or is in the trash) refuses all (404), and so do tasks of two lists (400).
+ * same parent, take positions 0, 1, 2… in that order, in one statement. One that is not the user's (or
+ * is in the trash) refuses all (404), and so do tasks of two lists (400).
  */
 export async function reorderTasks(userId: string, taskIds: string[]): Promise<void> {
   const ids = [...new Set(taskIds)];
@@ -429,13 +429,13 @@ export async function reorderTasks(userId: string, taskIds: string[]): Promise<v
     if (rows.length !== ids.length) throw new AppError(404, NOT_FOUND);
     const lists = new Set(rows.map((row) => `${row.dossier_id ?? ''}|${row.parent_id ?? ''}`));
     if (lists.size > 1) throw new AppError(400, 'Si ordinano i compiti di una lista alla volta.');
-    // One write per task through Prisma, inside the transaction: SQL both the online Postgres and the desktop
-    // app's SQLite take (G-612, spec §5), with `updatedAt` written as Prisma writes it everywhere else. The
-    // rows were checked above as the user's, in one list, out of the trash.
-    const now = new Date();
-    for (const [position, id] of ids.entries()) {
-      await tx.task.update({ where: { id }, data: { position, updatedAt: now } });
-    }
+    // One statement, in SQL both the online Postgres and the desktop app's SQLite take (G-612, spec §5): the
+    // position of each id from a CASE (each one cast, since Postgres cannot type a bare parameter there),
+    // `updated_at` from the dialect's UTC now (on Postgres the same expression as before).
+    await tx.$executeRaw`
+      UPDATE tasks SET position = CASE id ${Prisma.join(ids.map((id, position) => Prisma.sql`WHEN ${id} THEN CAST(${position} AS INTEGER)`), ' ')} END,
+        updated_at = ${utcNow()}
+      WHERE id IN (${Prisma.join(ids)}) AND user_id = ${userId}`;
   });
 }
 

@@ -28,7 +28,8 @@ afterAll(async () => {
 const SRC = path.resolve(__dirname, '../../src');
 /** The files of the sections that stay online (Learn, the Forum, the account's removal of contributions). */
 const ONLINE_ONLY = [/^lingo\//, /^routes\/lingo/, /^forum\//, /^controllers\/forum(Communities|Profile)Controller\.ts$/, /^account\/removeAllContributions\.ts$/];
-const LOCKS = /\bFOR\s+(NO\s+KEY\s+UPDATE|UPDATE|KEY\s+SHARE|SHARE)\b|pg_advisory/;
+// A lock clause written out, or built from a fragment (`FOR ${Prisma.raw(mode)}`, as Learn does).
+const LOCKS = /\bFOR\s+(NO\s+KEY\s+UPDATE|UPDATE|KEY\s+SHARE|SHARE)\b|\bFOR\s+\$\{|pg_advisory/;
 
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -69,6 +70,17 @@ describe('the dialect seam', () => {
 });
 
 describe('Work on the encrypted local file', () => {
+  it('utcNow gives each database its expression', async () => {
+    const { utcNow } = await import('../../src/lib/sqlDialect');
+    expect(utcNow().sql).toContain('strftime');
+    process.env.LEXCRAFT_MODE = 'online';
+    try {
+      expect(utcNow().sql).toBe("(now() AT TIME ZONE 'UTC')");
+    } finally {
+      process.env.LEXCRAFT_MODE = 'local';
+    }
+  });
+
   it('reorderTasks puts the named tasks at 0, 1, 2 in that order', async () => {
     const { prisma } = await import('../../src/lib/prisma');
     const { reorderTasks } = await import('../../src/tasks/tasks');
