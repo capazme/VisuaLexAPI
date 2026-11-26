@@ -1250,12 +1250,17 @@ schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
 
 ## Tests
 
-Only through `npm test`: the setup refuses a database whose name lacks "test". The database is
-reset once per run (`tests/globalSetup.ts`, vitest's `globalSetup`: `prisma migrate reset`), and
-before every test `tests/setup.ts` empties every table of `public` but `_prisma_migrations` and
-puts back the text versions the migrations insert (`lingo_testi_versioni`, read once right after
-the reset): every test starts from empty tables plus version 1 of each text to accept, as a fresh
-database has. The seeded `lingo_impostazioni` rows are not put back: a missing row reads as the
+Only through `npm test`: the setup refuses a database whose name lacks "test". Each run creates a
+database of its own beside the one `DATABASE_URL` names (`<name>_run_<pid>_<random>`), applies the
+migrations to it with `prisma migrate deploy` and drops it at the end (`tests/globalSetup.ts`,
+vitest's `globalSetup`); `tests/setup.ts` points `DATABASE_URL` at it before anything reads the
+variable. No Prisma command that drops data runs: Prisma 7 refuses its reset when an AI agent runs
+it, a safeguard never worked around (G-542). The role in `DATABASE_URL` must be allowed to create
+databases (the CI service's is; locally it may need `CREATEDB`). Before every test
+`tests/setup.ts` empties every table of `public` but `_prisma_migrations` and puts back the text
+versions the migrations insert (`lingo_testi_versioni`, read once right after the migrations):
+every test starts from empty tables plus version 1 of each text to accept, as a fresh database
+has. The seeded `lingo_impostazioni` rows are not put back: a missing row reads as the
 default, as it always has in the suite. The tables come from the catalog, so a new table is
 emptied with no change to the setup; one statement deletes them, each table after those that
 reference it (`tests/testDatabase.ts` `deletionOrder`; the two cycles among the keys, a dossier
@@ -1267,8 +1272,8 @@ in insertion order (a sequential scan of rows never updated); after DELETEs Post
 compares a list in order must ask for one. And a schema change a test leaves behind (a `CHECK`
 added for a moment, undone in a `finally`) would reach the next files: each file compares the
 schema with the one the run started from (`SCHEMA_FINGERPRINT`) and refuses to run when it
-differs. Under `npm run test:watch` the reset runs once, at start: restart it after adding a
-migration. The global setup builds a Prisma client in vitest's main process, whose environment the
+differs. Under `npm run test:watch` the run's database is made once, at start: restart it after
+adding a migration. The global setup builds a Prisma client in vitest's main process, whose environment the
 test processes inherit, and takes out what it loads at once, as below. The suite's environment is `.env.test` and the setup's own
 values, never a development `.env`: `dotenv` is mocked in the setup (so `src/config.ts` reads
 nothing); Prisma 7 loads no `.env` of its own (G-612), so nothing else needs wrapping; and every
