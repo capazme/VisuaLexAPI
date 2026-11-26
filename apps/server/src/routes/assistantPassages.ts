@@ -8,6 +8,7 @@ import { citeStoredItem } from '../norms/decisionCitation';
 import { isSwitchOn } from '../assistant/switches';
 import { EntryHasNoText, EntryUnreadable, RecitalHasNoText, SourceHasNoText, TextUnavailable, readEntryText, type EntryText } from '../assistant/entryText';
 import { CONTEXT_MAX, QUOTE_MAX, QUOTE_MIN, locateQuote } from '../assistant/locateQuote';
+import { forUpdate } from '../lib/sqlDialect';
 
 /**
  * The connected application's side of an entry's text (D7b, spec 2026-10-23 §8.4–8.7) and of the glosses on its
@@ -179,7 +180,7 @@ router.post('/dossiers/:id/items/:itemId/glosses', async (req, res) => {
   const outcomes = await prisma.$transaction(async (tx) => {
     // The dossier's lock, as the trash takes it: two calls cannot pass the limit together, and no row is
     // written while the entry goes to the trash (which then finds it gone, or waits and takes it along).
-    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM dossiers WHERE id = ${item.dossierId} AND user_id = ${req.user!.id} FOR UPDATE`;
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM dossiers WHERE id = ${item.dossierId} AND user_id = ${req.user!.id}${forUpdate()}`;
     const now = locked.length === 0 ? null : await tx.dossierItem.findFirst({ where: { id: item.id, dossierId: item.dossierId }, select: { content: true } });
     if (!now) throw new AppError(404, 'Voce non trovata');
     // The entry changed while its text was read (another version, say): the offsets would point into the old text.

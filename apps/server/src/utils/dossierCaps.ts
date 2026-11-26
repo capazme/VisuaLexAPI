@@ -1,5 +1,6 @@
 import type { Prisma } from '../lib/db';
 import { AppError } from '../middleware/errorHandler';
+import { forNoKeyUpdate } from '../lib/sqlDialect';
 
 /**
  * How much an account may hold in its dossiers (G-576, the owner's words: «Sì: 500 dossier, 2.000 voci per
@@ -56,7 +57,7 @@ const ACCOUNT_ITEMS: CapRefusal = {
 
 /** The account's row, locked for the rest of the transaction: two writes at once cannot both pass a cap. */
 async function lockAccount(tx: Prisma.TransactionClient, userId: string): Promise<void> {
-  const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM users WHERE id = ${userId} FOR NO KEY UPDATE`;
+  const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM users WHERE id = ${userId}${forNoKeyUpdate()}`;
   if (locked.length === 0) throw new AppError(404, 'Account non trovato.');
 }
 

@@ -14,6 +14,7 @@ import {
   stateChange,
 } from '../assistant/notes';
 import { serializeItemFor } from '../controllers/dossierController';
+import { forUpdate } from '../lib/sqlDialect';
 
 /**
  * The web app's side of D7b (first cut) and of D8's glosses: an entry's proposals (the assistant's highlights on
@@ -47,8 +48,7 @@ async function lockedProposal(tx: Prisma.TransactionClient, req: Request) {
   const { itemId, proposalId } = req.params;
   const rows = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM highlights
-    WHERE id = ${proposalId} AND user_id = ${req.user!.id} AND dossier_item_id = ${itemId} AND created_by_client_id IS NOT NULL
-    FOR UPDATE`;
+    WHERE id = ${proposalId} AND user_id = ${req.user!.id} AND dossier_item_id = ${itemId} AND created_by_client_id IS NOT NULL${forUpdate()}`;
   if (rows.length === 0) throw new AppError(404, 'Proposta non trovata');
   return tx.highlight.findUniqueOrThrow({ where: { id: proposalId } });
 }
@@ -134,8 +134,7 @@ async function lockedNoteEntry(tx: Prisma.TransactionClient, req: Request) {
   const { id, itemId } = req.params;
   const rows = await tx.$queryRaw<{ id: string }[]>`
     SELECT i.id FROM dossier_items i JOIN dossiers d ON d.id = i.dossier_id
-    WHERE i.id = ${itemId} AND i.dossier_id = ${id} AND d.user_id = ${req.user!.id}
-    FOR UPDATE OF i`;
+    WHERE i.id = ${itemId} AND i.dossier_id = ${id} AND d.user_id = ${req.user!.id}${forUpdate('i')}`;
   if (rows.length === 0) throw new AppError(404, 'Voce non trovata');
   const item = await tx.dossierItem.findUniqueOrThrow({ where: { id: itemId } });
   if (item.noteState === null) throw new AppError(409, 'Questa voce non è una nota dell’IA.');

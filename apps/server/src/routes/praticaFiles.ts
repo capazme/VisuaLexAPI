@@ -11,6 +11,7 @@ import { prisma } from '../lib/prisma';
 import { provenanceFromRequest } from '../controllers/dossierController';
 import { readBlob, removeBlob, requireStore, writeBlob } from '../pratica/fileStore';
 import { EXTRACTABLE, PDF_MIME, extractText, pdfText, textToDocx } from '../pratica/docText';
+import { advisoryXactLock } from '../lib/sqlDialect';
 
 /**
  * A case's act files and its instructions for Claude (LC50, server part; testing only, no real client files).
@@ -189,7 +190,7 @@ async function ownFile(req: Request, where: Prisma.PraticaFileWhereInput = {}, d
 
 /** One change to a user's case files at a time: deposits, trash, restore and deletion queue on it. */
 const lockUserFiles = (tx: Prisma.TransactionClient, userId: string) =>
-  tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pratica-files:${userId}`}))`;
+  advisoryXactLock(tx, `pratica-files:${userId}`);
 
 const logLine = (req: Request, azione: PraticaFileAzione, fileId: string | null) => {
   const { createdByClientId, createdByClientName } = provenanceFromRequest(req);
