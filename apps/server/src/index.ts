@@ -14,6 +14,10 @@ import {
   DEFAULT_INGEST_STALE_AFTER_MS,
 } from './services/merlt/jobWatchdog';
 
+// The online server's entry: its background jobs (the norm watcher, the MERL-T sweepers, the Forum's) belong online.
+// The desktop app's local mode starts from src/local/main.ts instead.
+if (process.env.LEXCRAFT_MODE === 'local') throw new Error('[local] the local mode starts from src/local/main.ts, not src/index.ts');
+
 /** Positive integer from env, or the default (also on garbage input). */
 function envMs(name: string, fallback: number): number {
   const parsed = parseInt(process.env[name] || '', 10);

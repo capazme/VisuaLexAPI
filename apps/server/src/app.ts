@@ -51,8 +51,11 @@ import { delegatedAuth } from './middleware/delegated';
 import { TRUST_PROXY } from './lib/trustProxy';
 import { webSession } from './middleware/webSession';
 import { csrfGuard } from './middleware/csrfGuard';
+import { localSections } from './local/online';
 
 const app = express();
+// The desktop app's local mode (G-612, spec §6): started by src/local/main.ts, behind its port's checks.
+const LOCAL_MODE = process.env.LEXCRAFT_MODE === 'local';
 
 // The client's address past the ingress and the host's own hops (lib/trustProxy.ts).
 app.set('trust proxy', TRUST_PROXY);
@@ -68,10 +71,17 @@ app.use(helmet({
 // (429, 401) miss the Access-Control-Allow-Origin header and the
 // browser flags them as CORS failures instead of surfacing the real
 // status code.
-app.use(cors({
-  origin: config.cors.origins,
-  credentials: true,
-}));
+// Locally there is no CORS at all: the window's page is same-origin, and no other page may read an answer.
+if (!LOCAL_MODE) {
+  app.use(cors({
+    origin: config.cors.origins,
+    credentials: true,
+  }));
+}
+
+// Locally, the online sections and the sign-in routes answer that they are not here, before the session, the
+// limiters and any route that reads the database.
+if (LOCAL_MODE) app.use(localSections());
 
 // The web's session (A.1): the cookie's session and its user, for everything below that reads `req.user`: the
 // ingress's login check, the limiters (a web user counts as a user, not as an address) and `authenticate`. A Bearer
