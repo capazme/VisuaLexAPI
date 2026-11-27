@@ -235,8 +235,10 @@ jobs:
       - run: node --test infra/ingress/paths.test.mjs
       - run: sh infra/ingress/checks/gate.sh
 
-  # The repositories the core pins (G-603): apps/web and apps/mcp at a release tag of their own, and,
-  # where the pinned one carries the contract itself, at the core's commit of lexcraft-contracts.
+  # The repositories the core pins (G-603, G-607…G-611): apps/web and apps/mcp at a release tag of
+  # their own; conventions at a reviewed commit of lexcraft-contracts; and, where the pinned one
+  # carries the contract itself, the core's commit or an older one of the same major that the core's
+  # only adds to, as the contract's compat/compare.mjs computes from the files.
   contract:
     name: Contract
     runs-on: ubuntu-latest
