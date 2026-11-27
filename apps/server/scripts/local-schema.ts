@@ -9,8 +9,10 @@
  * `tests/local/schema.test.ts` fails when either committed file differs from what this writes.
  *
  * What changes, and nothing else: the datasource becomes `sqlite`; every `@db.*` native type is dropped;
- * every scalar or enum list becomes `Json`, `@default([])` becoming `@default("[]")`; the generator writes the
- * local client to `src/generated/prisma-local` with the small query compiler.
+ * every scalar or enum list becomes `Json` with `@default("[]")`, whether it had `@default([])` or no default (on
+ * Postgres Prisma takes a scalar list as optional and reads it back as `[]`: the local client must take a create
+ * without it too); the generator writes the local client to `src/generated/prisma-local` with the small query
+ * compiler.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -53,7 +55,8 @@ export function deriveLocalSchema(source: string): string {
     const list = model ? /^(\s+)(\w+)(\s+)(\w+)\[\](\??)(.*)$/.exec(next) : null;
     if (list && !models.has(list[4])) {
       const [, indent, name, gap, , , rest] = list;
-      next = `${indent}${name}${gap}Json${rest.replace(/@default\(\[\]\)/, '@default("[]")')}`;
+      const withDefault = /@default\(\[\]\)/.test(rest) ? rest.replace(/@default\(\[\]\)/, '@default("[]")') : ` @default("[]")${rest}`;
+      next = `${indent}${name}${gap}Json${withDefault}`;
     }
     return next;
   });

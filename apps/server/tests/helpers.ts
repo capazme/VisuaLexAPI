@@ -5,8 +5,12 @@ import { createPgAdapter } from '../src/lib/pgAdapter';
 import jwt from 'jsonwebtoken';
 import expressApp from '../src/app';
 import { createWebSession, sessionCookieName } from '../src/auth/webSession';
+import { prisma as appPrisma } from '../src/lib/prisma';
 
-const prisma = new PrismaClient({ adapter: createPgAdapter(process.env.DATABASE_URL ?? '') });
+// On the local file (`LEXCRAFT_TEST_DB=local`) there is one connection, so the helpers use the server's own client.
+const prisma: PrismaClient = process.env.LEXCRAFT_TEST_DB === 'local'
+  ? appPrisma
+  : new PrismaClient({ adapter: createPgAdapter(process.env.DATABASE_URL ?? '') });
 
 // ONE persistent listening server for the whole suite. Passing the bare Express
 // app to `request(app)` makes supertest spin up (and tear down) a fresh ephemeral

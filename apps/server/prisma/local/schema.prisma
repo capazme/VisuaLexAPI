@@ -416,7 +416,7 @@ model Bookmark {
   normaData Json     @map("norma_data") // Full article data from VisualEx API
   title     String? // Optional custom title
   notes     String? // User notes
-  tags      Json // Array of tags
+  tags      Json @default("[]") // Array of tags
   folderId  String?  @map("folder_id")
   userId    String   @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
@@ -1181,7 +1181,7 @@ model Environment {
   version     String?
   category    EnvironmentCategory?
   color       String? // Hex color for UI distinction
-  tags        Json
+  tags        Json @default("[]")
 
   // Full content snapshot — dossiers / quickNorms / customAliases /
   // annotations / highlights are blobbed as JSON exactly like the
@@ -1215,7 +1215,7 @@ model SharedEnvironment {
 
   // Categorization
   category EnvironmentCategory
-  tags     Json
+  tags     Json @default("[]")
 
   // Metrics
   viewCount     Int @default(0) @map("view_count")
@@ -2071,7 +2071,7 @@ model LingoCardCompetenza {
 model OAuthClient {
   id           String   @id
   clientName   String?  @map("client_name")
-  redirectUris Json @map("redirect_uris")
+  redirectUris Json @default("[]") @map("redirect_uris")
   // The registration answer as the client received it (RFC 7591 metadata).
   metadata     Json
   createdAt    DateTime @default(now()) @map("created_at")
@@ -2094,7 +2094,7 @@ model OAuthAuthorizationRequest {
   redirectUri         String    @map("redirect_uri")
   codeChallenge       String    @map("code_challenge")
   state               String?
-  scopes              Json
+  scopes              Json @default("[]")
   resource            String
   expiresAt           DateTime  @map("expires_at")
   decidedAt           DateTime? @map("decided_at")
@@ -2121,7 +2121,7 @@ model OAuthAuthorizationCode {
   redirectUri   String    @map("redirect_uri")
   codeChallenge String    @map("code_challenge")
   resource      String
-  scopes        Json
+  scopes        Json @default("[]")
   expiresAt     DateTime  @map("expires_at")
   usedAt        DateTime? @map("used_at")
   createdAt     DateTime  @default(now()) @map("created_at")
@@ -2142,7 +2142,7 @@ model OAuthGrant {
   id         String    @id @default(uuid())
   userId     String    @map("user_id")
   clientId   String    @map("client_id")
-  scopes     Json
+  scopes     Json @default("[]")
   resource   String
   createdAt  DateTime  @default(now()) @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
@@ -2178,7 +2178,7 @@ model OAuthToken {
   kind      OAuthTokenKind
   grantId   String         @map("grant_id")
   chainId   String         @map("chain_id")
-  scopes    Json
+  scopes    Json @default("[]")
   resource  String
   expiresAt DateTime       @map("expires_at")
   rotatedAt DateTime?      @map("rotated_at")

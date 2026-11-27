@@ -4,6 +4,7 @@ import { addDays, romeDay } from '../src/lingo/studyDay';
 import { RECURRENCE_RULES } from '../src/tasks/recurrence';
 import { completeTask, listTasks, sweepTrashedTasks, TASK_TRASH_RETENTION_MS } from '../src/tasks/tasks';
 import { trashDossier, BY_THE_USER } from '../src/trash/trash';
+import { forUpdate } from '../src/lib/sqlDialect';
 
 // The planner's tasks (wave 1): routes, views, subtasks, ticks, repetition, trash.
 
@@ -488,7 +489,7 @@ describe('a dossier going to the trash while one of its tasks changes', () => {
     let trashing: Promise<{ trashId: string }> | undefined;
     // An edit in flight on another connection: the row locked and changed, not yet committed.
     await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM tasks WHERE id = ${task.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM tasks WHERE id = ${task.id}${forUpdate()}`;
       await tx.task.update({ where: { id: task.id }, data: { title: 'dopo' } });
       trashing = trashDossier(user.id, dossier.id, null, BY_THE_USER);
       await new Promise((resolve) => setTimeout(resolve, 500));
