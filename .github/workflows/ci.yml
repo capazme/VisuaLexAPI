@@ -88,6 +88,39 @@ jobs:
       - run: npm run build
       - run: npm run test
 
+  local:
+    # The desktop app's local mode (G-612; spec §8 and §10.7): tests/local/ and the Work test files of
+    # apps/server/tests/local/work-files.txt on an encrypted SQLite file, with no Postgres, on both platforms of the
+    # first version. Not a required check: the owners decide that once it has run green for a while.
+    name: Local mode (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/server
+    steps:
+      # Windows runners check files out with CRLF, and the local schema's files are compared byte for byte.
+      - run: git config --global core.autocrlf false
+        working-directory: .
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/server/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run local:generate
+      - run: npm run build
+      - run: npm run test:local
+
   merlt:
     name: MERL-T tests
     runs-on: ubuntu-latest
