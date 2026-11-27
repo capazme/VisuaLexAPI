@@ -120,6 +120,10 @@ jobs:
       - run: npm run local:generate
       - run: npm run build
       - run: npm run test:local
+      # The local server as the app's shell will start it: one bundle, the local SQL and the driver's native addon,
+      # then the trial's flow against it (the port's checks, Work, the trash, a restart, one process per folder).
+      - run: npm run build:local
+      - run: npm run local:flow
 
   merlt:
     name: MERL-T tests

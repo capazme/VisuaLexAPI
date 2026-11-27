@@ -4,7 +4,8 @@
  *
  * The contract with the shell:
  * - environment: LEXCRAFT_DATA_DIR (the data folder), LEXCRAFT_WEB_DIR (the built web), optionally LEXCRAFT_PORT
- *   (the preferred port, 47310 by default) and LEXCRAFT_SQL_DIR (the local SQL, prisma/local by default);
+ *   (the preferred port, 47310 by default) and LEXCRAFT_SQL_DIR (the local SQL: `sql/` beside the bundle that
+ *   `npm run build:local` makes, else prisma/local);
  * - stdin, first line: `key=<64 hex> launch=<secret>`. The database key comes from the system's keychain; the launch
  *   secret is made by the shell for this launch. Neither is ever written to a file, a log or the environment;
  * - stdout, once it listens on 127.0.0.1: `LEXCRAFT_READY port=<n> ready_ms=<t>`;
@@ -89,7 +90,8 @@ async function main(): Promise<void> {
   process.env.LEXCRAFT_MODE = 'local';
   const dataDir = path.resolve(process.env.LEXCRAFT_DATA_DIR || fail('LEXCRAFT_DATA_DIR is not set'));
   const webDir = path.resolve(process.env.LEXCRAFT_WEB_DIR || fail('LEXCRAFT_WEB_DIR is not set'));
-  const sqlDir = path.resolve(process.env.LEXCRAFT_SQL_DIR || path.join(__dirname, '../../prisma/local'));
+  const bundled = path.join(__dirname, 'sql');
+  const sqlDir = path.resolve(process.env.LEXCRAFT_SQL_DIR || (fs.existsSync(path.join(bundled, 'init.sql')) ? bundled : path.join(__dirname, '../../prisma/local')));
   const preferredPort = Number(process.env.LEXCRAFT_PORT || 47310);
   if (!Number.isInteger(preferredPort) || preferredPort < 1024 || preferredPort > 65535 - PORT_TRIES) fail('LEXCRAFT_PORT is not a usable port');
 

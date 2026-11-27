@@ -15,6 +15,7 @@
  * compiler.
  */
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { localSql, parseChecks } from './localSql';
@@ -63,10 +64,18 @@ export function deriveLocalSchema(source: string): string {
   return HEADER + lines.join('\n');
 }
 
+/**
+ * The Prisma CLI with the server's own Node, by its file: no `npx`, which on Windows is a `.cmd` that only a shell runs.
+ * Returns what it prints.
+ */
+export function prismaCli(args: string[]): string {
+  const cli = path.join(path.dirname(createRequire(path.join(SERVER, 'package.json')).resolve('prisma/package.json')), 'build/index.js');
+  return execFileSync(process.execPath, [cli, ...args], { cwd: SERVER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
 /** `prisma migrate diff` of the local schema from nothing: SQLite DDL, before post-processing. */
 export function diffFromEmpty(): string {
-  return execFileSync('npx', ['prisma', 'migrate', 'diff', '--config', 'prisma.local.config.ts', '--from-empty',
-    '--to-schema', 'prisma/local/schema.prisma', '--script'], { cwd: SERVER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return prismaCli(['migrate', 'diff', '--config', 'prisma.local.config.ts', '--from-empty', '--to-schema', 'prisma/local/schema.prisma', '--script']);
 }
 
 if (require.main === module) {
