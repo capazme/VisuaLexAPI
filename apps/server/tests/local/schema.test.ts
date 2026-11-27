@@ -38,6 +38,10 @@ describe('the local schema', () => {
     expect(local).toMatch(/datasource db \{\s*provider = "sqlite"/);
   });
 
+  it('init.sql leaves no JSON default unquoted', () => {
+    expect(readFileSync(LOCAL_INIT, 'utf8')).not.toMatch(/ DEFAULT [[{]/);
+  });
+
   it("init.sql is the local schema's migrate diff, post-processed (npm run local:schema)", () => {
     const expected = localSql(diffFromEmpty(), parseChecks(readFileSync(LOCAL_CHECKS, 'utf8')));
     expect(readFileSync(LOCAL_INIT, 'utf8')).toBe(expected);

@@ -70,7 +70,8 @@ function listen(server: http.Server, first: number): Promise<number> {
     const attempt = (port: number, left: number) => {
       const onError = (error: NodeJS.ErrnoException) => {
         server.off('listening', onListening);
-        if (error.code === 'EADDRINUSE' && left > 1) attempt(port + 1, left - 1);
+        // Taken, or reserved (on Windows a port Hyper-V or WinNAT keeps answers EACCES): the next one.
+        if ((error.code === 'EADDRINUSE' || error.code === 'EACCES') && left > 1) attempt(port + 1, left - 1);
         else reject(error);
       };
       const onListening = () => {

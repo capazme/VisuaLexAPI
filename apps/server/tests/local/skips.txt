@@ -41,8 +41,5 @@ tests/history.decisions.test.ts > decisions in the search history > exports the 
 tests/praticaFiles.test.ts > Pratica files > removes every file of an account that is deleted, and no one else's
 tests/tasks.privacy.test.ts > tasks and the account > deleting the account deletes its tasks and frees the ones assigned to it
 
-[The sources are never reached in M1 (spec §6; M3)]
-tests/assistant/entryText.aknFallback.test.ts > an AKN fallback text is never the text to anchor to > reads the HTML text, and an answer from before the field, as before
-
 [It compares with the live Postgres schema: it runs in the server job]
 tests/local/checks.test.ts > the local tables keep the CHECK constraints of Postgres > every CHECK live on these tables after the Postgres migrations has a twin in checks.sql

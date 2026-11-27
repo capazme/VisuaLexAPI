@@ -191,7 +191,8 @@ try {
   check('the flow ran to its end', false, error instanceof Error ? error.message : String(error));
 } finally {
   for (const child of running) child.kill();
-  rmSync(work, { recursive: true, force: true });
+  // Retried: on Windows a file a process has just let go can still be busy for a moment.
+  rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
 console.log(`${passed} / ${passed + failed} checks passed`);
 process.exit(failed === 0 ? 0 : 1);

@@ -45,7 +45,8 @@ export { SCHEMA_ROWS };
 /** Once per run: the folder, the key and the migrated template. */
 export async function createLocalRun(): Promise<{ run: LocalRun; remove: () => void }> {
   const dir = mkdtempSync(path.join(tmpdir(), 'lexcraft-test-run-'));
-  const remove = () => rmSync(dir, { recursive: true, force: true });
+  // Retried: on Windows a file a process has just let go can still be busy for a moment.
+  const remove = () => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   try {
     const template = path.join(dir, 'template.db');
     assertLocalTestFile(template);

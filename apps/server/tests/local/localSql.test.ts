@@ -18,6 +18,22 @@ describe('localSql', () => {
     expect(out).toMatch(/CREATE TABLE "highlights" \([^;]*CONSTRAINT "highlights_review_comment_check"[^;]*\n\);/);
   });
 
+  it("quotes a JSON default, which SQLite would otherwise store as ''", async () => {
+    const ddl = 'CREATE TABLE "bookmarks" (\n    "id" TEXT NOT NULL PRIMARY KEY,\n    "tags" JSONB NOT NULL DEFAULT [],\n    "meta" JSONB NOT NULL DEFAULT {}\n);';
+    const sql = localSql(ddl, []);
+    expect(sql).toContain(`"tags" JSONB NOT NULL DEFAULT '[]',`);
+    expect(sql).toContain(`"meta" JSONB NOT NULL DEFAULT '{}'\n`);
+    const { default: Database } = await import('better-sqlite3');
+    const db = new Database(':memory:');
+    try {
+      db.exec(sql);
+      db.prepare('INSERT INTO "bookmarks" ("id") VALUES (?)').run('b1');
+      expect(db.prepare('SELECT "tags", "meta" FROM "bookmarks"').get()).toEqual({ tags: '[]', meta: '{}' });
+    } finally {
+      db.close();
+    }
+  });
+
   it('refuses init SQL that lacks a table checks.sql names', () => {
     expect(() => localSql(table('tasks'), checks)).toThrow(/checks.sql names table "highlights"/);
   });

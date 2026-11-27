@@ -22,7 +22,6 @@ tests/attiVersionCap.test.ts
 tests/praticaFiles.test.ts
 tests/assistantProposals.test.ts
 tests/assistant/entryText.test.ts
-tests/assistant/entryText.aknFallback.test.ts
 tests/assistant/locateQuote.test.ts
 tests/assistant/ruleTwentyThree.test.ts
 tests/accountData.test.ts
@@ -40,4 +39,5 @@ tests/smoke.test.ts
 # not run: tests/assistant/passages.versionRace.test.ts — through a connected application (OAuth and MCP are online in M1)
 # not run: tests/norms/dossierNorms.test.ts — norms added by reference need the sources, which M1 never reaches (spec §6; M3)
 # not run: tests/norms/dossierDecisions.test.ts — decisions added by reference need the sources, which M1 never reaches (spec §6; M3)
+# not run: tests/assistant/entryText.aknFallback.test.ts — it is about the text the Python API answers, which M1 never asks (spec §6): locally every text is unavailable, so its tests would pass whatever the answer
 # not run: tests/accountExport.otherUser.test.ts — it seeds the other user through the Forum (online)
