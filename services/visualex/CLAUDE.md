@@ -363,6 +363,15 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     first bytes (`_HEAD`), not by decoding a 2.6 MB page. An entry is written to
     `<digest>.<random>.tmp` and renamed over `<digest>.json` (`os.replace`), so a reader or
     a sweep never meets one half written; a temporary a crash left goes after an hour.
+    An entry may carry a lifetime of its own (`set(key, value, ttl=)`, written in its head
+    after the timestamp and read by `get`, `stamp` and the sweep; an entry without one keeps
+    the namespace's): a Normattiva page at a date at least 30 days before today in Rome
+    (`!vig=<day>`) or of the original (`@originale`) is kept 30 days, as the decisions are
+    (owner, G-648, G-653: Normattiva consolidates an amendment days or weeks late, so a more
+    recent date keeps the day;
+    `normattiva_scraper.dated_page_ttl`, `store_page`), but only once the extractor found the
+    article's text in it (a part's page once `_part_text` checked it); the text in force and a
+    text at today keep `PERSISTENT_CACHE_TTL`, since the next version may come into force tomorrow.
     `stamp(key)` reads an entry's write time from its head (None when `get` would answer
     nothing; it counts as a use for the prune): it names the stored value. `tools/page_memo.py`
     keeps, in memory and bounded, what a stored page says under that stamp, so a Normattiva
