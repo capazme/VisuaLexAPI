@@ -178,7 +178,7 @@ def instrument() -> None:
 
     _wrap_sync(bs4.BeautifulSoup, "__init__", "parse:bs4")
     _wrap_async(normattiva_scraper.NormattivaScraper, "estrai_da_html", "extract:normattiva")
-    _wrap_async(eurlex_scraper.EurlexScraper, "extract_article_text", "extract:eurlex")
+    _wrap_sync(eurlex_scraper.EurlexScraper, "article_text_of", "extract:eurlex")
     # An EU act's page, the scraper's and the tree's alike: CELLAR first (its network time is
     # under net:publications.europa.eu), the browser on EUR-Lex second.
     _wrap_async(eurlex_fetch, "fetch_from_cellar", "cellar:eurlex")

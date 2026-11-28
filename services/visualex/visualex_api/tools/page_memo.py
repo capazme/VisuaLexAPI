@@ -10,8 +10,10 @@ so it is kept, in memory, under the page's identity: the persistent entry's writ
 afresh; an expired or missing page has no stamp, and the read goes the way it always went.
 
 - **The same answer.** On a miss, the function runs on the page `get` returns, exactly as before;
-  on a hit, the caller gets a copy of what it returned for that page. Nothing a collector
-  returns as text passes here (rule 23 is untouched): the validity, the notes, the parts.
+  on a hit, the caller gets a copy of what it returned for that page: a Normattiva page's
+  validity, notes and parts, and an EU article's text (`EurlexScraper._article_text`), which is
+  kept exactly as the extractor returned it on the page with that stamp (rule 23: nothing is
+  computed here that the extractor did not compute).
 - **Bounded.** The least recently used answers go past `MAX_ENTRIES`; a restart empties the memo
   and the pages on disk fill it again without a request.
 - **A backend without stamps** (Redis) reads the page every time, as before.
