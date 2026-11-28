@@ -9,6 +9,7 @@ from visualex_api.services.decisions.giustizia_amministrativa import (
     GiustiziaAmministrativaReader,
     SourceChanged,
     document_format,
+    read_document,
     read_results,
     read_search_form,
     search_fields,
@@ -19,6 +20,7 @@ FIX = Path(__file__).parent / "fixtures" / "decisions"
 PAGE = (FIX / "ga_search_page.html").read_text(encoding="utf-8")
 RESULTS = (FIX / "ga_results.html").read_text(encoding="utf-8")
 DOCUMENT = (FIX / "ga_document.xml").read_text(encoding="utf-8")
+RENDERED = (FIX / "ga_document_rendered.html").read_text(encoding="utf-8")
 PREFIX = "_decisioni_pareri_web_DecisioniPareriWebPortlet_INSTANCE_Test123_"
 
 
@@ -139,9 +141,45 @@ def test_a_document_that_is_not_one_is_a_changed_source():
         text_from_document("<html><body>altro</body></html>")
 
 
+def test_the_court_xml_is_still_read_whole_with_its_day():
+    assert read_document(DOCUMENT.encode("utf-8")) == (text_from_document(DOCUMENT), "2099-02-01")
+
+
+def test_the_rendered_page_gives_its_day_and_no_text():
+    # its stylesheet changes, moves and drops characters of the XML (root rule 23): never read as text
+    assert read_document(RENDERED.encode("utf-8")) == ({}, "2099-02-01")
+
+
+def test_a_rendered_page_without_the_head_note_gives_the_day_of_deposit():
+    older = RENDERED.replace("Pubblicato il 01/02/2099", "").replace(
+        '<p class="fatto">IL SEGRETARIO</p>',
+        '<p class="fatto">DEPOSITATA IN SEGRETERIA</p>\n<p class="fatto">\nIl 03/04/2098\n</p>')
+    assert read_document(older.encode("utf-8")) == ({}, "2098-04-03")
+    undated = RENDERED.replace("Pubblicato il 01/02/2099", "")
+    assert read_document(undated.encode("utf-8")) == ({}, None)
+
+
+def test_a_day_that_does_not_exist_is_no_day():
+    assert read_document(RENDERED.replace("01/02/2099", "31/13/2099").encode("utf-8")) == ({}, None)
+    assert ga.published_on(DOCUMENT.replace("01/02/2099", "30/02/2099")) is None
+
+
+@pytest.mark.parametrize("body", [
+    b"<html><body>altro</body></html>",
+    RENDERED.replace('class="corpo"', 'class="errore"').encode("utf-8"),
+    # the same style without the measure's number: an error or an empty document, not a decision
+    b'<html><body class="corpo"><p>Documento non trovato</p></body></html>',
+    b"", b"\x00\x01\x02",
+])
+def test_a_page_that_is_neither_the_xml_nor_the_rendered_page_is_a_changed_source(body):
+    with pytest.raises(SourceChanged):
+        read_document(body)
+
+
 class FakeClient:
-    def __init__(self):
+    def __init__(self, document=DOCUMENT):
         self.calls = []
+        self.document = document
 
     async def request(self, method, url, **kwargs):
         self.calls.append((method, url, kwargs.get("data")))
@@ -150,7 +188,7 @@ class FakeClient:
         elif method == "POST":
             text = RESULTS
         else:
-            text = DOCUMENT
+            text = self.document
         return type("R", (), {"text": text})()
 
 
@@ -164,6 +202,15 @@ async def test_a_lookup_is_the_page_the_search_and_the_document(monkeypatch):
     assert testo["dispositivo"].startswith("P.Q.M.") and published == "2099-02-01"
     assert [c[0] for c in client.calls] == ["GET", "POST", "GET"]
     assert client.calls[1][1].endswith("p_auth=tok3n")
+
+
+async def test_a_lookup_that_meets_the_rendered_page_gives_the_day_and_no_text(monkeypatch):
+    # the client reads the body as latin-1 (one byte, one character): the reader gets the bytes back
+    client = FakeClient(RENDERED.encode("utf-8").decode("latin-1"))
+    monkeypatch.setattr(ga, "decisions_http_client", client)
+    reader = GiustiziaAmministrativaReader()
+    sentenza = next(r for r in await reader.search("Consiglio di Stato", 42, 2099) if r.kind == "SENTENZA")
+    assert await reader.text(sentenza) == ({}, "2099-02-01")
 
 
 async def test_a_pdf_or_a_foreign_link_is_not_fetched(monkeypatch):

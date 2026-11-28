@@ -41,8 +41,9 @@ class MemoryCache:
 class FakeAdmin:
     """The portal: what each seat lists, and a text for every document."""
 
-    def __init__(self, by_seat=None, error=None):
+    def __init__(self, by_seat=None, error=None, testo=None):
         self.by_seat, self.error = by_seat or {}, error
+        self.testo = {"motivazione": "Il testo."} if testo is None else testo
         self.searches, self.texts = [], 0
 
     async def search(self, sede, numero, anno):
@@ -53,7 +54,7 @@ class FakeAdmin:
 
     async def text(self, result):
         self.texts += 1
-        return {"motivazione": "Il testo."}, "2020-03-04"
+        return self.testo, "2020-03-04"
 
 
 def resolver(admin, cache=None):
@@ -125,6 +126,18 @@ async def test_the_search_and_the_text_are_kept():
         await resolver(admin, cache).resolve(ref(corte="consiglio_di_stato"))
     assert len(admin.searches) == 1 and admin.texts == 1
     assert ("decisions_found", "ga:v1:consiglio_di_stato:sent:42:2020") in cache.data
+
+
+async def test_a_document_without_text_is_found_with_the_notice_and_kept_a_day_only():
+    # a PDF, or the page the portal renders from the XML: the decision, its day and link, no text
+    cache = MemoryCache()
+    admin = FakeAdmin({"Consiglio di Stato": [r("SENT")]}, testo={})
+    outcome = await resolver(admin, cache).resolve(ref(corte="consiglio_di_stato"))
+    assert outcome.esito == "trovata" and outcome.decisione.testo == {}
+    assert outcome.decisione.data_deposito == "2020-03-04" and outcome.decisione.fonte["url"] == URL
+    assert {"tipo": "testo_non_disponibile"} in outcome.avvisi
+    assert ("decisions_pending", "ga:v1:consiglio_di_stato:sent:42:2020") in cache.data
+    assert ("decisions_found", "ga:v1:consiglio_di_stato:sent:42:2020") not in cache.data
 
 
 @pytest.mark.parametrize("error", [NetworkError("down"), ga.SourceChanged("modulo"), asyncio.TimeoutError()])
