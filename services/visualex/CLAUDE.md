@@ -349,7 +349,15 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     still counts from the write. `sweep_expired` reads an entry's write time from its
     first bytes (`_HEAD`), not by decoding a 2.6 MB page. An entry is written to
     `<digest>.<random>.tmp` and renamed over `<digest>.json` (`os.replace`), so a reader or
-    a sweep never meets one half written; a temporary a crash left goes after an hour
+    a sweep never meets one half written; a temporary a crash left goes after an hour.
+    `stamp(key)` reads an entry's write time from its head (None when `get` would answer
+    nothing; it counts as a use for the prune): it names the stored value. `tools/page_memo.py`
+    keeps, in memory and bounded, what a stored page says under that stamp, so a Normattiva
+    page's validity (`read_validity`, keyed also by the article, the day asked and today, which
+    its state is judged against) and its update notes and parts (`_page_extras_for`, keyed by
+    the article; a part's page goes the old way) are computed once per page, not at every read
+    (T133: a warm read of an article of a code 44 → 1.6 ms). A page written again has a new
+    stamp; a backend without stamps (Redis) reads the page every time
 
 **Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
 in-process, cold then warm, and prints where each one's time goes (network per host, our
