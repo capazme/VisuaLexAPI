@@ -114,7 +114,7 @@ async def scraper(cache, monkeypatch):
     await NormattivaScraper.get_document.cache.clear()
     instance = NormattivaScraper()
 
-    async def request_document(url, *, source="base_scraper"):
+    async def request_document(url, *, source="base_scraper", **kwargs):
         return _page()
 
     instance.request_document = request_document
@@ -138,7 +138,7 @@ async def test_a_page_at_a_past_day_is_stored_for_30_days_and_today_s_for_a_day(
 
 
 async def test_a_dated_page_without_the_article_s_text_is_kept_a_day_as_before(today, scraper, cache):
-    async def empty_page(url, *, source="base_scraper"):
+    async def empty_page(url, *, source="base_scraper", **kwargs):
         return '<html><body>Servizio momentaneamente non disponibile</body></html>'
 
     async def no_akn(*args, **kwargs):

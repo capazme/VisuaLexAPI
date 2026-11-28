@@ -30,6 +30,7 @@ from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..tools.exceptions import ValidationError
 from ..tools.text_op import parse_date
 from ..tools.page_memo import PAGE_MEMO
+from .normattiva_fragments import fragment_meta_key
 from .akn_parser import comparable_article_key
 
 log = structlog.get_logger()
@@ -312,13 +313,26 @@ async def read_validity(
         # Computed once per stored page (`page_memo`): the state depends on today, so the day
         # is part of the answer's name, and passed to the extractor that judges it.
         today = _today_in_rome()
-        return await PAGE_MEMO.derive(
+        validity = await PAGE_MEMO.derive(
             cache, urn, "validity", (article, requested_date, today.isoformat()),
             lambda raw: extract_validity(raw, article=article, requested_date=requested_date, today=today),
         )
+        if (validity is not None and validity.get("act_updated") is None
+                and not re.search(r"!vig=\d|@originale", urn)):
+            # A fragment (only ever for the text in force) has no head: the day the act was last
+            # updated comes from its index (G-652).
+            meta = await cache.get(fragment_meta_key(urn))
+            if isinstance(meta, dict) and meta.get("act_updated"):
+                validity = dict(validity, act_updated=meta["act_updated"])
+        return validity
     except Exception as exc:  # noqa: BLE001 - best effort by contract
         log.warning("Validity could not be read", error=str(exc), urn=str(urn)[:100])
         return None
+
+
+def read_act_updated(raw_html: Optional[str]) -> Optional[str]:
+    """The day the act was last updated, from a whole page's head, or None."""
+    return _read_act_updated(raw_html) if isinstance(raw_html, str) and raw_html else None
 
 
 def is_historical_request(version: Any, version_date: Any) -> bool:

@@ -17,11 +17,12 @@ from ..tools.config import HTTP_TIMEOUT
 from ..tools.exceptions import DocumentNotFoundError, IndexUnavailableError, ParsingError, ResourceNotFoundError
 from ..tools.text_op import parse_date
 from ..tools.selectors import NormattivaSelectors
-from ..tools.single_flight import call_key, single_flight
+from ..tools.single_flight import SingleFlight, call_key, single_flight
 from .akn_fetch import fetch_act_article
 from .http_client import http_client, new_session
 from .normattiva_parts import extract_parts, part_cache_key, part_range, ranges_in_words
-from .normattiva_validity import today_in_rome
+from .normattiva_fragments import ActSessions, act_of, fragment_link, fragment_meta_key
+from .normattiva_validity import extract_validity, read_act_updated, today_in_rome
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -77,6 +78,13 @@ async def store_page(cache, key: str, page: str, urn) -> None:
         await cache.set(key, page, ttl=ttl)
 
 
+def _reads_text_in_force(nv) -> bool:
+    """A request for an article's text in force: no day, not the original."""
+    day, version = nv.data_versione, nv.versione
+    return (bool(nv.numero_articolo) and not (isinstance(day, str) and day.strip())
+            and not (isinstance(version, str) and version.strip().lower() == "originale"))
+
+
 def _asks_for_original(normavisitata) -> bool:
     """A request for the original text: «originale» and no day (a day wins, G-353)."""
     version = normavisitata.versione
@@ -116,6 +124,9 @@ class NormattivaScraper(BaseScraper):
         self.selectors = NormattivaSelectors()
         log.info("Normattiva scraper initialized")
         self.cache = get_cache_manager().get_persistent("normattiva")
+        # The acts open on Normattiva, for the fragments of their following articles (G-652).
+        self.sessions = ActSessions()
+        self._act_pages = SingleFlight()
 
     # Readers asking for the same text at once share one read (one request, one parse): the
     # memory cache answers the hits, the single flight joins the misses that arrive together.
@@ -133,6 +144,13 @@ class NormattivaScraper(BaseScraper):
         html_content: str = await self.cache.get(cache_key)
         if html_content:
             log.info("Cache hit", source="normattiva_persistent")
+        elif _reads_text_in_force(normavisitata):
+            # The first article of an act from its whole page, the following ones from the
+            # fragment (G-652, `normattiva_fragments`).
+            html_content = await self._from_fragment(normavisitata, urn)
+            if html_content is None:
+                html_content = await self.read_act_page(urn)
+                await self.cache.set(cache_key, html_content)
         else:
             html_content = await self.request_document(urn, source="normattiva")
             # A dated article's page is kept 30 days only once the extractor found its text in
@@ -184,6 +202,80 @@ class NormattivaScraper(BaseScraper):
         else:
             log.info("Returning full document text")
             return html_content, urn
+
+    async def read_act_page(self, urn: str, max_retries: Optional[int] = None) -> str:
+        """An article's whole page, read in its act's own session, which is kept when the page
+        carries the act's index: the act is open, and its following articles can be read from
+        the fragment (G-652). Errors as `request_document` raises them."""
+        # Readers of the same page at once share one read (as the shared client joins its GETs,
+        # which a request in a session of its own is not).
+        return await self._act_pages.run((urn, max_retries), lambda: self._read_act_page(urn, max_retries))
+
+    async def _read_act_page(self, urn: str, max_retries: Optional[int]) -> str:
+        act = act_of(urn)
+        open_act = self.sessions.get(act) if act else None
+        if open_act is not None:
+            # The act is open: its session is shared with the fragments other readers may be
+            # reading in it now, so it is used, never replaced.
+            return await self.request_document(urn, source="normattiva", session=open_act.session,
+                                               max_retries=max_retries)
+        session = self.sessions.new()
+        kept = False
+        try:
+            page = await self.request_document(urn, source="normattiva", session=session, max_retries=max_retries)
+            if act and isinstance(page, str) and "showArticle(" in page:
+                kept = self.sessions.keep(act, session, urn)
+            return page
+        finally:
+            if not kept:
+                await session.close()
+
+    async def _from_fragment(self, nv: NormaVisitata, urn: str) -> Optional[str]:
+        """The article's fragment, stored under `urn` with its extras (`fragment_meta_key`), when
+        its act is open and the fragment is unmistakably the article; else None, and the whole
+        page is read as before. A refused or unreadable answer costs that one attempt."""
+        act = act_of(urn)
+        entry = self.sessions.get(act) if act and not self.sessions.paused() else None
+        if entry is None:
+            return None
+        index_page = await self.cache.get(entry.index_key)
+        path = fragment_link(index_page, nv.numero_articolo) if index_page else None
+        if path is None:
+            return None
+        try:
+            piece = (await http_client.request("GET", self.base_url.rstrip("/") + path, source="normattiva",
+                                               session=entry.session, max_retries=0)).text
+        except Exception as exc:  # noqa: BLE001 - the whole page, as before
+            log.info("Fragment not read, the whole page instead", error_type=type(exc).__name__)
+            self.sessions.drop(act, entry.session)
+            self.sessions.failed()
+            return None
+        checked = await asyncio.to_thread(self._is_the_article, piece, nv.numero_articolo)
+        if not checked:
+            log.info("Fragment is not the article asked for, the whole page instead")
+            self.sessions.failed()
+            return None
+        self.sessions.succeeded()
+        meta = {
+            "index": entry.index_key,
+            "act_updated": read_act_updated(index_page),
+            "parts": await asyncio.to_thread(extract_parts, index_page, article=nv.numero_articolo),
+        }
+        await self.cache.set(urn, piece)
+        await self.cache.set(fragment_meta_key(urn), meta)
+        log.info("Article read from the fragment", bytes=len(piece))
+        return piece
+
+    def _is_the_article(self, piece: str, article: str) -> bool:
+        """The fragment holds the article asked for: its validity reads (which checks the
+        article's label) and the extractor finds a text."""
+        if not piece or extract_validity(piece, article=article) is None:
+            return False
+        try:
+            text = self.estrai_testo(piece)
+        except Exception:  # noqa: BLE001
+            return False
+        return isinstance(text, str) and bool(text.strip())
 
     async def _get_part(self, nv: NormaVisitata) -> Tuple[str, str]:
         """`(text, key)` of one part of an article Normattiva splits into parts (G-387 (a)).

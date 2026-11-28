@@ -44,6 +44,25 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `/fetch_brocardi_info` answers 410, and its hosts are out of
     `ALLOWED_HOSTS`, so `ThrottledHttpClient` refuses them. The scraper, its
     tables in `map.py`, its tests and fixtures stay until they are deleted.
+  - `normattiva_fragments.py` — an article read from Normattiva's fragment once its act is open
+    (owner, G-652; T133). For the text in force, the first article of an act is read from its
+    whole page, as before, in the act's own session (`NormattivaScraper.read_act_page`; Normattiva
+    keeps the act in the session, so each act has its own cookies; `ActSessions`, 32 acts, 15
+    minutes idle and 15 at most from the opening, so the index the addresses come from is never
+    older; a live session is never replaced; closed at shutdown; readers of one whole page at
+    once share one read); the following ones from the fragment
+    (`/atto/caricaArticolo?…`, 4-33 KB instead of up to 2.6 MB) at the address the index gives the
+    current version (`fragment_link`: one candidate only, never an article split into parts),
+    checked to be the article (its validity reads the label, the extractor finds a text). The
+    extractor's text on the fragment equals the whole page's on all 29 Normattiva articles of the
+    harness, and so do the update notes. The fragment is stored under the article's URN and its
+    extras beside it (`<URN>#frammento`: the index it came from, `act_updated` read from that
+    index, which `read_validity` puts back, and the parts read from it, which `_page_extras_for`
+    uses). The current version's address is the latest version's, a later one included (art. 3
+    d.P.R. 131/1986, repealed from 2027: the same window as the whole page), so the «not in force
+    yet» logic reads the same. Any doubt reads the whole page; after 5 fragments refused or not
+    the article in a row none is asked for 10 minutes; a dated request never takes this path. A
+    following article of a code: 4.2 → 0.6 s
   - `akn_parser.py` / `akn_fetch.py` — Normattiva's Akoma Ntoso export.
     **Structure and fallback only, never the display text**: the export
     transliterates every accent ("attivita'", "e'"), and `article_text` is the
