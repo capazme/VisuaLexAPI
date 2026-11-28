@@ -62,6 +62,7 @@ const PARSED: Record<string, {
   'art. 4 e considerando 26 gdpr': { parsed: { act_type: 'regolamento UE', act_number: '679', date: '2016', recital: '26' }, recognized: true, refusal: 'recital_with_article' },
   // What /parse_query reads since G-577: a regional law refused, a name of two acts listed.
   'art. 3 l.r. Toscana 65/2014': { parsed: null, recognized: false, refusal: 'regional_law' },
+  'art. 3 l.p. 9/2018': { parsed: null, recognized: false, refusal: 'provincial_law' },
   'art. 29 tua': {
     parsed: null, recognized: false, ambiguous: [
       { name: "codice dell'ambiente", display: 'd.lgs. 3 aprile 2006, n. 152',
@@ -389,10 +390,11 @@ describe('POST /api/dossiers/:id/norms', () => {
     expect(await prisma.dossierItem.count()).toBe(0);
   });
 
-  it('adds no regional law and no name of two acts, and says why (G-577)', async () => {
-    const response = await addNorms(alice, dossierId, ['art. 3 l.r. Toscana 65/2014', 'art. 29 tua']);
+  it('adds no regional or provincial law and no name of two acts, and says why (G-577)', async () => {
+    const response = await addNorms(alice, dossierId, ['art. 3 l.r. Toscana 65/2014', 'art. 3 l.p. 9/2018', 'art. 29 tua']);
     expect(response.body.results.map((r: { outcome: string; detail: string }) => [r.outcome, r.detail])).toEqual([
       ['not_recognised', 'Le leggi regionali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla banca dati della Regione.'],
+      ['not_recognised', 'Le leggi provinciali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla banca dati della Provincia autonoma.'],
       ['ambiguous', "Il nome indica più atti: codice dell'ambiente (d.lgs. 3 aprile 2006, n. 152) o testo unico accise "
         + '(d.lgs. 26 ottobre 1995, n. 504). Indica l’atto per numero e data.'],
     ]);

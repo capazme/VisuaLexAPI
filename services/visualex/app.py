@@ -26,6 +26,7 @@ from visualex_api.tools.config import (
     FETCH_QUEUE_DELAY,
 )
 from visualex_api.tools.norma import Norma, NormaVisitata
+from visualex_api.services.http_client import http_client
 from visualex_api.services.normattiva_scraper import NormattivaScraper, text_source_of
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services import eurlex_fetch
@@ -66,13 +67,14 @@ from visualex_api.services.decisions.resolver import (
 )
 from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, read_request_date, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
-from visualex_api.tools.treextractor import get_tree
+from visualex_api.tools.page_memo import PAGE_MEMO
+from visualex_api.tools.treextractor import get_tree, seed_tree_from_page, tree_is_cached
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
 from visualex_api.tools.sources import cite_act, cite_article, cite_recital, recital_numbers
 from visualex_api.tools.act_identity import identifies_act
 from visualex_api.tools.norm_query import act_names, ambiguous_choices, read_norm_query
-from visualex_api.tools.regional_law import REGIONAL_LAW_REFUSAL, is_regional_act_type
+from visualex_api.tools.regional_law import LOCAL_LAW_REFUSALS, local_act_type_refusal
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
 from visualex_api.tools.exceptions import (
@@ -162,7 +164,7 @@ def _link_refused_before_lookup(norm):
     act, and a range or a list (the browser sends the first article, §4.4; a range would
     read the act's index for nothing)."""
     if (not identifies_act(norm) or _LINK_RANGE_OR_LIST.search(norm['article'])
-            or is_regional_act_type(norm['act_type'])):
+            or local_act_type_refusal(norm['act_type'])):
         return 'not_linkable'
     return None
 
@@ -426,6 +428,21 @@ def _read_page_extras(raw, article, tree_raw=None):
         log.warning("Article parts could not be read", error=str(exc))
         parts = None
     return notes, parts
+
+
+# The codes whose article pages were measured to carry the act's index identically, annex
+# included (G-646, T133): their default annex (`:2`, `:1`) is read from an article's page. Another
+# act with an annex goes the old way until its pages are measured.
+_MEASURED_CODES = (
+    "urn:nir:stato:regio.decreto:1942-03-16;262",   # codice civile
+    "urn:nir:stato:regio.decreto:1930-10-19;1398",  # codice penale
+    "urn:nir:stato:regio.decreto:1940-10-28;1443",  # codice di procedura civile
+)
+
+
+def _measured_code(url) -> bool:
+    urn = str(url or "").split("N2Ls?", 1)[-1]
+    return any(urn == code or urn.startswith(code + ":") for code in _MEASURED_CODES)
 
 
 class NormaController:
@@ -805,10 +822,11 @@ class NormaController:
         act_number = data.get('act_number')
         norma_date = data.get('date')
 
-        # No address for a regional act (G-577): Normattiva would answer it with the State's act
-        # of the same number, the wrong text in silence.
-        if is_regional_act_type(act_type):
-            raise ValidationError(REGIONAL_LAW_REFUSAL)
+        # No address for a regional or a provincial act (G-577): Normattiva would answer it with
+        # the State's act of the same number, the wrong text in silence.
+        refused = local_act_type_refusal(act_type)
+        if refused:
+            raise ValidationError(refused)
 
         # A consolidated EU version. Validated here so a Normattiva request
         # carrying the field fails loudly instead of being silently ignored.
@@ -932,6 +950,10 @@ class NormaController:
 
         log.debug("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
 
+        if (not strict and not address.is_eu and articles and asked_annex is None and not explicit_dispositivo
+                and (annex_value is None or _measured_code(norma.url))):
+            await self._tree_from_article_page(norma, articles[0], annex_value, data)
+
         # Smart article lookup: if no annex specified and not a hardcoded codice,
         # check if the article actually exists in the dispositivo or in an annex
         # SKIP smart lookup if user explicitly requested dispositivo (empty string)
@@ -1029,6 +1051,45 @@ class NormaController:
                 norma, cleaned_article, scope, akn_fallback=not strict)
             address.checked.append((cleaned_article, exists))
         return address
+
+    async def _tree_from_article_page(self, norma, article, annex, data):
+        """On an act whose tree is not cached, read the first article's page and take the act's
+        tree from it (owner, G-646): the read needs that page anyway, and the act's own page,
+        which the existence check used to download first, carries the same index (6.6 s and one
+        request less on the first article of a code). Only for the text in force (a dated page
+        carries the index at that day) and when the request names no annex (an annex's pages
+        were not measured); the page is the one `get_document` reads next, stored where it reads
+        it. Anything else, or a page with no index, leaves the check to read the act's page as
+        before. One attempt, as the tree's own download: a failure costs what the tree's did."""
+        if not isinstance(article, str) or not article or not getattr(norma, 'url', None):
+            return
+        version, day = data.get('version'), data.get('version_date')
+        if (data.get('upcoming') is True or (isinstance(day, str) and day.strip())
+                or (isinstance(version, str) and version.strip().lower() == 'originale')):
+            return
+        try:
+            if await tree_is_cached(norma.url):
+                return
+            urn = NormaVisitata(norma=norma, numero_articolo=article, versione=version,
+                                data_versione=None, allegato=annex).urn
+            cache = normattiva_scraper.cache
+            page = await cache.get(urn)
+            if page:
+                await seed_tree_from_page(norma.url, page)
+                return
+            page = (await http_client.request("GET", urn, source="normattiva", max_retries=0)).text
+            entries = await seed_tree_from_page(norma.url, page)
+            # Kept for the read only when the act holds that article where it was asked: for an
+            # article it does not hold, Normattiva answers another page (art. 1), which must never
+            # be stored under this article's address.
+            wanted = comparable_article_key(article)
+            if entries and any(
+                    isinstance(entry, dict) and str(entry.get('allegato') or '') == str(annex or '')
+                    and comparable_article_key(entry.get('numero', '')) == wanted
+                    for entry in entries):
+                await cache.set(urn, page)
+        except Exception as exc:  # noqa: BLE001 - the existence check reads the act's page as before
+            log.debug("Tree not read from the article's page", error_type=type(exc).__name__)
 
     async def _name_the_part(self, nv, part, comma):
         """Set `nv.parte` from the request's `parte` or `comma` (G-387 (a), G-389).
@@ -1387,11 +1448,19 @@ class NormaController:
         notes = parts = None
         try:
             cache = getattr(scraper, 'cache', None)
-            raw = await cache.get(url) if cache is not None and url else None
-            # A part's page (its key holds PART_KEY_MARK) has no tree: the article page has.
-            tree_raw = await cache.get(article_page_key(url)) if raw and PART_KEY_MARK in url else None
-            if isinstance(raw, str) and raw:
-                notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo, tree_raw)
+            if cache is not None and url and PART_KEY_MARK not in url:
+                # Read once per stored page (`page_memo`), not at every read of the article.
+                extras = await PAGE_MEMO.derive(
+                    cache, url, "extras", (nv.numero_articolo,),
+                    lambda raw: _read_page_extras(raw, nv.numero_articolo))
+                if extras is not None:
+                    notes, parts = extras
+            else:
+                raw = await cache.get(url) if cache is not None and url else None
+                # A part's page (its key holds PART_KEY_MARK) has no tree: the article page has.
+                tree_raw = await cache.get(article_page_key(url)) if raw and PART_KEY_MARK in url else None
+                if isinstance(raw, str) and raw:
+                    notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo, tree_raw)
         except Exception as exc:  # noqa: BLE001 - best effort: the text already read stands
             log.warning("Page extras could not be read", error=str(exc), url=str(url)[:100])
         fields = {**update_notes_fields(notes), **parts_fields(parts)}
@@ -1465,13 +1534,13 @@ class NormaController:
         Returns:
             { recognized: bool, parsed?: {...api params}, urn?: str,
               display?: str, source?: 'alias' | 'nl_parser' | 'recital',
-              refusal?: 'recital_not_eu' | 'recital_with_article' | 'regional_law',
+              refusal?: 'recital_not_eu' | 'recital_with_article' | 'regional_law' | 'provincial_law',
               notice?: str, ambiguous?: [{name, parsed, display}] }
 
         G-577: a dated name («art. 1 tuir») is read at today's date in Rome; its `parsed` carries
         `annex` when the act's text is an annex, and `notice` is the one line to show with it. A
-        regional law is not recognised, with `refusal: "regional_law"`, never read as a State
-        law. An ambiguous name («art. 1 tua») is not recognised, and `ambiguous` lists the acts
+        regional or a provincial law is not recognised, with `refusal: "regional_law"` or
+        `"provincial_law"`, never read as a State law. An ambiguous name («art. 1 tua») is not recognised, and `ambiguous` lists the acts
         it could mean, each with its own `parsed`.
         """
         try:
@@ -1489,9 +1558,9 @@ class NormaController:
                 if choices:
                     answer["ambiguous"] = choices
                 return jsonify(answer)
-            if parsed_params.get("refusal") == "regional_law":
+            if parsed_params.get("refusal") in LOCAL_LAW_REFUSALS:
                 return jsonify({"parsed": None, "recognized": False, "identifies_act": False,
-                                "refusal": "regional_law"})
+                                "refusal": parsed_params["refusal"]})
             if parsed_params.get("recital"):
                 return jsonify(_recital_reading(parsed_params, source))
             notice = parsed_params.pop("notice", None)

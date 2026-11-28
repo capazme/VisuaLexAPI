@@ -13,10 +13,19 @@ search lists (§5) and reads the text of the one it chose.
 - **The answer** lists every measure with that number and year at that seat: the Consiglio di
   Stato numbers each kind in its own series (n. 2270/2019 is a sentenza, an ordinanza cautelare
   and a parere), so a row carries its kind, section, case number (NRG), ECLI and document link.
-- **The document** is XML (the court's own `GA` schema): `epigrafe`, `premessa`, `motivazione`,
+- **The document** was XML (the court's own `GA` schema): `epigrafe`, `premessa`, `motivazione`,
   `dispositivo`, `sottoscrizioni`, each of `h:div` lines, plus `…Ted` twins for the German
   version of the Bolzano section, left out. Read with the network off and no DTD: the document
   names one on a private address.
+- **Since November 2026 the same link serves a page** the portal renders from that XML with the
+  court's stylesheet (`Sentenze.xsl`, one per kind of measure): `<body class="corpo">`, paragraphs
+  in the stylesheet's order. Measured on four decisions against archived copies of their XML, the
+  page is not the XML's text: the stylesheet replaces the heading's word («DECISIONE» becomes
+  «SENTENZA», about 90 characters in), moves the panel of judges after the dispositivo and the
+  object after the parties, drops the secretary's name and adds words of its own («REPUBBLICA
+  ITALIANA», «contro»). Its text would not be the projection notes are anchored to, so a decision
+  served that way comes without text, like a PDF, with its day of publication; a new projection
+  from the page is the owner's decision, not this reader's.
 
 Text contract (root rule 23), from the day notes can be stored on it: each `h:div` is a line, runs
 of ASCII whitespace become one space, nothing else changes; the metadata block is not text.
@@ -26,6 +35,7 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
+from datetime import date
 from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup
@@ -198,6 +208,51 @@ def text_from_document(document: bytes | str) -> dict[str, str]:
     return blocks
 
 
+# «Pubblicato il 08/04/2019», in the rendered page's head (documents with a PDF version)
+_PUBLISHED_NOTE = re.compile(r"Pubblicato il[ \t\r\n]+(\d{2})/(\d{2})/(\d{4})")
+_DEPOSITED = re.compile(r"DEPOSITAT[AO] IN SEGRETERIA")
+_DEPOSIT_DAY = re.compile(r"Il (\d{2})/(\d{2})/(\d{4})")
+_RENDERED_BODY = re.compile(r'<body class="corpo">')
+# every branch of the stylesheet opens the body with the measure's register number («N. 02270/2019»):
+# a page of the same style without it (an error, an empty document) is not a decision
+_RENDERED_REGISTER = re.compile(r'<p class="registri">[ \t\r\n]*N\. \d{1,6}/\d{4}')
+
+
+def _day(d: str, m: str, y: str) -> str | None:
+    """«08», «04», «2019» → «2019-04-08»; None for a day that does not exist."""
+    try:
+        return date(int(y), int(m), int(d)).isoformat()
+    except ValueError:
+        return None
+
+
+def _published_on_page(page: str, soup: BeautifulSoup) -> str | None:
+    """The day of publication the rendered page gives: the head's note, or else the paragraph
+    under «DEPOSITATA IN SEGRETERIA» (both are the XML's `dataPubblicazione`)."""
+    m = _PUBLISHED_NOTE.search(page.split("<body", 1)[0])
+    if m is None:
+        lines = [_WS.sub(" ", p.get_text()).strip() for p in soup.find_all("p")]
+        for line, after in zip(lines, lines[1:]):
+            if _DEPOSITED.fullmatch(line) and (m := _DEPOSIT_DAY.fullmatch(after)):
+                break
+    return _day(*m.groups()) if m else None
+
+
+def read_document(document: bytes | str) -> tuple[dict[str, str], str | None]:
+    """The decision's text and day of publication from what the document link serves: the court's
+    XML gives both; the page the portal renders from it gives the day only (its text is not the
+    XML's, module note); anything else is a changed source."""
+    data = document.encode("utf-8") if isinstance(document, str) else document
+    page = data.decode("utf-8", errors="replace")
+    # read from the markup, not from a parsed tree: the head's loose note («Pubblicato il …») makes
+    # an HTML parser open the body before the page's own <body class="corpo">
+    if _RENDERED_BODY.search(page):
+        if not _RENDERED_REGISTER.search(page):
+            raise SourceChanged("giustizia-amministrativa: pagina senza il numero del provvedimento")
+        return {}, _published_on_page(page, BeautifulSoup(page, "lxml"))
+    return text_from_document(data), published_on(data)
+
+
 class GiustiziaAmministrativaReader:
     """Three requests a lookup: the search page, the search, the document."""
 
@@ -214,7 +269,8 @@ class GiustiziaAmministrativaReader:
 
     async def text(self, result: Result) -> tuple[dict[str, str], str | None]:
         """The decision's text and its day of publication; ({}, None) for a document that is not
-        HTML (the newest are PDFs, not read yet)."""
+        HTML (the newest are PDFs, not read yet), and no text with the day for the page the portal
+        renders from the XML (`read_document`)."""
         if urlparse(result.url).hostname != _DOCUMENT_HOST or document_format(result.url) != "html":
             return {}, None
         answer = await decisions_http_client.request(
@@ -222,8 +278,7 @@ class GiustiziaAmministrativaReader:
             text_encoding="latin-1", headers=http_headers({"Accept": "text/xml, application/xml"}))
         # latin-1 maps the bytes one to one: lxml reads them in the encoding the document declares,
         # whatever the HTTP header said (a text frozen in the wrong encoding would stay wrong)
-        body = answer.text.encode("latin-1")
-        return text_from_document(body), published_on(body)
+        return read_document(answer.text.encode("latin-1"))
 
 
 # --- from a result to a decision ---------------------------------------------------------------
@@ -280,7 +335,7 @@ def published_on(document: bytes | str) -> str | None:
         raise SourceChanged("giustizia-amministrativa: documento non leggibile") from exc
     found = root.find(".//dataPubblicazione") if root is not None else None
     m = re.fullmatch(r"(\d{2})/(\d{2})/(\d{4})", (found.text or "").strip()) if found is not None else None
-    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else None
+    return _day(*m.groups()) if m else None
 
 
 def to_decision(result: Result, corte: str, sede: str | None, testo: dict[str, str] | None = None,

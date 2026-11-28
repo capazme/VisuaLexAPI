@@ -160,6 +160,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   suggestion, and both trash restores. A refusal is 409 with an Italian `detail` that
   names the cap and `error` `dossier_limit`, `dossier_items_limit` or
   `account_items_limit`. A new creation path must call it too.
+  `POST /dossiers/:id/items/bulk { items }` (G-595) takes a dossier's entries in one
+  request: up to 2,000 entries and 8 MB (its own JSON parser in `app.ts`, under the
+  ingress's 10 MB). One transaction; each entry is checked as `POST /items` checks it
+  (`prepareItem`), the caps once (`itemRoom`): what fits goes in, in order, the rest is
+  listed. The answer is `{ entered, total, items, refused: [{ index, error, detail }] }`
+  with the single route's code and sentence per refused entry (`validationDetail` for a
+  schema error; `invalid` where the single route answers no code), and each created
+  entry carries its `index` in the request. It costs one write plus one per 50 entries past the first 50
+  (`chargeWrites`). Session only.
   A dossier has a `kind`, `lavoro` (a practice: it may hold a client's data; the default, and
   what every dossier older than the column became) or `studio` (a topic studied: a dossier
   taken from a Forum suggestion is one); `POST`/`PUT /dossiers` take it. Each dossier answer

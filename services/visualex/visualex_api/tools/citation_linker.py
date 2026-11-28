@@ -19,7 +19,7 @@ from .article_clause import ARTICLE_CLAUSE_SOURCE
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import NORMATTIVA_SEARCH
 from .nl_parser import build_eu_act_pattern, eu_act_from_groups
-from .regional_law import regional_law_spans
+from .regional_law import local_law_spans
 
 # Pre-build lowercase lookup for case-insensitive resolution
 _SEARCH_LOWER = {k.lower(): v for k, v in NORMATTIVA_SEARCH.items()}
@@ -271,11 +271,11 @@ def extract_citations(
             used_starts.insert(i, c.start)
             used_ends.insert(i, c.end)
 
-    # A regional law is never read as a State law (G-577): its citation, with the article written
-    # before it, is taken before any pass, so no pattern links «legge 65/2014 della Regione
-    # Toscana» to the legge 65/2014; and it ends the context, so a bare «art. 4» after it does
-    # not fall to the act named before it.
-    regional = regional_law_spans(text)
+    # A regional or a provincial law is never read as a State law (G-577): its citation, with the
+    # article written before it, is taken before any pass, so no pattern links «legge 65/2014
+    # della Regione Toscana» or «l.p. 9/2018» to the State's act of that number; and it ends the
+    # context, so a bare «art. 4» after it does not fall to the act named before it.
+    regional = local_law_spans(text)
     for start, end in regional:
         if not _overlaps(start, end):
             i = bisect_right(used_starts, start)

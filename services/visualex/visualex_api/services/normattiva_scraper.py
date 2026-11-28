@@ -16,6 +16,7 @@ from ..tools.config import HTTP_TIMEOUT
 from ..tools.exceptions import DocumentNotFoundError, IndexUnavailableError, ParsingError, ResourceNotFoundError
 from ..tools.text_op import parse_date
 from ..tools.selectors import NormattivaSelectors
+from ..tools.single_flight import call_key, single_flight
 from .akn_fetch import fetch_act_article
 from .http_client import http_client, new_session
 from .normattiva_parts import extract_parts, part_cache_key, part_range, ranges_in_words
@@ -78,7 +79,10 @@ class NormattivaScraper(BaseScraper):
         log.info("Normattiva scraper initialized")
         self.cache = get_cache_manager().get_persistent("normattiva")
 
+    # Readers asking for the same text at once share one read (one request, one parse): the
+    # memory cache answers the hits, the single flight joins the misses that arrive together.
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer(), skip_cache_func=_is_akn_result)
+    @single_flight(call_key)
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:
         log.info("Fetching Normattiva document", norma=str(normavisitata))
         if normavisitata.parte:
@@ -212,6 +216,14 @@ class NormattivaScraper(BaseScraper):
         return text
 
     async def estrai_da_html(
+        self, atto: str, comma: Optional[str] = None, get_link_dict: bool = False
+    ) -> Union[str, Dict[str, Any]]:
+        """The article's text in a Normattiva page (`estrai_testo`), read in a thread: parsing a
+        page of a code (2.6 MB) takes 0.2-0.4 s of CPU, which on the event loop held every other
+        request for as long (T133). The same function on the same page: the text is the same."""
+        return await asyncio.to_thread(self.estrai_testo, atto, comma, get_link_dict)
+
+    def estrai_testo(
         self, atto: str, comma: Optional[str] = None, get_link_dict: bool = False
     ) -> Union[str, Dict[str, Any]]:
         try:

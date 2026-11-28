@@ -1,4 +1,4 @@
-"""A regional law, told apart so it is never read as a State law (G-577).
+"""A regional or a provincial law, told apart so it is never read as a State law (G-577).
 
 No reader of this API covers a regional law. Its citation shares the State's words («legge
 10 novembre 2014, n. 65»), so the parser read «l.r. 65/2014», «legge regionale 12 marzo 2015,
@@ -7,9 +7,15 @@ n. 3» or «L. 65/2014 (Toscana)» as the legge 65/2014 or 3/2015 of the State, 
 find is refused before any table or pattern reads it, and no address is built for a regional
 act type.
 
-The patterns are mcp-legal-it's (pull request 191, decision LI-086), reviewed there for the
-same failure and for linear time: one separator class per gap, never two quantifiers over one
-run of spaces. A leaf module: patterns only, no import from the readers.
+The laws of the autonomous Provinces of Trento and Bolzano have the same fault and get the same
+treatment (G-577): «legge provinciale 9/2018», «l.p. 9/2018», «legge 9/2018 della Provincia
+autonoma di Trento» were read as the State's legge 9/2018. Each kind is refused with its own
+sentence and its own code (`local_law`).
+
+The regional patterns are mcp-legal-it's (pull request 191, decision LI-086), reviewed there for
+the same failure and for linear time: one separator class per gap, never two quantifiers over
+one run of spaces; the provincial ones are built the same way. A leaf module: patterns only, no
+import from the readers.
 """
 from __future__ import annotations
 
@@ -22,6 +28,13 @@ REGIONAL_LAW_REFUSAL = (
     "Le leggi regionali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla "
     "banca dati della Regione."
 )
+#: What the API answers for a law of the Province of Trento or Bolzano.
+PROVINCIAL_LAW_REFUSAL = (
+    "Le leggi provinciali non sono coperte: verifica il testo sul Bollettino ufficiale o sulla "
+    "banca dati della Provincia autonoma."
+)
+#: The refusal code of each kind (`/parse_query`'s `refusal`) and the sentence it is said with.
+LOCAL_LAW_REFUSALS = {"regional_law": REGIONAL_LAW_REFUSAL, "provincial_law": PROVINCIAL_LAW_REFUSAL}
 
 _MONTHS = ("gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|"
            "novembre|dicembre")
@@ -61,6 +74,32 @@ _REGIONAL_LAW = re.compile(
 #: A URN kind of a Region, «regione.toscana:legge», with or without «urn:nir:».
 _REGIONAL_URN_KIND = re.compile(r"^\s*(?:urn:nir:)?regione\b", re.IGNORECASE)
 
+#: The two autonomous Provinces as a citation names them («Trento», «Bolzano», «Bolzano - Alto
+#: Adige», «Alto Adige», «Südtirol»).
+_PROVINCES = r"trento|bolzano(?:\s?[-–]\s?alto\s+adige)?|alto\s+adige|s[üu]dtirol"
+#: A Province by name, or by its sigla «P.A.T.», «PAT», «P.A.B.» (never «P.A.» alone, nor «patente»).
+_PROVINCE_NAME = rf"(?:(?:{_PROVINCES})\b|p\.?a\.?[tb]\b\.?)"
+#: «l.p.», «L.P.», «l. p.», «LP»; «l. prov.», «legge prov.», «legge prov.le», «legge provinciale»,
+#: «L. Provinciale»; Bolzano's German «Landesgesetz».
+_PROVINCIAL_SIGLA = rf"(?:l\.?\s?p\.?|{_LAW}\s*prov(?:inciale\b|\.(?:le\b)?)|landesgesetz\b)"
+#: «Provincia autonoma di Trento», «Prov. aut. Trento», «Prov. Bolzano», «P.A. Trento», «della
+#: Provincia di Bolzano», «(Trento)», «della P.A.T.».
+_PROVINCE = (r"(?:(?:della|dalla)\s+)?(?:(?:provincia|prov\.|p\.\s?a\.)\s*(?:autonoma\s+|aut\.\s*)?(?:(?:di|della|del)\s+)?)?"
+             rf"{_PROVINCE_NAME}")
+#: A provincial law anywhere in a query or a name, built as `_REGIONAL_LAW` is: a provincial
+#: sigla, with or without a number; «legge (della) Provincia …», «legge Trento 9/2018»; or the
+#: State's spelling followed by a Province («legge 9/2018 della Provincia autonoma di Trento»,
+#: «L. 9/2018 (Bolzano)»). «legge 56/2014 sulle province» names the State's law on them.
+_PROVINCIAL_LAW = re.compile(
+    rf"(?<![\w.])(?:{_PROVINCIAL_SIGLA}(?![a-zà-ù])"
+    rf"|{_LAW}\s*(?:della\s+)?(?:provincia|prov\.)(?![a-zà-ù])"
+    rf"|{_LAW}\s+{_PROVINCE_NAME}"
+    rf"|{_LAW}\s*{_EXTREMES}[\s,(]*(?:(?:(?:della|dalla)\s+)?provincia(?![a-zà-ù])|{_PROVINCE}))",
+    re.IGNORECASE,
+)
+#: A URN kind of a Province, «provincia.autonoma.trento:legge».
+_PROVINCIAL_URN_KIND = re.compile(r"^\s*(?:urn:nir:)?provincia\b", re.IGNORECASE)
+
 
 def cites_regional_law(text: str | None) -> bool:
     """Whether a query or an act name cites a regional law («art. 3 l.r. Toscana 65/2014»,
@@ -70,32 +109,69 @@ def cites_regional_law(text: str | None) -> bool:
     return bool(text) and bool(_REGIONAL_LAW.search(text))
 
 
+def cites_provincial_law(text: str | None) -> bool:
+    """Whether a query or an act name cites a law of the Province of Trento or Bolzano («art. 3
+    l.p. 9/2018», «legge provinciale 9 agosto 2018, n. 9», «legge 9/2018 della Provincia autonoma
+    di Trento»). «legge 56/2014 sulle province» does not."""
+    return bool(text) and bool(_PROVINCIAL_LAW.search(text))
+
+
+def local_law(text: str | None) -> str | None:
+    """The refusal code of a query or a name that cites a provincial or a regional law
+    («provincial_law», «regional_law»), or None. The Province first: «legge provinciale di
+    Trento» is not the Region's."""
+    if cites_provincial_law(text):
+        return "provincial_law"
+    if cites_regional_law(text):
+        return "regional_law"
+    return None
+
+
+def cites_local_law(text: str | None) -> bool:
+    """Whether a query or an act name cites a regional or a provincial law: no State law."""
+    return local_law(text) is not None
+
+
 def is_regional_act_type(act_type: str | None) -> bool:
     """Whether an act type names a regional act: a regional law («legge regionale», «l.r.»), or a
     URN kind of a Region («regione.toscana:legge»). No address is built for it."""
     return bool(act_type) and (cites_regional_law(act_type) or bool(_REGIONAL_URN_KIND.match(act_type)))
 
 
+def local_act_type_refusal(act_type: str | None) -> str | None:
+    """The sentence a fetch of a regional or a provincial act type is refused with («legge
+    provinciale», «l.r.», «provincia.autonoma.trento:legge»), or None: no address is built for
+    one, since Normattiva would answer the State's act of that number."""
+    if not act_type:
+        return None
+    if cites_provincial_law(act_type) or _PROVINCIAL_URN_KIND.match(act_type):
+        return PROVINCIAL_LAW_REFUSAL
+    if is_regional_act_type(act_type):
+        return REGIONAL_LAW_REFUSAL
+    return None
+
+
 #: One article number as a citation writes it: «4», «4-bis», «4 bis».
 _ARTICLE_NUMBER = rf"\d+(?:\s*-?\s*(?:{ARTICLE_SUFFIX_ALTERNATION})\b)?"
 #: «art. 3 della », «artt. 3 e 4 della », «Art. 4 bis della », «art. 5, comma 2, dell'» just before
-#: a regional law: the articles are the regional law's, not the act named before it.
+#: a regional or a provincial law: the articles are that law's, not the act named before it.
 _ARTICLE_BEFORE = re.compile(
     rf"\bart(?:icol[oi]|t?\.)?\s*{_ARTICLE_NUMBER}(?:\s*(?:,|\be\b|\bed\b)\s*{_ARTICLE_NUMBER})*"
     r"(?:\s*,\s*comma\s*\d+[\w-]*)?\s*,?\s*(?:(?:della|del|dell['’]|di)\s*)?$",
     re.IGNORECASE,
 )
-#: How far before a regional law an article is looked for: a short list of articles.
+#: How far before such a law an article is looked for: a short list of articles.
 _ARTICLE_REACH = 96
 
 
-def regional_law_spans(text: str) -> list[tuple[int, int]]:
-    """Where a text cites a regional law: (start, end) of each citation, in order, an article
-    written just before it included («art. 3 della l.r. Toscana 65/2014»). The citation linker
-    reads none of them as a State law."""
+def local_law_spans(text: str) -> list[tuple[int, int]]:
+    """Where a text cites a regional or a provincial law: (start, end) of each citation, in
+    order, an article written just before it included («art. 3 della l.r. Toscana 65/2014»,
+    «art. 2 della l.p. 9/2018»). The citation linker reads none of them as a State law."""
     spans = []
-    for m in _REGIONAL_LAW.finditer(text or ""):
-        start = m.start()
-        before = _ARTICLE_BEFORE.search(text, max(0, start - _ARTICLE_REACH), start)
-        spans.append((before.start() if before else start, m.end()))
-    return spans
+    for pattern in (_REGIONAL_LAW, _PROVINCIAL_LAW):
+        for m in pattern.finditer(text or ""):
+            start = m.start()
+            before = _ARTICLE_BEFORE.search(text, max(0, start - _ARTICLE_REACH), start)
+            spans.append((before.start() if before else start, m.end()))
+    return sorted(spans)

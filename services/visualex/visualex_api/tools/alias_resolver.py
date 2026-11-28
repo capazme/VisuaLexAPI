@@ -14,7 +14,7 @@ import yaml
 
 from .act_resolver import resolve_atto
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
-from .regional_law import cites_regional_law
+from .regional_law import cites_local_law
 
 # One ordinal suffix, from the shared table: numbering goes far past "decies",
 # and the \b keeps "bis" from matching the head of an ordinary word.
@@ -63,12 +63,12 @@ def resolve_alias(text: str, day: Optional[date] = None) -> Optional[dict]:
     Returns a dict with API parameters (act_type, act_number, date) if matched,
     or None if no alias matched. A dated name («tuir») is read at `day`, today in
     Rome when None (`dated_names`): its reading adds `annex` when the act's text
-    is an annex, and `notice`. A regional law is never read (`regional_law`).
+    is an annex, and `notice`. A regional or provincial law is never read (`regional_law`).
 
     The match is case-insensitive and strips surrounding whitespace.
     Supports both exact matches and "art. N <alias>" patterns.
     """
-    if not text or not text.strip() or cites_regional_law(text):
+    if not text or not text.strip() or cites_local_law(text):
         return None
 
     # Strip article prefix to isolate the alias part

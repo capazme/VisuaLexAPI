@@ -12,6 +12,35 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.72.0] - 2026-11-28
+
+Administrative decisions open again, faster collectors, provincial laws and a dossier's entries in one request.
+No migration, no cache to clear. MERL-T stays off. The desktop app's work (#757 and after) is not in it.
+
+Pins: lexcraft-web v1.72.0 (the note), lexcraft-mcp v1.70.0, lexcraft-contracts 2927be88 (1.71.0).
+
+### Features
+
+- A dossier's entries in one request, the caps applied once (G-595) (#748).
+- The core accepts an older contract of the same major when its own only adds to it (G-607…G-611) (#765).
+
+### Fixes
+
+- Administrative decisions (Consiglio di Stato, CGARS, TAR) open without text, with references, ECLI, date and
+  the source link, instead of a 503 (T134) (#768).
+- A law of the Province of Trento or Bolzano is never read as a State law (G-577) (#742).
+- The article tests never reach Normattiva (#746).
+
+### Performance
+
+- Concurrent identical reads share one fetch (#769); a stored Normattiva page is read once (#770); an EU article
+  is extracted once (#771); one queue per source, Normattiva at 3 (G-647) (#773); a cold page is parsed off the
+  event loop (#774); the act's tree comes from the article's own page (G-646) (#775). Measurement tools (#767).
+
+### Documentation
+
+- The desktop app's local mode: design and M1 plan (#756).
+
 ## [1.71.0] - 2026-11-23
 
 The first release after the repository split (G-596): the web app, the MCP server and the contract live in

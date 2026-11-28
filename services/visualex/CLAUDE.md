@@ -18,7 +18,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `BROWSER_WAIT_SECONDS` (20) raises a `NetworkError` (`status_code` 503) whose words say to retry:
   the reader sees them as the article's error, `/fetch_tree` as a 500; `tests/test_eurlex_browser_slots.py`),
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
-  `http_client.py` (the shared throttled aiohttp client — TLS verification on;
+  `http_client.py` (the shared throttled aiohttp client — TLS verification on; one queue per
+  source host (owner, G-647): `HTTP_MAX_CONCURRENCY` requests at once and `HTTP_MIN_INTERVAL`
+  between two toward each host, as the one queue gave every source before, so Normattiva keeps
+  its 3 and its half second and no other source waits behind it (an EU article cold behind 12
+  c.c. articles: 17.0 → 1.0 s, T133); keyed by host, so callers naming a host differently share it;
   `request(..., session=s)` sends one request on the caller's own session, for a page that
   opens only with the cookies of the page before it, with the same rate limit, host check
   and retries; `request(..., max_retries=n)` lowers the retry budget for a caller that paces
@@ -27,7 +31,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   answer (429/503) that states a `Retry-After` pauses its `source` for that wait, so the
   next request to the same source, from any caller, waits it out first, or is refused at
   once (429) when more than `MAX_PAUSE_WAIT` (30 s) is left; our own backoff never pauses
-  the source; the pause lives in the client instance).
+  the source; the pause lives in the client instance. Identical GETs sent while one is in
+  flight share it (`tools/single_flight.py`): one request reaches the source, every caller
+  gets its answer or its error, and nothing outlives the run; a request on the caller's own
+  session or with a body always goes alone. `NormattivaScraper.get_document` and `get_tree`
+  join their concurrent misses the same way, beneath their memory caches, so fifty readers
+  of one cold article cost one page and one parse (measured: 79 requests to Normattiva → 2,
+  T133); a tree's followers get a deep copy).
   - `brocardi_scraper.py` is **switched off**: Brocardi is no longer a source
     (D-078). No route calls it, no answer carries `brocardi_info` or
     `brocardi_error` (a client's `show_brocardi_info` is ignored),
@@ -165,7 +175,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     case's judgment, joined cases included, then its Italian XHTML or, before about 2009, the
     former HTML; design 2026-10-12 §4), `giustizia_amministrativa.py` and `tar_seats.py` (the
     Consiglio di Stato, the C.G.A.R.S. and the TAR from giustizia-amministrativa.it: the portal's
-    search form, read from the page each time, then the court's XML document; the 29 seats, a copy
+    search form, read from the page each time, then the court's XML document, or the page the
+    portal has rendered from it since November 2026, read for its day only; the 29 seats, a copy
     of `conventions/sources/tar-seats.json`; design 2026-10-12-administrative-courts), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
     User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
@@ -180,7 +191,16 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     download: a Normattiva tree is parsed once in its widest form (section labels and
     metadata, key `…|details=True|metadata=True`) and every other variant is cut from it
     (`_narrow`: drop the labels, drop the metadata), so the existence check, a range and the
-    index the web opens no longer fetch the same page three times. A EUR-Lex tree reads the
+    index the web opens no longer fetch the same page three times. On an act whose tree is not
+    cached, an undated request that names no annex (a default annex only for the c.c., c.p. and
+    c.p.c., the codes measured) reads its first article's page first and
+    takes the tree from it (`NormaController._tree_from_article_page`, `seed_tree_from_page`;
+    owner, G-646): that page carries the act's index, identical to the act page's on 27 of 27
+    pairs measured, and the read needs it anyway, so the first article of a code costs one
+    request instead of two (art. 2043 c.c. cold 8.8 → 4.6 s, T133). A dated request, a range
+    (its tree is read first) or a page with no index goes the old way; the page is kept for the
+    read only when the tree holds that article in that part (for an article an act does not
+    hold Normattiva answers another page). A EUR-Lex tree reads the
     page from the scraper's own copy (namespace `eurlex`, same URL) and leaves the page it
     visited there, only when it parsed into articles: one browser visit serves the tree, the
     rubriche and the articles (`tests/test_tree_variants.py`). The Normattiva page comes
@@ -257,13 +277,16 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     and is fixed. A name typed with an act's number or year is that act on any day
     (`act_resolver.act_typed_with`: «art. 81 TUIR 917/1986» is the d.p.r., «TUA 152/2006» the
     codice dell'ambiente), and with another act's number reads nothing.
-  - `regional_law.py` — `cites_regional_law`, `is_regional_act_type` (G-577; mcp-legal-it's
-    patterns, LI-086): a regional law is never read as a State law. The search's reading refuses
-    it first (`refusal: "regional_law"`), `parse_nl_query` and `resolve_atto` read nothing, the
-    fetch answers 400 (`REGIONAL_LAW_REFUSAL`) and `/fetch_norm_links` `not_linkable`, so no
-    Normattiva address is built for one (Normattiva would answer the State's act of that number).
-    `citation_linker` takes each regional citation (`regional_law_spans`, the article before it
-    included, a list of articles too) before its passes, and ends the context there.
+  - `regional_law.py` — `local_law`, `cites_local_law`, `local_act_type_refusal` (G-577; the
+    regional patterns are mcp-legal-it's, LI-086): a regional law, or a law of the Province of
+    Trento or Bolzano («l.p. 9/2018», «legge 9/2018 della Provincia autonoma di Trento»,
+    «Landesgesetz»), is never read as a State law. The search's reading refuses it first
+    (`refusal: "regional_law"` or `"provincial_law"`), `parse_nl_query` and `resolve_atto` read
+    nothing, the fetch answers 400 with the kind's sentence (`LOCAL_LAW_REFUSALS`) and
+    `/fetch_norm_links` `not_linkable`, so no Normattiva address is built for one (Normattiva
+    would answer the State's act of that number). `citation_linker` takes each such citation
+    (`local_law_spans`, the article before it included, a list of articles too) before its
+    passes, and ends the context there.
   - `egress.py` — `ALLOWED_HOSTS` plus `is_allowed(url)`, checked in
     `ThrottledHttpClient.request`; it refuses a backslash, a control character,
     credentials before the host and a scheme other than http(s), which Chromium would
@@ -339,13 +362,33 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     still counts from the write. `sweep_expired` reads an entry's write time from its
     first bytes (`_HEAD`), not by decoding a 2.6 MB page. An entry is written to
     `<digest>.<random>.tmp` and renamed over `<digest>.json` (`os.replace`), so a reader or
-    a sweep never meets one half written; a temporary a crash left goes after an hour
+    a sweep never meets one half written; a temporary a crash left goes after an hour.
+    `stamp(key)` reads an entry's write time from its head (None when `get` would answer
+    nothing; it counts as a use for the prune): it names the stored value. `tools/page_memo.py`
+    keeps, in memory and bounded, what a stored page says under that stamp, so a Normattiva
+    page's validity (`read_validity`, keyed also by the article, the day asked and today, which
+    its state is judged against) and its update notes and parts (`_page_extras_for`, keyed by
+    the article; a part's page goes the old way) are computed once per page, not at every read
+    (T133: a warm read of an article of a code 44 → 1.6 ms). A page written again has a new
+    stamp; a backend without stamps (Redis) reads the page every time. An EU article's text is
+    kept the same way (`EurlexScraper._article_text`, keyed by the article): the act's page
+    is parsed once per stored page, in a thread, not at every article read (the GDPR's 824 KB
+    page, about 100 ms each; warm 103 → 0.7 ms); a copy that is no act's page goes the way
+    `_load_soup` always went
 
 **Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
 in-process, cold then warm, and prints where each one's time goes (network per host, our
 throttle and retry waits, parsing, Playwright, cache); `--compare <earlier run>` checks the
 returned article and decision texts byte for byte (root rule 23). It talks to the real
-sources: a few runs, never a loop, never on the deployment host.
+sources: a few runs, never a loop, never on the deployment host. `--record <dir>` keeps every
+source answer (a scratch folder, never git: decisions carry personal data); `--replay <dir>`
+answers from them. Load tests run only on recorded answers: `scripts/replay_server.py` is the API
+as production runs it (Hypercorn, one worker) with every request answered from the recording
+after its recorded latency (`replay_net.py`, the one door every collector uses,
+`aiohttp.ClientSession`), and `GET /__replay/stats` counts what would have reached each source;
+`scripts/replay_load.py` sends N users at once (`warm`, `cold-same`, `cold-distinct`) and prints
+the percentiles, reads per second and source requests per 100 reads. Baseline, targets and plan:
+`docs/superpowers/specs/2026-11-28-collectors-speed-design.md`.
 
 ## Key API Endpoints
 
@@ -368,8 +411,8 @@ POST unless noted, JSON bodies.
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection. `/parse_query`
   answers `identifies_act` beside `recognized` (`act_identity.py`). A dated name («art. 1 tuir»,
   `tools/dated_names.py`) is read at today's date in Rome: `parsed.annex` when the act's text is an
-  annex, and a top-level `notice`, the one line to show with it. A regional law is not recognised,
-  with `refusal: "regional_law"`. An ambiguous name («art. 1 tua», «T.U.E.») is not recognised, and
+  annex, and a top-level `notice`, the one line to show with it. A regional or a provincial law is
+  not recognised, with `refusal: "regional_law"` or `"provincial_law"`. An ambiguous name («art. 1 tua», «T.U.E.») is not recognised, and
   `ambiguous` lists `{name, parsed, display}` for each act it could mean (G-577). A recital clause
   («considerando 26 GDPR», «cons. 26 reg. 2016/679», lists and ranges up to 150; spec
   `docs/superpowers/specs/2026-11-17-eu-recitals-design.md` §3) is taken out first by
@@ -383,7 +426,7 @@ POST unless noted, JSON bodies.
 - `/parse_query_batch` — `{"queries": [...]}`, 1 to 200 strings of 1 to 200 characters, the body
   at most 48 KB (anything else a 400 that names the limit) → `{"results": [{recognized, parsed,
   source, identifies_act}]}` in order: each read as `/parse_query` reads one (`read_norm_query`),
-  a recital clause and a regional law answered as not recognised, a dated name's `notice` beside
+  a recital clause and a regional or provincial law answered as not recognised, a dated name's `notice` beside
   `parsed`, and no further — no URN, so no request leaves, nothing cached or kept. It logs the count, the
   failures and the duration, never a string, and an error by its type only: the strings are the
   citations of a document the user may hold confidential (`tests/test_parse_query_batch.py`
@@ -892,7 +935,9 @@ Breaking one of these breaks the product. Read before editing.
 1. **Scraper fragility** — every scraper depends on third-party HTML. Breakage
    means the site changed.
 2. **Async context** — never block the Python event loop; wrap blocking calls in
-   `asyncio.to_thread()`.
+   `asyncio.to_thread()`. The cold parses of a Normattiva page are in a thread: an article's text
+   (`estrai_da_html` → `estrai_testo`) and an act's tree (`parse_normattiva_tree`); a code's
+   page held the loop up to 279 ms before (21 ms now, T133).
 3. **Rate limiting** — per-IP, configured in `config.py`; 429 when exceeded.
 4. **Playwright** — needed for PDF export (`playwright install chromium`);
    always via `PlaywrightManager`. Date completion no longer uses it.
@@ -1045,7 +1090,14 @@ Breaking one of these breaks the product. Read before editing.
     The administrative courts' reader is in it too (`ga_synthetic_document`; real documents as
     `private/ga_<key>.xml`): each `h:div` of the court's XML is a line, a div inside a div is read
     once, ASCII whitespace runs become one space; it leaves out the metadata block and the German
-    twins (`…Ted`), and reads the bytes in the encoding the document declares. Its search never
+    twins (`…Ted`), and reads the bytes in the encoding the document declares. Since November 2026
+    the portal serves, at the same link, a page rendered from that XML by the court's stylesheet
+    (`<body class="corpo">` opening with the measure's register number; a page of that style
+    without it is `fonte_non_raggiungibile`): its text is not the XML's (a heading word replaced about 90 characters
+    in, the panel and the object moved, the secretary's name dropped, words added), so
+    `read_document` returns no text for it, only the day of publication, and the decision comes
+    with `testo_non_disponibile` like a PDF; a new projection from that page needs the owner's
+    decision. Its search never
     drops a result row in silence: a row it cannot read, fewer rows than the portal's count, a
     seat the form does not offer or an answer for another seat is `fonte_non_raggiungibile`.
     The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a

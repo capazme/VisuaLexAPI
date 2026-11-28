@@ -36,20 +36,25 @@ security risk.
 
 MERL-T work that spans the server and the web app: `docs/merlt/claude-notes.md`.
 
-## The repositories the core pins (G-596, G-603)
+## The repositories the core pins (G-596, G-603, G-607…G-611)
 
 The web app, the MCP server and the contract live in repositories of their own, with their history:
 LexCraft-IT/lexcraft-web (the app in `app/`, the site of lexcraft.it in `landing/`),
 lexcraft-mcp and lexcraft-contracts. The core holds them as submodules, `apps/web` and `apps/mcp`
-each at a release tag of its own repository and `conventions` at a commit of lexcraft-contracts;
-`scripts/ci/check_pins.sh` (job «Contract») refuses another pin, and a pinned repository whose
-own `conventions/` is not the core's commit.
+each at a release tag of its own repository and `conventions` at a commit on lexcraft-contracts'
+`develop` or `main`. `scripts/ci/check_pins.sh` (job «Contract») refuses another pin. A pinned
+repository that carries `conventions/` must hold the core's commit, or an older one of the same
+major from which the core's contract is only an addition: the class (patch, minor, major) is
+recomputed from the files at every run by the contract's own `compat/compare.mjs`, and its rules
+are lexcraft-contracts' README, «Versions». So a minor of the contract (a path, a case) needs the
+core alone; a major moves all three together.
 
 - **Here they are read, never changed.** Work on the web or the MCP server happens in a clone of its
   repository, beside this checkout (`../lexcraft-web`, `../lexcraft-mcp`, which `start.sh --dev`
   takes) or wherever `LEXCRAFT_WEB_DIR` and `LEXCRAFT_MCP_DIR` say. A change of the convention is a
-  pull request in lexcraft-contracts first, then the submodule moved here with the fixes of the
-  server, the API and MERL-T in one pull request (`conventions/contract/README.md`).
+  pull request in lexcraft-contracts first, merged, then the submodule moved here with the fixes of
+  the server, the API and MERL-T in one pull request (`conventions/CLAUDE.md`, «How a change
+  travels»).
 - **Clone with `--recurse-submodules`**, or run `git submodule update --init --recursive`. A test
   that cannot find `conventions/` fails; it never skips.
 - **Versions** (G-597, G-604). Each repository has its own `version.txt` and tags; the product's

@@ -28,9 +28,20 @@ from visualex_api.tools.exceptions import (
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.tools.treextractor import _parse_normattiva_tree
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
-    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, controller,
+    ARTICLE_ENDPOINTS, FakeCache, ask, brocardi, no_network, controller,
 )
 from tests.validity_pages import page
+
+
+
+@pytest.fixture(autouse=True)
+def tree_from_the_mock_only():
+    """These tests give the act's tree through `app.get_tree`; the tree an article's page
+    carries (G-646, `_tree_from_article_page`, tested in tests/test_tree_from_article_page.py)
+    would be another source of it, and a request to the network, so it is left out here."""
+    with patch.object(NormaController, "_tree_from_article_page", AsyncMock(return_value=None)):
+        yield
+
 
 L296_TREE = page("l296_2006_art1_parts_tree_trimmed.html")
 DLGS23_TREE = page("dlgs23_2015_tree_trimmed.html")

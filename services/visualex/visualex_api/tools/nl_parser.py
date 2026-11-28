@@ -14,7 +14,7 @@ from .act_resolver import act_typed_with, ambiguous_act, resolve_atto
 from .article_clause import ARTICLE_CLAUSE_SOURCE
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import ANNEX_SIGLE, NORMATTIVA_SEARCH, NORMATTIVA_URN_CODICI, code_row_of_annex
-from .regional_law import cites_regional_law
+from .regional_law import cites_local_law
 from .sources import SIGLA_BY_ANNEX
 
 # Italian month names → month number
@@ -204,8 +204,8 @@ def parse_nl_query(raw_input: str, day: Optional[_date] = None) -> Optional[Pars
     Parse a natural language legal query into structured parameters.
 
     Returns ParsedQuery if the input was recognized, None if it couldn't be parsed
-    (caller should fall back to existing parser). A regional law is None, never a
-    State law (`regional_law`). A dated name («art. 1 tuir») is read at `day`, today in
+    (caller should fall back to existing parser). A regional or a provincial law is
+    None, never a State law (`regional_law`). A dated name («art. 1 tuir») is read at `day`, today in
     Rome when None (`dated_names`), with its annex and its notice.
 
     Examples:
@@ -221,7 +221,7 @@ def parse_nl_query(raw_input: str, day: Optional[_date] = None) -> Optional[Pars
     if len(raw_input) > 500:
         return None
 
-    if cites_regional_law(raw_input):
+    if cites_local_law(raw_input):
         return None
 
     raw_input, annex = _extract_annex(raw_input)

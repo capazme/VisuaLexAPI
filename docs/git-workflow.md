@@ -88,9 +88,14 @@ This is the **product's** version, the one `/version` serves. Since the split (G
 app, the MCP server and the contract live in repositories of their own, LexCraft-IT/lexcraft-web,
 lexcraft-mcp and lexcraft-contracts, each with its own `version.txt` and tags, released on its own.
 A release of the core pins the components it ships: the submodules `apps/web` and `apps/mcp` at
-release tags of their repositories, `conventions` at a commit of lexcraft-contracts. The check
-«Contract» (`scripts/ci/check_pins.sh`) refuses another pin, and a pinned component whose own
-`conventions/` is not the core's commit (G-603).
+release tags of their repositories, `conventions` at a commit on lexcraft-contracts' `develop` or
+`main` (G-603). The check «Contract» (`scripts/ci/check_pins.sh`), on every pull request, refuses
+another pin, and a pinned component whose own `conventions/` is neither the core's commit nor an
+older one of the same major from which the core's contract is only an addition. The class of the
+change is recomputed from the files each time, by the contract's own `compat/compare.mjs`; its rules,
+and what patch, minor and major mean for the contract, are lexcraft-contracts' README, «Versions»
+(G-607…G-611). The contract's tags up to `v1.70.0` were the product's; its own numbering starts at
+`v1.71.0` (G-608).
 
 Each release has a section in `CHANGELOG.md`, in English, written from the
 merge titles (`sh scripts/release-notes.sh vPREVIOUS origin/develop` lists
@@ -121,12 +126,18 @@ A release is cut when the owners say so. The checklist, in order:
    requests do not edit it, so they never conflict on it), rename it to
    `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`.
    **The components first:** each one that changed is released in its own repository before this
-   pull request: lexcraft-contracts; lexcraft-web, whose release carries the Italian note
-   `app/src/content/novita/X.Y.Z.md` (always, as the note is the web's); lexcraft-mcp. Each ends
-   with its tag on its `main`. Then, in this pull request, move the submodules to those tags
-   (`git -C apps/web fetch --tags && git -C apps/web checkout vA.B.C`, then `git add apps/web`; the
-   same for `apps/mcp` and `conventions`) and name their versions in the changelog section. The
-   checks «Repository tooling» (the note) and «Contract» (the pins) fail on anything missing.
+   pull request: lexcraft-contracts, with the number its CI accepts in `version.txt`; lexcraft-web,
+   whose release carries the Italian note `app/src/content/novita/X.Y.Z.md` (always, as the note is
+   the web's); lexcraft-mcp. Each ends with its tag on its `main`. Then, in this pull request, move
+   the submodules to those tags (`git -C apps/web fetch --tags && git -C apps/web checkout vA.B.C`,
+   then `git add apps/web`; the same for `apps/mcp` and `conventions`) and name their versions in
+   the changelog section, each component with the contract it holds. The checks «Repository
+   tooling» (the note) and «Contract» (the pins) fail on anything missing.
+   **A contract that only grew needs the core alone:** for a patch or a minor of lexcraft-contracts,
+   the web and the MCP server do not move to it. They keep the contract they were released with,
+   which «Contract» accepts while the core's is only an addition to it, and they move when they need
+   the change (the web is still released for the note). A major of the contract moves all three: the
+   web and the MCP server are released on it first, and «Contract» refuses different majors.
    Pull request into `develop`, merge.
    **The reviews' store:** if `SCHEMA_VERSION` in
    `services/visualex/visualex_api/services/massimario/store.py` changed since the last release, the
@@ -159,7 +170,8 @@ preview could not go back to the release.
 1. The fix lands first in the repository that holds the code, as a hotfix there (from its `main`,
    back to its `main` and `develop`, tagged); the web's hotfix always carries the Italian note
    `app/src/content/novita/X.Y.Z.md` of the product's new version, so a hotfix of the core alone
-   (the server, the API) still needs one of lexcraft-web carrying the note (G-604). Then here:
+   (the server, the API) still needs one of lexcraft-web carrying the note (G-604). A hotfix of the
+   contract that is a patch or a minor does not make the web or the MCP server move to it. Then here:
    `git switch -c hotfix/thing origin/main`, move the submodule to that tag, raise the patch number
    in `version.txt`, add its section to `CHANGELOG.md`; pull request into `main`.
 2. Merge it, then tag and release on `main` as in "Release", steps 5 and 6.

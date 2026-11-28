@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from bs4 import BeautifulSoup, NavigableString, Tag
 import logging
 import re
@@ -11,6 +12,7 @@ from .cache_manager import get_cache_manager
 from .egress import is_allowed
 from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
+from .single_flight import call_key, single_flight
 from ..services.akn_parser import comparable_article_key, normalize_article_key
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..services import eurlex_fetch
@@ -75,7 +77,10 @@ def _no_tree(result):
     return isinstance(result, tuple) and len(result) >= 2 and result[1] == 0
 
 
+# Callers asking for the same tree at once share one read; each follower gets its own copy, as a
+# cache hit would give it (the lists and dicts of a tree are the caller's to change).
 @cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer(), skip_cache_func=_no_tree)
+@single_flight(call_key, share=copy.deepcopy)
 async def get_tree(normurn, link=False, details=False, return_metadata=False):
     """
     Recupera l'albero degli articoli da un URN normativo e ne estrae le informazioni.
@@ -185,11 +190,12 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         logging.debug(f"Empty or too short response from {normurn[:50]}")
         return failure("Empty response from server")
 
-    soup = BeautifulSoup(text, 'html.parser')
-
     if not is_eurlex:
-        result, count, metadata = await _parse_normattiva_tree(
-            soup, normurn, link, True, return_metadata=True)
+        # Parsed in a thread: a code's index page (2.6 MB) takes about 0.3 s of CPU, which on the
+        # event loop held every other request for as long (T133).
+        result, count, metadata = await asyncio.to_thread(
+            lambda: parse_normattiva_tree(BeautifulSoup(text, 'html.parser'), normurn, link, True,
+                                          return_metadata=True))
         if count > 0:
             await _tree_cache.set(_full_key(normurn, link),
                                   {"result": result, "count": count, "metadata": metadata})
@@ -197,6 +203,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         return _narrow(result, count, metadata, details, return_metadata) + (from_copy,)
     else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
+        soup = BeautifulSoup(text, 'html.parser')
         result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
         if count > 0 and not from_copy and eurlex_fetch.is_act_page(text):
             # A page that parsed into articles is the act's: kept where the scraper reads it.
@@ -216,12 +223,47 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     return result, count, from_copy
 
 
+async def tree_is_cached(normurn) -> bool:
+    """Whether the persistent cache holds a Normattiva tree `get_tree` would read for the
+    existence check (its own variant or the widest), without decoding it."""
+    for key in (f"{normurn}|link=False|details=False|metadata=True|{_TREE_FORMAT}", _full_key(normurn, False)):
+        if await _tree_cache.stamp(key) is not None:
+            return True
+    return False
+
+
+async def seed_tree_from_page(normurn, text):
+    """Store the act's tree read from a page that carries the act's index, as `_tree_from_page`
+    stores the act page's (the widest variant, without links); True when stored.
+
+    An article's page carries the same index as the act's page: identical trees on 27 of 27
+    pairs measured (c.c., c.p.c., c.p., l. 241/1990, d.lgs. 231/2001, the 18 articles of l.
+    24/2017; owner, G-646). So the first read of an act needs the article's page only, which it
+    downloads anyway, instead of the act's page first (6.6 s for a code). A page with no index
+    stores nothing, and `get_tree` reads the act's page as before. Returns the tree's entries
+    when stored, else None."""
+    if _source_of(normurn) != "normattiva" or not isinstance(text, str) or len(text) < 500:
+        return None
+    soup = BeautifulSoup(text, 'html.parser')
+    result, count, metadata = await _parse_normattiva_tree(soup, normurn, False, True, return_metadata=True)
+    if count <= 0:
+        return None
+    await _tree_cache.set(_full_key(normurn, False), {"result": result, "count": count, "metadata": metadata})
+    logging.info(f"Stored the act's tree read from an article's page: {count} articles")
+    return result
+
+
 # "art. 1" in the tree's links, or "art 1" without the dot, as some annexes write it
 # (d.lgs. 36/2023, Allegato I.4): the dotless ones used to be dropped from the tree.
 _ARTICLE_LABEL_PREFIX = re.compile(r'^\s*art(?:\.\s*|\s+)', re.IGNORECASE)
 
 
 async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False):
+    """`parse_normattiva_tree`, for the callers that await it."""
+    return parse_normattiva_tree(soup, normurn, link, details, return_metadata)
+
+
+def parse_normattiva_tree(soup, normurn, link, details, return_metadata=False):
     """
     Parsa la struttura dell'albero degli articoli per Normattiva.
 

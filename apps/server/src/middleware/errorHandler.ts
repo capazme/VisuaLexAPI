@@ -2,6 +2,21 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 
+/**
+ * The sentence a validation refusal answers with, as `detail`: «Invalid request: field (message; message), …».
+ * Grouped by field before it becomes prose. One value can break several rules at once — a short password fails
+ * both the length check and the complexity regex — and naming the field once per violation reads as
+ * "password (...), password (...)". Also the reason of an entry refused inside a bulk write.
+ */
+export function validationDetail(err: ZodError): string {
+  const byField = new Map<string, string[]>();
+  for (const issue of err.issues) {
+    const field = issue.path.join('.') || '(body)';
+    byField.set(field, [...(byField.get(field) ?? []), issue.message]);
+  }
+  return `Invalid request: ${[...byField].map(([field, messages]) => `${field} (${messages.join('; ')})`).join(', ')}`;
+}
+
 export class AppError extends Error {
   /**
    * `code`, when given, is answered as `error`: a stable name a client can act on without reading the
@@ -89,21 +104,10 @@ export const errorHandler = (
       fields.map((f) => `${f.field}: ${f.message}`).join('; ')
     );
 
-    // Grouped by field before it becomes prose. One value can break several
-    // rules at once — a short password fails both the length check and the
-    // complexity regex — and naming the field once per violation reads as
-    // "password (...), password (...)".
-    const byField = new Map<string, string[]>();
-    for (const f of fields) {
-      byField.set(f.field, [...(byField.get(f.field) ?? []), f.message]);
-    }
-
     return res.status(400).json({
       // `detail` stays a plain string. services/api.ts renders it straight to
       // the user, so an object here would reach them as "[object Object]".
-      detail: `Invalid request: ${[...byField]
-        .map(([field, messages]) => `${field} (${messages.join('; ')})`)
-        .join(', ')}`,
+      detail: validationDetail(err),
       // Ungrouped on purpose: one entry per violation, so a caller that wants
       // to highlight fields can, without parsing the prose above.
       errors: fields,
