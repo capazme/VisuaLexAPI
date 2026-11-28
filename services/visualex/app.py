@@ -68,6 +68,7 @@ from visualex_api.services.decisions.resolver import (
 from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, read_request_date, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.page_memo import PAGE_MEMO
+from visualex_api.services.normattiva_fragments import fragment_meta_key
 from visualex_api.tools.treextractor import get_tree, seed_tree_from_page, tree_is_cached
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
@@ -479,6 +480,7 @@ class NormaController:
             await asyncio.gather(self._cache_sweep, return_exceptions=True)
             self._cache_sweep = None
         await cleanup_browser_pool()
+        await normattiva_scraper.sessions.close_all()
         log.info("Background services stopped and browser pool cleaned up")
 
     async def _sweep_caches(self):
@@ -1077,7 +1079,8 @@ class NormaController:
             if page:
                 await seed_tree_from_page(norma.url, page)
                 return
-            page = (await http_client.request("GET", urn, source="normattiva", max_retries=0)).text
+            # In the act's own session, which stays open for its following articles (G-652).
+            page = await normattiva_scraper.read_act_page(urn, max_retries=0)
             entries = await seed_tree_from_page(norma.url, page)
             # Kept for the read only when the act holds that article where it was asked: for an
             # article it does not hold, Normattiva answers another page (art. 1), which must never
@@ -1455,6 +1458,11 @@ class NormaController:
                     lambda raw: _read_page_extras(raw, nv.numero_articolo))
                 if extras is not None:
                     notes, parts = extras
+                if parts is None:
+                    # A fragment carries no index: its parts were read from its act's (G-652).
+                    meta = await cache.get(fragment_meta_key(url))
+                    if isinstance(meta, dict):
+                        parts = meta.get("parts")
             else:
                 raw = await cache.get(url) if cache is not None and url else None
                 # A part's page (its key holds PART_KEY_MARK) has no tree: the article page has.

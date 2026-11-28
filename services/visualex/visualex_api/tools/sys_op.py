@@ -75,10 +75,12 @@ WebDriverManager = PlaywrightManager
 
 
 class BaseScraper:
-    async def request_document(self, url, *, source: str = "base_scraper"):
+    async def request_document(self, url, *, source: str = "base_scraper", **kwargs):
+        """The page at `url` through the shared client. `kwargs` go to its `request`: `session`
+        (the caller's own, for cookies of its own) and `max_retries`."""
         log.info(f"Consulting source - URL: {url}")
         try:
-            result = await http_client.request("GET", url, source=source)
+            result = await http_client.request("GET", url, source=source, **kwargs)
             return result.text
         except Exception as e:
             log.error(f"Error during consultation: {e}")

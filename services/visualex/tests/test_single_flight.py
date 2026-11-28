@@ -253,7 +253,7 @@ def _page(text):
 async def test_readers_of_the_same_article_share_one_page_and_one_parse(cold_scraper):
     requested, parsed, gate = [], [], asyncio.Event()
 
-    async def request_document(url, *, source="base_scraper"):
+    async def request_document(url, *, source="base_scraper", **kwargs):
         requested.append(url)
         await gate.wait()
         return _page("Qualunque fatto doloso o colposo")
@@ -280,7 +280,7 @@ async def test_readers_of_the_same_article_share_one_page_and_one_parse(cold_scr
 async def test_readers_of_two_articles_read_two_pages(cold_scraper):
     requested, gate = [], asyncio.Event()
 
-    async def request_document(url, *, source="base_scraper"):
+    async def request_document(url, *, source="base_scraper", **kwargs):
         requested.append(url)
         await gate.wait()
         return _page(url[-4:])
