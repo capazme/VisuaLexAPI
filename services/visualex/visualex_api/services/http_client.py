@@ -18,6 +18,7 @@ from ..tools.config import (
 )
 from ..tools.egress import is_allowed
 from ..tools.exceptions import DocumentNotFoundError, NetworkError
+from ..tools.single_flight import SingleFlight
 
 log = structlog.get_logger()
 
@@ -80,6 +81,7 @@ class ThrottledHttpClient:
         # call that received it had no attempt left to spend it on. Our own backoff stays
         # with the call: a page that always fails must not slow every other page down.
         self._not_before: Dict[str, float] = {}
+        self._flights = SingleFlight()
 
     async def _get_session(self) -> aiohttp.ClientSession:
         async with self._session_lock:
@@ -94,6 +96,31 @@ class ThrottledHttpClient:
             await self._session.close()
 
     async def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        source: str = "generic",
+        text_encoding: Optional[str] = None,
+        max_retries: Optional[int] = None,
+        session: Optional[aiohttp.ClientSession] = None,
+        **kwargs,
+    ) -> HttpResult:
+        """One request to a source (`_send`). Identical GETs sent while one is in flight share it
+        (`single_flight`): one request reaches the source and every caller gets its answer, or
+        its error. Only a GET with no body on the client's own session is shared; a request on
+        the caller's session (cookies of its own) or with a body always goes alone."""
+        if method.upper() != "GET" or session is not None or "data" in kwargs or "json" in kwargs:
+            return await self._send(method, url, source=source, text_encoding=text_encoding,
+                                    max_retries=max_retries, session=session, **kwargs)
+        key = (method.upper(), url, source, text_encoding, max_retries, repr(sorted(kwargs.items())))
+        result = await self._flights.run(
+            key, lambda: self._send(method, url, source=source, text_encoding=text_encoding,
+                                    max_retries=max_retries, **kwargs))
+        # The body is a string, shared; the headers are a dict each caller may change.
+        return HttpResult(text=result.text, status=result.status, headers=dict(result.headers))
+
+    async def _send(
         self,
         method: str,
         url: str,

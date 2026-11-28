@@ -27,7 +27,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   answer (429/503) that states a `Retry-After` pauses its `source` for that wait, so the
   next request to the same source, from any caller, waits it out first, or is refused at
   once (429) when more than `MAX_PAUSE_WAIT` (30 s) is left; our own backoff never pauses
-  the source; the pause lives in the client instance).
+  the source; the pause lives in the client instance. Identical GETs sent while one is in
+  flight share it (`tools/single_flight.py`): one request reaches the source, every caller
+  gets its answer or its error, and nothing outlives the run; a request on the caller's own
+  session or with a body always goes alone. `NormattivaScraper.get_document` and `get_tree`
+  join their concurrent misses the same way, beneath their memory caches, so fifty readers
+  of one cold article cost one page and one parse (measured: 79 requests to Normattiva → 2,
+  T133); a tree's followers get a deep copy).
   - `brocardi_scraper.py` is **switched off**: Brocardi is no longer a source
     (D-078). No route calls it, no answer carries `brocardi_info` or
     `brocardi_error` (a client's `show_brocardi_info` is ignored),
