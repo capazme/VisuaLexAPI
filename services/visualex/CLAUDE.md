@@ -165,7 +165,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     case's judgment, joined cases included, then its Italian XHTML or, before about 2009, the
     former HTML; design 2026-10-12 §4), `giustizia_amministrativa.py` and `tar_seats.py` (the
     Consiglio di Stato, the C.G.A.R.S. and the TAR from giustizia-amministrativa.it: the portal's
-    search form, read from the page each time, then the court's XML document; the 29 seats, a copy
+    search form, read from the page each time, then the court's XML document, or the page the
+    portal has rendered from it since November 2026, read for its day only; the 29 seats, a copy
     of `conventions/sources/tar-seats.json`; design 2026-10-12-administrative-courts), `resolver.py` (one outcome, lookups
     cached per archive), `http.py` (the readers' own `ThrottledHttpClient` and honest
     User-Agent); behind `POST /search_decisions` and `POST /fetch_decision_pdf`: `search.py`
@@ -1048,7 +1049,14 @@ Breaking one of these breaks the product. Read before editing.
     The administrative courts' reader is in it too (`ga_synthetic_document`; real documents as
     `private/ga_<key>.xml`): each `h:div` of the court's XML is a line, a div inside a div is read
     once, ASCII whitespace runs become one space; it leaves out the metadata block and the German
-    twins (`…Ted`), and reads the bytes in the encoding the document declares. Its search never
+    twins (`…Ted`), and reads the bytes in the encoding the document declares. Since November 2026
+    the portal serves, at the same link, a page rendered from that XML by the court's stylesheet
+    (`<body class="corpo">` opening with the measure's register number; a page of that style
+    without it is `fonte_non_raggiungibile`): its text is not the XML's (a heading word replaced about 90 characters
+    in, the panel and the object moved, the secretary's name dropped, words added), so
+    `read_document` returns no text for it, only the day of publication, and the decision comes
+    with `testo_non_disponibile` like a PDF; a new projection from that page needs the owner's
+    decision. Its search never
     drops a result row in silence: a row it cannot read, fewer rows than the portal's count, a
     seat the form does not offer or an answer for another seat is `fonte_non_raggiungibile`.
     The freeze binds now that notes and highlights on decisions are stored (PR 4): a change to a

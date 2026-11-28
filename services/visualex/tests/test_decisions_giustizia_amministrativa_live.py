@@ -19,6 +19,7 @@ async def test_a_number_of_the_consiglio_di_stato_lists_each_kind_and_reads_the_
     sentenza = next(r for r in results if r.kind == "SENTENZA")
     assert sentenza.ecli == "ECLI:IT:CDS:2019:2270SENT"
     testo, published = await reader.text(sentenza)
-    assert testo["epigrafe"].startswith("Il Consiglio di Stato")
-    assert testo["dispositivo"].startswith("P.Q.M.")
+    # since November 2026 the link serves the page rendered from the XML: its day, never its text
+    # (module note). The XML's text, if the portal serves it again, is frozen in the golden file.
+    assert testo == {} or testo["epigrafe"].startswith("Il Consiglio di Stato")
     assert published == "2019-04-08"
