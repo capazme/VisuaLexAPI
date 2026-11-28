@@ -191,7 +191,16 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     download: a Normattiva tree is parsed once in its widest form (section labels and
     metadata, key `…|details=True|metadata=True`) and every other variant is cut from it
     (`_narrow`: drop the labels, drop the metadata), so the existence check, a range and the
-    index the web opens no longer fetch the same page three times. A EUR-Lex tree reads the
+    index the web opens no longer fetch the same page three times. On an act whose tree is not
+    cached, an undated request that names no annex (a default annex only for the c.c., c.p. and
+    c.p.c., the codes measured) reads its first article's page first and
+    takes the tree from it (`NormaController._tree_from_article_page`, `seed_tree_from_page`;
+    owner, G-646): that page carries the act's index, identical to the act page's on 27 of 27
+    pairs measured, and the read needs it anyway, so the first article of a code costs one
+    request instead of two (art. 2043 c.c. cold 8.8 → 4.6 s, T133). A dated request, a range
+    (its tree is read first) or a page with no index goes the old way; the page is kept for the
+    read only when the tree holds that article in that part (for an article an act does not
+    hold Normattiva answers another page). A EUR-Lex tree reads the
     page from the scraper's own copy (namespace `eurlex`, same URL) and leaves the page it
     visited there, only when it parsed into articles: one browser visit serves the tree, the
     rubriche and the articles (`tests/test_tree_variants.py`). The Normattiva page comes

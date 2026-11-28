@@ -26,6 +26,7 @@ from visualex_api.tools.config import (
     FETCH_QUEUE_DELAY,
 )
 from visualex_api.tools.norma import Norma, NormaVisitata
+from visualex_api.services.http_client import http_client
 from visualex_api.services.normattiva_scraper import NormattivaScraper, text_source_of
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services import eurlex_fetch
@@ -67,7 +68,7 @@ from visualex_api.services.decisions.resolver import (
 from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, read_request_date, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.page_memo import PAGE_MEMO
-from visualex_api.tools.treextractor import get_tree
+from visualex_api.tools.treextractor import get_tree, seed_tree_from_page, tree_is_cached
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
 from visualex_api.tools.sources import cite_act, cite_article, cite_recital, recital_numbers
@@ -427,6 +428,21 @@ def _read_page_extras(raw, article, tree_raw=None):
         log.warning("Article parts could not be read", error=str(exc))
         parts = None
     return notes, parts
+
+
+# The codes whose article pages were measured to carry the act's index identically, annex
+# included (G-646, T133): their default annex (`:2`, `:1`) is read from an article's page. Another
+# act with an annex goes the old way until its pages are measured.
+_MEASURED_CODES = (
+    "urn:nir:stato:regio.decreto:1942-03-16;262",   # codice civile
+    "urn:nir:stato:regio.decreto:1930-10-19;1398",  # codice penale
+    "urn:nir:stato:regio.decreto:1940-10-28;1443",  # codice di procedura civile
+)
+
+
+def _measured_code(url) -> bool:
+    urn = str(url or "").split("N2Ls?", 1)[-1]
+    return any(urn == code or urn.startswith(code + ":") for code in _MEASURED_CODES)
 
 
 class NormaController:
@@ -934,6 +950,10 @@ class NormaController:
 
         log.debug("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
 
+        if (not strict and not address.is_eu and articles and asked_annex is None and not explicit_dispositivo
+                and (annex_value is None or _measured_code(norma.url))):
+            await self._tree_from_article_page(norma, articles[0], annex_value, data)
+
         # Smart article lookup: if no annex specified and not a hardcoded codice,
         # check if the article actually exists in the dispositivo or in an annex
         # SKIP smart lookup if user explicitly requested dispositivo (empty string)
@@ -1031,6 +1051,45 @@ class NormaController:
                 norma, cleaned_article, scope, akn_fallback=not strict)
             address.checked.append((cleaned_article, exists))
         return address
+
+    async def _tree_from_article_page(self, norma, article, annex, data):
+        """On an act whose tree is not cached, read the first article's page and take the act's
+        tree from it (owner, G-646): the read needs that page anyway, and the act's own page,
+        which the existence check used to download first, carries the same index (6.6 s and one
+        request less on the first article of a code). Only for the text in force (a dated page
+        carries the index at that day) and when the request names no annex (an annex's pages
+        were not measured); the page is the one `get_document` reads next, stored where it reads
+        it. Anything else, or a page with no index, leaves the check to read the act's page as
+        before. One attempt, as the tree's own download: a failure costs what the tree's did."""
+        if not isinstance(article, str) or not article or not getattr(norma, 'url', None):
+            return
+        version, day = data.get('version'), data.get('version_date')
+        if (data.get('upcoming') is True or (isinstance(day, str) and day.strip())
+                or (isinstance(version, str) and version.strip().lower() == 'originale')):
+            return
+        try:
+            if await tree_is_cached(norma.url):
+                return
+            urn = NormaVisitata(norma=norma, numero_articolo=article, versione=version,
+                                data_versione=None, allegato=annex).urn
+            cache = normattiva_scraper.cache
+            page = await cache.get(urn)
+            if page:
+                await seed_tree_from_page(norma.url, page)
+                return
+            page = (await http_client.request("GET", urn, source="normattiva", max_retries=0)).text
+            entries = await seed_tree_from_page(norma.url, page)
+            # Kept for the read only when the act holds that article where it was asked: for an
+            # article it does not hold, Normattiva answers another page (art. 1), which must never
+            # be stored under this article's address.
+            wanted = comparable_article_key(article)
+            if entries and any(
+                    isinstance(entry, dict) and str(entry.get('allegato') or '') == str(annex or '')
+                    and comparable_article_key(entry.get('numero', '')) == wanted
+                    for entry in entries):
+                await cache.set(urn, page)
+        except Exception as exc:  # noqa: BLE001 - the existence check reads the act's page as before
+            log.debug("Tree not read from the article's page", error_type=type(exc).__name__)
 
     async def _name_the_part(self, nv, part, comma):
         """Set `nv.parte` from the request's `parte` or `comma` (G-387 (a), G-389).
