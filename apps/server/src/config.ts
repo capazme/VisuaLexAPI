@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Not in the desktop app's local mode: its entry point sets every variable it needs, and a `.env` in whatever folder
+// the process started from must not set the others.
+if (process.env.LEXCRAFT_MODE !== 'local') dotenv.config();
 
 const readBoolean = (value: string | undefined, defaultValue = false): boolean => {
   if (value === undefined) return defaultValue;

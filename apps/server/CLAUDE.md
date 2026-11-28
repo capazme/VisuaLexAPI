@@ -51,6 +51,18 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   Postgres and nothing on SQLite (spec §5); `tests/local/dialect.test.ts` fails
   on a lock clause written anywhere else, but in the files of the sections that
   stay online (Learn, the Forum).
+- The desktop app's local server (spec §6) starts from `src/local/main.ts`, never
+  from `src/index.ts` (which refuses `LEXCRAFT_MODE=local`, so the online
+  background jobs never start there). Its contract with the app's shell is in
+  that file's header: the database key and a launch secret on stdin, a READY line
+  on stdout, the end when stdin closes. Its port listens on 127.0.0.1 only, and
+  every request passes `src/local/guards.ts`: the exact Host (421), no foreign
+  Origin or `Sec-Fetch-Site` (403), the window's per-launch cookie, which only
+  the shell obtains (`POST /__lexcraft/session` with the launch secret as a
+  Bearer header, never in a URL). Locally there is no CORS, the online sections
+  and the sign-in routes answer before the session (`src/local/online.ts`), and
+  the sources say the text needs the network (`src/local/sources.ts`). Any
+  change there runs `tests/local/guards.test.ts` and `tests/local/entry.test.ts`.
 - `src/index.ts` — graceful shutdown on SIGTERM/SIGINT: clear the MERL-T
   watchdog's and the saved-norm watcher's intervals, `server.close()`, drop each
   keep-alive socket as soon as it goes idle, `prisma.$disconnect()`, exit; a
