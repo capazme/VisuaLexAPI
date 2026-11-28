@@ -59,9 +59,12 @@ def controller():
     return NormaController.__new__(NormaController)
 
 
-async def test_the_tree_is_the_one_the_act_page_gives(caches):
+async def test_the_tree_is_stored_as_the_act_pages_tree_would_be(caches):
+    """The key and the shape `_tree_from_page` stores, from whatever page carries the index (that
+    an article's page carries the act's index identically was measured offline on 27 pairs of
+    real pages, too large for the repository)."""
     tree_cache, _ = caches
-    assert await treextractor.seed_tree_from_page(ACT, LANDING) is True
+    assert await treextractor.seed_tree_from_page(ACT, LANDING)
     seeded = await tree_cache.get(treextractor._full_key(ACT, False))
     direct = await treextractor._parse_normattiva_tree(
         treextractor.BeautifulSoup(LANDING, "html.parser"), ACT, False, True, return_metadata=True)
@@ -146,4 +149,43 @@ async def test_a_named_annex_reads_the_act_page_as_before(caches):
             patch.object(app_module, "fetch_act_index", AsyncMock(return_value=None)):
         await controller().resolve_norm_address(
             {"act_type": "legge", "date": "1990-08-07", "act_number": "241", "article": "3", "annex": "1"})
+    called.assert_not_awaited()
+
+
+async def test_a_page_for_an_article_the_act_does_not_hold_is_not_kept(caches):
+    """Normattiva answers another page (art. 1) for an article an act does not hold: the tree is
+    the act's all the same, but the page must never be kept under that article's address."""
+    _, pages = caches
+    source = Source()
+    with patch.object(app_module.http_client, "request", source.request):
+        await controller()._tree_from_article_page(l241(), "9999", None, {})
+    assert await treextractor.tree_is_cached(l241().url)
+    assert await pages.get(ACT + "~art9999") is None
+
+
+async def test_an_article_only_in_an_annex_is_not_kept_under_the_body_s_address(caches):
+    _, pages = caches
+    source = Source()
+    with patch.object(app_module.http_client, "request", source.request):
+        await controller()._tree_from_article_page(l241(), "3", "1", {})
+    assert await pages.get(ACT + ":1~art3") is None
+
+
+@pytest.mark.parametrize("url,measured", [
+    ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2", True),
+    ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1930-10-19;1398:1", True),
+    ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1940-10-28;1443", True),
+    ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1931-06-18;773", False),
+    ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;2620", False),
+])
+async def test_only_the_measured_codes_are_read_through_their_default_annex(url, measured):
+    assert app_module._measured_code(url) is measured
+
+
+async def test_the_link_route_reads_the_act_page_as_before(caches):
+    called = AsyncMock()
+    with patch.object(NormaController, "_tree_from_article_page", called), \
+            patch.object(app_module, "get_tree", AsyncMock(return_value=([{"numero": "3", "allegato": None}], 1, {}))):
+        await controller().resolve_norm_address(
+            {"act_type": "legge", "date": "1990-08-07", "act_number": "241", "article": "3"}, strict=True)
     called.assert_not_awaited()

@@ -430,6 +430,21 @@ def _read_page_extras(raw, article, tree_raw=None):
     return notes, parts
 
 
+# The codes whose article pages were measured to carry the act's index identically, annex
+# included (G-646, T133): their default annex (`:2`, `:1`) is read from an article's page. Another
+# act with an annex goes the old way until its pages are measured.
+_MEASURED_CODES = (
+    "urn:nir:stato:regio.decreto:1942-03-16;262",   # codice civile
+    "urn:nir:stato:regio.decreto:1930-10-19;1398",  # codice penale
+    "urn:nir:stato:regio.decreto:1940-10-28;1443",  # codice di procedura civile
+)
+
+
+def _measured_code(url) -> bool:
+    urn = str(url or "").split("N2Ls?", 1)[-1]
+    return any(urn == code or urn.startswith(code + ":") for code in _MEASURED_CODES)
+
+
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
@@ -935,7 +950,8 @@ class NormaController:
 
         log.debug("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
 
-        if not strict and not address.is_eu and articles and asked_annex is None and not explicit_dispositivo:
+        if (not strict and not address.is_eu and articles and asked_annex is None and not explicit_dispositivo
+                and (annex_value is None or _measured_code(norma.url))):
             await self._tree_from_article_page(norma, articles[0], annex_value, data)
 
         # Smart article lookup: if no annex specified and not a hardcoded codice,
@@ -1058,12 +1074,20 @@ class NormaController:
                                 data_versione=None, allegato=annex).urn
             cache = normattiva_scraper.cache
             page = await cache.get(urn)
-            if not page:
-                page = (await http_client.request("GET", urn, source="normattiva", max_retries=0)).text
-                if not page:
-                    return
+            if page:
+                await seed_tree_from_page(norma.url, page)
+                return
+            page = (await http_client.request("GET", urn, source="normattiva", max_retries=0)).text
+            entries = await seed_tree_from_page(norma.url, page)
+            # Kept for the read only when the act holds that article where it was asked: for an
+            # article it does not hold, Normattiva answers another page (art. 1), which must never
+            # be stored under this article's address.
+            wanted = comparable_article_key(article)
+            if entries and any(
+                    isinstance(entry, dict) and str(entry.get('allegato') or '') == str(annex or '')
+                    and comparable_article_key(entry.get('numero', '')) == wanted
+                    for entry in entries):
                 await cache.set(urn, page)
-            await seed_tree_from_page(norma.url, page)
         except Exception as exc:  # noqa: BLE001 - the existence check reads the act's page as before
             log.debug("Tree not read from the article's page", error_type=type(exc).__name__)
 

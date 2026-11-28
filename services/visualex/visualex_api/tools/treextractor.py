@@ -230,7 +230,7 @@ async def tree_is_cached(normurn) -> bool:
     return False
 
 
-async def seed_tree_from_page(normurn, text) -> bool:
+async def seed_tree_from_page(normurn, text):
     """Store the act's tree read from a page that carries the act's index, as `_tree_from_page`
     stores the act page's (the widest variant, without links); True when stored.
 
@@ -238,16 +238,17 @@ async def seed_tree_from_page(normurn, text) -> bool:
     pairs measured (c.c., c.p.c., c.p., l. 241/1990, d.lgs. 231/2001, the 18 articles of l.
     24/2017; owner, G-646). So the first read of an act needs the article's page only, which it
     downloads anyway, instead of the act's page first (6.6 s for a code). A page with no index
-    stores nothing, and `get_tree` reads the act's page as before."""
+    stores nothing, and `get_tree` reads the act's page as before. Returns the tree's entries
+    when stored, else None."""
     if _source_of(normurn) != "normattiva" or not isinstance(text, str) or len(text) < 500:
-        return False
+        return None
     soup = BeautifulSoup(text, 'html.parser')
     result, count, metadata = await _parse_normattiva_tree(soup, normurn, False, True, return_metadata=True)
     if count <= 0:
-        return False
+        return None
     await _tree_cache.set(_full_key(normurn, False), {"result": result, "count": count, "metadata": metadata})
     logging.info(f"Stored the act's tree read from an article's page: {count} articles")
-    return True
+    return result
 
 
 # "art. 1" in the tree's links, or "art 1" without the dot, as some annexes write it
