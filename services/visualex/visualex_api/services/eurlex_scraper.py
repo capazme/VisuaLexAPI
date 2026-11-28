@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import os
 import re
@@ -9,6 +10,7 @@ from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
+from ..tools.page_memo import PAGE_MEMO
 from ..tools.selectors import EURLexSelectors
 from ..tools.treextractor import (HEADING_ORDINAL, cites_an_article, following_nodes, glued_headings,
                                  is_quoted_heading, node_text, strip_amendment_markers)
@@ -409,6 +411,30 @@ class EurlexScraper(BaseScraper):
         await self.cache.set(url, html_content)
         return self.parse_document(html_content)
 
+    async def _article_text(self, url: str, article) -> str:
+        """An article's text, extracted once per stored page (`page_memo`, T133).
+
+        The act's page (824 KB for the GDPR) was parsed again for every article read: about
+        100 ms of CPU each, the heaviest warm read. The text is the extractor's on the page the
+        persistent cache holds, kept under that entry's write time and the article; a page
+        written again is read again. A copy that is not an act's page, or none, goes the way
+        `_load_soup` always went (fetched, kept, parsed), and its text is kept from the next read.
+        """
+        memo_key = await PAGE_MEMO.key_for(self.cache, url, "eurlex_article", (str(article),))
+        if memo_key is not None:
+            hit = PAGE_MEMO.hit(memo_key)
+            if hit is not PAGE_MEMO.MISSING:
+                return hit
+            cached_html = await self.cache.get(url)
+            if eurlex_fetch.is_act_page(cached_html):
+                log.info("Cache hit", source="eurlex_persistent")
+                text = await asyncio.to_thread(
+                    lambda: self.article_text_of(self.parse_document(cached_html), article))
+                PAGE_MEMO.put(memo_key, text)
+                return text
+        soup = await self._load_soup(url)
+        return await self.extract_article_text(soup, article)
+
     async def get_recitals(self, norma) -> tuple[list[dict], str]:
         """All recitals (considerando) of an EU act, and the page they came from.
 
@@ -444,16 +470,20 @@ class EurlexScraper(BaseScraper):
         else:
             url = urn
 
-        soup = await self._load_soup(url)
-
         if article:
             log.info(f"Extracting text for article {article}")
-            return await self.extract_article_text(soup, article), url
-        else:
-            log.info("Returning full document text")
-            return soup.get_text(), url
+            return await self._article_text(url, article), url
+
+        soup = await self._load_soup(url)
+        log.info("Returning full document text")
+        return soup.get_text(), url
 
     async def extract_article_text(self, soup, article):
+        return self.article_text_of(soup, article)
+
+    def article_text_of(self, soup, article):
+        """The text of `article` in the act's parsed page, or DocumentNotFoundError. Synchronous
+        (it only reads the tree), so it can run in a thread with the parse."""
         log.info(f"Searching for article {article} in the document")
 
         if is_consolidated_markup(soup):

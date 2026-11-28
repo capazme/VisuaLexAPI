@@ -357,7 +357,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     its state is judged against) and its update notes and parts (`_page_extras_for`, keyed by
     the article; a part's page goes the old way) are computed once per page, not at every read
     (T133: a warm read of an article of a code 44 → 1.6 ms). A page written again has a new
-    stamp; a backend without stamps (Redis) reads the page every time
+    stamp; a backend without stamps (Redis) reads the page every time. An EU article's text is
+    kept the same way (`EurlexScraper._article_text`, keyed by the article): the act's page
+    is parsed once per stored page, in a thread, not at every article read (the GDPR's 824 KB
+    page, about 100 ms each; warm 103 → 0.7 ms); a copy that is no act's page goes the way
+    `_load_soup` always went
 
 **Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
 in-process, cold then warm, and prints where each one's time goes (network per host, our
