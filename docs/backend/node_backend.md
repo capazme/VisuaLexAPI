@@ -87,7 +87,7 @@ npm start
 | `prisma:generate` | Generate Prisma client |
 | `prisma:migrate` | `prisma migrate dev` — **do not use on the development database**: on drift it offers to reset it. Write the migration by hand and apply it with `npx prisma migrate deploy` (`apps/server/CLAUDE.md`) |
 | `prisma:studio` | Open Prisma Studio (port 5555) |
-| `prisma:reset` | `prisma migrate reset` — wipes the database it points at; the test setup uses it on `visualex_test` only |
+| `prisma:reset` | `prisma migrate reset` — wipes the database it points at. The test setup no longer uses it: each run creates and drops a database of its own (`apps/server/tests/globalSetup.ts`) |
 | `db:seed` | Seed database with sample data |
 
 ---

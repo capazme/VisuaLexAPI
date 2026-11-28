@@ -11,6 +11,9 @@ vi.mock('dotenv', () => {
   return { default: { config }, config };
 });
 // Prisma 7 loads no `.env` of its own (its generated client has no dotenv): `dotenv` above is the only loader.
+// The run's own database (`tests/globalSetup.ts`): from here on every reader of DATABASE_URL in this process uses
+// it: this file's client, `src/lib/prisma.ts`, `src/config.ts`, `tests/helpers.ts` and the tests themselves.
+process.env.DATABASE_URL = inject('testDatabase').url;
 const prisma = new PrismaClient({ adapter: createPgAdapter(process.env.DATABASE_URL ?? '') });
 // A guarded name exported by the shell, or anywhere else outside `.env.test`.
 dropDevelopmentEnv();
@@ -25,12 +28,12 @@ process.env.OAUTH_REQUESTS_PER_15_MINUTES = '100000';
 process.env.OAUTH_MCP_CLIENT_SECRET = 'test-mcp-client-secret';
 process.env.OAUTH_DELEGATION_SECRET = 'test-delegation-secret';
 
-// The database was reset once for the run (`tests/globalSetup.ts`). Before each test every
+// The run's database was created and migrated once (`tests/globalSetup.ts`). Before each test every
 // table is emptied, with DELETEs in the order the foreign keys allow (a TRUNCATE costs about
 // 200 ms each time, rewriting each table's files, against a few ms), and the text versions the
 // migrations insert are put back: every test starts from empty tables plus version 1 of each
 // text to accept, as a fresh database has. Each file first checks that the schema is still the
-// one the migrations made: no reset runs between files any more.
+// one the migrations made: nothing recreates the database between files.
 let database: TestDatabase;
 
 beforeAll(async () => {
@@ -41,7 +44,7 @@ beforeAll(async () => {
     throw new Error(
       'The test database schema is no longer the one the migrations made at the start of the run: ' +
         'a test in an earlier file changed it and did not undo it (one that timed out before its `finally`?), ' +
-        'or a migration was applied during `test:watch`. Fix that test, or restart watch mode: a new run resets the database.'
+        'or a migration was applied during `test:watch`. Fix that test, or restart watch mode: a new run creates a fresh database.'
     );
   }
 });

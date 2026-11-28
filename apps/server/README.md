@@ -81,7 +81,7 @@ Server will start at `http://localhost:3001`
 | `npm run prisma:generate` | Generate Prisma Client |
 | `npm run prisma:migrate` | `prisma migrate dev` — never on the development database: on drift it offers to reset it (see "Create New Migration") |
 | `npm run prisma:studio` | Open Prisma Studio (visual DB editor) |
-| `npm run prisma:reset` | Reset the database it points at (⚠️ deletes all data; the test setup runs it on `visualex_test`) |
+| `npm run prisma:reset` | Reset the database it points at (⚠️ deletes all data). The test setup no longer uses it: each run creates and drops a database of its own |
 | `npm run db:seed` | Seed database with test data |
 
 ## API Endpoints

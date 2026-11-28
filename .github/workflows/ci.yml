@@ -34,7 +34,7 @@ jobs:
   server:
     name: Server tests
     runs-on: ubuntu-latest
-    # The setup runs `prisma migrate reset` and empties every table: it needs
+    # The setup creates and drops a database of the run's own beside this one and empties its tables: it needs
     # a real Postgres and a database whose name contains "test".
     services:
       postgres:
