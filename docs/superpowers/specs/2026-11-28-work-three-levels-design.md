@@ -1,13 +1,16 @@
 # Work in three levels, in the desktop app only: practice, proceeding, event
 
-Status: proposed on 28 November 2026, for the owner's yes before any code. Local mode only. It builds on the local
-mode of `2026-11-26-desktop-local-mode-design.md` (M1, PRs #757–#764) and fills the slot that spec leaves for «the
-practices-as-folders and the local deadline register». The decisions it rests on:
+Status: proposed on 28 November 2026. The owner answered all its questions the same day (G-628…G-645, § «Decisions
+taken on 28 November»), and this text follows his answers. Local mode only. It builds on the local mode of
+`2026-11-26-desktop-local-mode-design.md` (M1, PRs #757–#764) and fills the slot that spec leaves for «the
+practices-as-folders and the local deadline register». The implementation stacks on M1 when the owner says go. The
+decisions it rests on:
 
 - **G-621** (27 November): this work lives only in the desktop app. The web stays on the law and never invites a
   client's data; the app handles the sensitive work, locally, and is open source.
 - **G-622** (27 November): the data structure is the one of the deadline workbook the owner uses at his firm, sent as
   an empty template. «Questa è la struttura dati, anche noi dobbiamo adattarci».
+- **G-628…G-645** (28 November): the owner's answers to every question of this design.
 - **G-563**: scheduled jobs (alerts, digests) exist only in the desktop app.
 - G-612–G-615 (today's server on one encrypted SQLite file, the porting line, local mode in the core first); G-514
   (a local profile); G-516 (a local MCP server, M6); D-105 (privacy by design); D-163 (synchronisation, later).
@@ -17,66 +20,78 @@ practices-as-folders and the local deadline register». The decisions it rests o
 - **The web owner's answers of 28 November** to the questions of his brief, folded in where they apply and listed in
   «Answers of 28 November».
 
-This document designs the backend. The screens are lexcraft-web's and wait for its owner (§ «For the web owner»).
-The decisions still open are in «Decisions for the owners». Each fact is marked **[read]** in a source listed at the
-end, **[measured]**, or **[estimated]**.
+This document designs the backend and the data the app's screens use. The porting line builds both, and the web
+owner reviews them (§ «For the web owner»). Each fact is marked **[read]** in a source listed at the end,
+**[measured]**, or **[estimated]**.
 
-**What this repository holds and what it does not.** This repository is public. It holds the structure of the
-firm's workbook (entities, fields, states, views) under G-622, and a computation engine written from the norms
-themselves, read on Normattiva. It does not hold the template file, any row of it, its rule catalogue or its
-formulas. Whether the firm's rules may be reused in public code is an open question (W1); until it is answered the
-app ships with no term rule of its own.
+**What this repository holds and what it does not.** This repository is public. Under G-622 and G-628 it holds:
+- the structure of the firm's workbook: entities, fields, states, views;
+- its catalogue of term rules, validated by the owner (G-633, §4.0);
+- a computation engine written from the norms themselves, read on Normattiva.
+
+It does not hold the template file or its list of courts: each firm writes its own.
 
 ## Risks first
 
-1. **The linked workbook is plain text.** The app's database is encrypted (G-613), the `.xlsx` it keeps in step is
-   not. If the lawyer keeps that file in Dropbox, OneDrive or iCloud Drive, the clients' data leave the computer,
-   and so does the log sheet with every past value. The app says so before it links a file, and again when the
-   path is inside a synced folder (§5.9).
+1. **The linked workbook and the practice folder are plain text.** The app's database is encrypted (G-613); the
+   `.xlsx` it keeps in step and the folder of §8 are not.
+   - If the lawyer keeps either in Dropbox, OneDrive or iCloud Drive, the clients' data leave the computer, and the
+     workbook's log sheet carries every past value with it.
+   - The app says so before it links a file or creates the folder, again when the path is inside a synced folder
+     (G-634, §5.9), and it warns when the disk itself is not encrypted (§8.6).
 2. **A deadline hidden in a branch is a missed deadline.** While two versions of the register exist, the alerts
    read every one of them, and also the workbook's rows the app has not reconciled yet (§6). No deadline may go
    silent because it sits in the «wrong» version.
-3. **A term computed by an unvalidated rule is not a certain date.** Every rule starts unvalidated. The app computes
-   and alerts anyway, so that nothing goes silent, but it marks the date as computed by an unvalidated rule until a
-   lawyer validates the rule, and the validation is written in the practice's diary (G-622).
+3. **A term is only as right as its rule.** The catalogue's rules ship validated by the owner (G-633). A rule a firm
+   adds, or changes, computes and alerts at once, so that nothing goes silent, but its dates carry «regola non
+   validata» until a lawyer validates it, and the validation is written in the diary of each practice it touches
+   (§4.6).
 4. **The page must never choose a file.** A route that took a file path from the web page would let any page that
    reaches the local port read or write any file the user can. The path of a workbook comes only from the native
    dialog of the shell, over the shell's private channel (§5.8).
-5. **Whatever Claude reads leaves the computer.** The local MCP server (M6) does not expose the register unless the
-   lawyer turns it on for that client (§7.3).
-6. **Notifications show on a locked screen.** Their text names no client by default (§6.3).
-7. **A pseudonymised mirror is not anonymous.** Pseudonymised data remain personal data under the GDPR
-   (art. 4(5), recital 26). In a lawyer's practice the real risk is identification from context: the court, the
-   dates, the facts, a decision later published. The web mirror of §11 is personal data held by whoever hosts it.
-   It needs a DPIA and a legal check before it is built, and it is never called anonymous.
+5. **Whatever an AI reads leaves the computer.**
+   - The local MCP server (M6) does not expose the register unless the lawyer turns it on for that client (§7.3).
+   - The folder of §8 is laid out for agents (G-629), and any agent that can read it reads everything in clear,
+     beyond the MCP server's switches.
+6. **Notifications show on a locked screen.** Their text names no client by default (§6.3), with alerts on even when
+   the app is closed (G-635).
+7. **A pseudonymised mirror is not anonymous.** Pseudonymised data remain personal data under the GDPR (art. 4(5),
+   recital 26). In a lawyer's practice the real risk is identification from context: the court, the dates, the facts,
+   a decision later published. G-639 lets the court, the dates and the amounts go in clear with the lawyer's
+   confirmation, and never the docket and decision numbers.
+   - G-642 builds and activates the mirror now, with the DPIA and the legal opinion after. Art. 35 GDPR wants the
+     DPIA before a high-risk processing begins, so both come before the first real user (§11.6).
+   - The mirror is never called anonymous.
 
 ## What the lawyer gets, and what the first version leaves out
 
-**The first version** (stages 1–5 of §9):
+**The first version** (stages 1–7 of §9):
 
 - practices with readable codes (P-001), their proceedings (P-001-A, P-001-B) and their events (E-0001): hearings,
   deadlines and checks, each with a date written by hand or computed from another event by a rule;
-- the term rules, the court holidays and the firm's lists, edited in the app;
+- the catalogue of term rules, validated (G-633); the court holidays and the firm's lists, edited in the app;
 - the computed views: the week, the month, the acts, the practice card, the alarms, by person and by area;
-- alerts, while the app runs and, if the lawyer wants, from the moment he logs in;
+- tasks generated by events, proposed from the firm's templates and confirmed by the lawyer (G-643);
+- alerts, while the app runs and, by default, from the moment the lawyer logs in (G-635);
+- the practices as folders on disk, editable outside the app and laid out for agents (G-629, §8);
 - a linked Excel workbook kept in step both ways, with a log sheet, «Riallinea con Excel», and a divergent branch
   when someone writes in the app without reconciling;
-- export to a new workbook and import from one, with a preview.
+- export to a new workbook and import from one, with a preview;
+- the data classes and their marks (§11.1).
+
+**Then, once the encrypted channel of the remote access exists** (stage 8): the pseudonymised web mirror (G-642,
+§11).
 
 **Left out of the first version:**
 
-- fees and invoices («Preventivi e parcelle») and insolvency claims («Fallimenti e passivo»), which the template has
-  (§9);
-- cloud connectors (WebDAV first, then the others of the owner's proposal) and synchronisation between computers
-  (D-163, W10);
+- fees and invoices («Preventivi e parcelle»), as records only, and insolvency claims («Fallimenti e passivo»),
+  both after the first version (G-636, §9);
+- cloud connectors (WebDAV first, then the others of the owner's proposal), and synchronisation between computers
+  (D-163; for the register G-637);
 - colleagues writing in the same register through the app (G-570); today they share the workbook;
-- the pseudonymised web mirror (§11), which waits for a DPIA and a legal check; the data classes and their marks are
-  in the first version;
 - formulas in an exported workbook: it carries values;
 - a code format the firm chooses (2026/001);
-- practices as folders of readable files (§8: the default is a read-only export, later);
-- the register through the local MCP server (M6, §7.3);
-- any term rule shipped by LexCraft (W1).
+- the register through the local MCP server (M6, §7.3).
 
 ## Design
 
@@ -93,8 +108,8 @@ this design must exist **only** locally (G-621). Three ways:
 | Links to dossiers | real foreign keys | real foreign keys (back-relations added by the derivation) | none: ids by hand |
 | Risk | a route mounted online by mistake accepts client data | small | references that rot between files |
 
-**Recommendation: (B).** The online schema never names a model of this design, so no mistake online can store a
-client's data, and the local file keeps real foreign keys to dossiers and the local profile.
+**Decided: (B), the local fragment (G-630).** The online schema never names a model of this design, so no mistake
+online can store a client's data, and the local file keeps real foreign keys to dossiers and the local profile.
 
 How (B) works:
 
@@ -107,10 +122,13 @@ How (B) works:
   ```
   /// back-relation User.workRegisters WorkRegister[]
   /// back-relation Dossier.workPractices WorkPractice[]
+  /// local-field Task.workEventId String? /// class: non-personal; mirror: yes
+  /// local-field Task.workEvent WorkEvent? @relation(fields: [workEventId], references: [id], onDelete: SetNull)
   ```
 
   `deriveLocalSchema` inserts each into the named model of the derived schema, appends the fragment, and fails on a
-  name it cannot place.
+  name it cannot place. A `local-field` line gives a server model a column that exists only locally: the task's link
+  to its event (G-643, §2.8).
 - **Tests:**
   - the server's `schema.prisma` names no `Work*` model, and the Postgres test database has no `work_` table after
     the migrations;
@@ -123,10 +141,9 @@ How (B) works:
   - The online type check excludes `src/work/`. The local CI job generates the local client first, then type-checks
     `src/work/` against it.
   - A test fails if a file outside `src/local/` and `src/work/` imports `src/work/`.
-- **Dossiers and tasks stay as they are.** A practice hangs on a dossier (§2.2): the dossier keeps its sources,
-  notes and highlights, and the practice adds the firm's data in a local-only table. Nothing of the dossier or of the
-  tasks changes online. What the web does with its own practices and tasks is a question for the web owner (§ «For
-  the web owner»).
+- **Dossiers and tasks stay as they are online.** A practice hangs on a work dossier (§2.2): the dossier keeps its
+  sources, notes and highlights, and the practice adds the firm's data in a local-only table. A task gains its link
+  to an event only locally. Nothing of the dossier or of the tasks changes online.
 
 ### 2. The data model
 
@@ -144,8 +161,8 @@ Conventions:
   owner on 28 November: P-001, P-001-A, E-0001. A format the firm chooses comes later. Codes are unique per register
   and never reused once deleted. A deleted row goes to the trash, as every Work row does.
 - **Every row has a `version`**, increased at each write, and `updatedAt`. The change log (§2.6) records each write.
-- **Every field carries a data class** (personal, indirect, pseudonymisable, non-personal), written beside it in the
-  schema and checked by a test (§11.1).
+- **Every field carries a data class** (personal, pseudonymisable, non-personal: G-638) **and a mirror rule** (never,
+  confirm, pseudonymise, yes: G-639), written beside it in the schema and checked by a test (§11.1).
 
 #### 2.1 Registers and branches
 
@@ -217,7 +234,8 @@ Computed, never stored: the next event, its days left, the practice's alarm.
     anticipate to the previous one), `saturdayIsHoliday`;
   - `followsPostponement`: whether a term computed from a hearing moves with it when the hearing is postponed;
   - `validatedAt`, `validatedBy`, `notes`;
-  - `origin`: the firm's, imported, or LexCraft's (none ships today, W1).
+  - `origin`: LexCraft's catalogue (§4.0, validated: G-633), an example of a firm's practice, the firm's own, or
+    imported.
 - **`WorkHoliday`.** `date`, `label`, `court` (empty for a national holiday).
   - The national ones are computed from `apps/server/src/tasks/italianHolidays.ts`, which already holds the fixed
     days, Easter Monday and 4 October from 2026, so the list never runs out.
@@ -253,6 +271,34 @@ It is the history of every row, the source of the workbook's log sheet (§5.4), 
   with the file and anyone can edit it.
 - **`WorkFileVersion`.** The previous versions of the linked file, kept as blobs in the encrypted database: the last
   20, and one per day for 30 days.
+- **`WorkFolderFile`.** The last version the app wrote of each file of the practice folder (§8.4).
+
+#### 2.8 Tasks generated by events (G-643)
+
+The owner decided that the event generates the tasks. The web owner's details, from his answers of 28 November:
+
+- **Two objects.** The event is a fact of the case: its date, rule, state, outcome and alarm. The task is work: a
+  planned date, subtasks, repetitions, an assignee. Today's `Task` stays the task.
+- **The link exists only locally.** `Task.workEventId` is the derivation's `local-field` (§1); the online `Task` has
+  no such column.
+- **The task's due date is the event's effective date.** It is read-only and follows a postponement. In local mode
+  the task routes refuse a change of `dueDate` on a linked task with «la scadenza segue l'evento E-0012». The task
+  code reaches that check through a small seam that only the local mode fills. If, after a postponement, the planned
+  date falls past the due date, the app warns.
+- **The event's responsible person** is the default assignee of the tasks it generates.
+- **The legal alarms stay on the events.** Tasks keep only the planner's reminders, so the same term never rings
+  twice (§6.1).
+- **Proposed, then confirmed.** `WorkTaskTemplate` holds the firm's task templates:
+  - for an event type or a rule: a title, a number of days before the event, optional subtasks;
+  - for example «redigere la memoria», 10 days before.
+
+  When an event is born, the app proposes its tasks and the lawyer confirms them; nothing is created unseen. The
+  templates are the firm's settings, like the internal rules, and none ships as law.
+- **Closing.** When an event closes, the app proposes to close its open tasks. Closing every task does not close the
+  event.
+- **Not in the workbook.** Tasks stay out of the Excel file, which remains the register of events (§5).
+- **In the folder** they are files of `Compiti/` (§8.1). **In the web mirror** they go with their event, pseudonymised
+  (§11.5).
 
 ### 3. Migrations
 
@@ -262,15 +308,56 @@ It is the history of every row, the source of the workbook's log sheet (§5.4), 
 - **CHECKs.** The local-only CHECK constraints go into `prisma/local/checks.sql`, in a section of their own. M1's
   twin test starts from the Postgres CHECKs, so it never meets these tables. M1's other test, which compares the
   CHECKs live in the local file with `checks.sql`, covers them as it covers the rest.
-- **Seeds.** The first migration creates the fixed lists (event types, states, hearing modes) and nothing else: no
-  court, no person, no rule.
+- **Seeds.** The first migration creates the fixed lists (event types, states, hearing modes) and nothing else.
+- **The rule catalogue is data the app brings, not a migration.**
+  - At first start the app inserts the catalogue of §4.0 from `src/work/terms/catalogue.ts`, with origin `lexcraft`
+    and validated (G-633).
+  - A later release that changes a catalogue rule never overwrites the firm's copy. It shows the difference and lets
+    the lawyer take it; taking it makes the rule validated again under the owner's name.
+  - No court and no person is seeded.
 
 ### 4. The term engine
 
 A pure module, `src/work/terms/`, with no database and no clock of its own: given an origin day, a rule, the
 proceeding's suspension and the holidays, it returns the day, or a refusal that names what is missing. It is the
 part of this design that, if wrong, makes a lawyer miss a term. So each step below comes from a norm read on
-Normattiva on 28 November 2026 **[read]**, or is marked as a setting the lawyer validates.
+Normattiva on 28 November 2026 **[read]**, or is a setting each rule carries.
+
+#### 4.0 The catalogue of rules (G-628, G-633)
+
+The firm's rules enter LexCraft with the structure (G-628), as rules the owner has validated: «Sono validate, ho solo
+dimenticato di segnalarlo» (G-633). `src/work/terms/catalogue.ts` holds each rule with every setting of §2.5 and its
+note. The table gives the settings that decide a date.
+
+All of them treat a Saturday as a holiday, as the firm's workbook computes. On the civil ones the note says to check a
+Saturday, and the app shows that note when a date moves because of one. «Back» rules anticipate a term that lands on
+a holiday to the previous working day; «forward» rules extend it to the next (art. 155 c.p.c.).
+
+| Code | What | Source | Direction, quantity | Summer suspension | Follows a postponement |
+|---|---|---|---|---|---|
+| COST-CONV-70 | the defendant enters an appearance, before the hearing in the writ | art. 166 c.p.c. | back 70 days | yes | **no**: from the hearing in the writ |
+| COST-APPELLATO-20 | the appellee enters an appearance, before the first hearing | art. 347, co. 1, c.p.c. | back 20 days | yes | yes |
+| MEM-171TER-1 / -2 / -3 | the three supplementary briefs, before the hearing | art. 171-ter c.p.c. | back 40 / 20 / 10 days | yes | yes |
+| ART189-PC / -CONCL / -REPL | conclusions, closing briefs, replies, before the hearing | art. 189 c.p.c. | back 60 / 30 / 15 days | yes | yes |
+| TERM-GIUD-10 | a term set by the judge (a model to duplicate) | the judge's order | back 10 days | yes | yes |
+| IMPUGN-BREVE-30 | appeal, from service of the judgment | art. 325 c.p.c. | forward 30 days | yes | — |
+| CASS-BREVE-60 | appeal to the Cassazione, from service | art. 325 c.p.c. | forward 60 days | yes | — |
+| IMPUGN-LUNGO-6M | the long term, from publication | art. 327 c.p.c. | forward 6 months | yes | — |
+| OPP-DI-40 | opposition to an injunction, from service | art. 641 c.p.c. | forward 40 days | yes | — |
+| CCII-201-30 | claim in the insolvency, before the verification hearing | art. 201, co. 1 and 10, CCII | back 30 days | yes | yes |
+| PRECETTO-481-90 | enforcement must start after the notice to pay | art. 481, co. 1, c.p.c. | forward 90 days | no | — |
+| PRECETTO-492BIS-79 | the residue after an art. 492-bis request (a model to duplicate) | artt. 481 and 492-bis c.p.c. | forward 79 days | no | — |
+| ISCR-PIGN-TERZI-30 | enrolment of an attachment of third-party assets | art. 543, co. 4, c.p.c. | forward 30 days | yes | — |
+| ISCR-PIGN-MOB-15 / -IMM-15 | enrolment of a movable or real-estate attachment | artt. 518, co. 6, and 557, co. 2, c.p.c. | forward 15 days | yes | — |
+| NEGOZ-INVITO-30 | answer to an invitation to assisted negotiation | art. 4, co. 1, d.l. 132/2014 | forward 30 days | no | — |
+| DIFFIDA-RISP-15 | answer to a formal notice received (a model to duplicate) | the counterparty's letter | forward 15 days | no | — |
+| MORA-1454-15 | the term given in a notice to perform | art. 1454 c.c. | forward 15 days | no | — |
+
+- **Four internal rules ship as examples of a firm's practice, not as law**: PREVENTIVO-7 and SOLLECITO-15 (forward 7
+  and 15 days), BOZZA-ATTI-10 and BOZZA-BREVI-5 (back 10 and 5 days). Each firm keeps, changes or deletes them.
+- **«Models to duplicate»** are rules a lawyer copies with the quantity of his case: another term set by the judge,
+  the residue of a notice to pay.
+- **The suspension column says whether it can apply.** The proceeding decides whether it does (§4.4).
 
 #### 4.1 Forward terms (art. 155 c.p.c.)
 
@@ -279,14 +366,16 @@ Normattiva on 28 November 2026 **[read]**, or is marked as a setting the lawyer 
 - **Months and years.** «Per il computo dei termini a mesi o ad anni, si osserva il calendario comune» (co. 2).
   - When the end month has no corresponding day (31 March plus one month), the engine takes the last day of that
     month. Art. 2963 c.c. says so for prescription («il termine si compie con l'ultimo giorno dello stesso mese»,
-    co. 5). Art. 155 does not say it: it is a setting the lawyer validates.
+    co. 5). Art. 155 does not say it; it is how the firm's workbook computes, and the catalogue's rules are validated
+    so (G-633).
 - **The end on a holiday.** «Se il giorno di scadenza è festivo, la scadenza è prorogata di diritto al primo giorno
   seguente non festivo» (co. 4).
 - **The end on a Saturday.** The extension «si applica altresì ai termini per il compimento degli atti processuali
   svolti fuori dell'udienza che scadono nella giornata del sabato» (co. 5). It applies to procedural acts outside a
   hearing, not to every term. For prescription art. 2963 c.c. extends only a holiday (co. 3). So `saturdayIsHoliday`
-  is a property of the rule: true for a procedural act outside a hearing, false for a civil term. The lawyer
-  validates it rule by rule.
+  is a property of the rule. The catalogue's rules all set it to true, as the firm's workbook computes, and they
+  were validated so (G-633). On the civil rules the app shows the rule's own note when a Saturday moves a date. A
+  rule a firm adds sets it as its lawyer decides.
 
 #### 4.2 Backward terms
 
@@ -295,8 +384,8 @@ A term counted back from a hearing (a filing due so many days before it).
 - The count goes back from the hearing's day, excluding that day, by the rule's quantity in days.
 - **Backward terms in months are refused**: none is needed today, and refusing is safer than guessing.
 - **The end on a holiday or a Saturday.** Art. 155 speaks only of extending forward. What happens to a backward term
-  that ends on a holiday is not in its text: «anticipate to the previous working day» is a `holidayPolicy` the
-  lawyer validates, with its source written in the rule's `reference`.
+  that ends on a holiday is not in its text. «Anticipate to the previous working day» is the `holidayPolicy` of the
+  catalogue's backward rules, validated by the owner (G-633).
 
 #### 4.3 Holidays
 
@@ -314,8 +403,13 @@ A term counted back from a hearing (a filing due so many days before it).
 - **The engine counts it by days, not by a fixed addition.** A forward term pauses on 1 August and resumes after 31
   August; a start inside August is deferred to its end. A backward term skips August going back. It holds for terms
   that cross more than one August.
-  - Whether a backward term is suspended at all, and how, is a setting the lawyer validates.
-  - For a term in months, how the months and the 31 days of August combine is also validated.
+  - A backward term is suspended as the catalogue's rules say, validated (G-633).
+  - A term in months is counted on the calendar, then extended by the days of August it crosses, as the firm's
+    workbook does.
+- **Parity with the validated computation.** On every rule of the catalogue and every origin day from 2026 to 2030,
+  the engine gives the date the firm's workbook gives. A test holds a transcription of the workbook's computation
+  for that purpose only. The two can differ only for a term that crosses two Augusts, which no catalogue rule does.
+  There the engine counts by days, as art. 1 says.
 - **Exclusions.** «In materia civile, l'articolo 1 non si applica alle cause ed ai procedimenti indicati
   nell'articolo 92 dell'ordinamento giudiziario 30 gennaio 1941, n. 12, nonché alle controversie previste dagli
   articoli 429 e 459 del codice di procedura civile» (art. 3). Art. 92 ord. giud. lists, among others, «alimenti»,
@@ -337,8 +431,9 @@ says so.
 
 #### 4.6 Validation, recomputation and the cross-check
 
-- **Unvalidated rules compute, and say so.** The event shows the computed date with «regola non validata», the
-  alerts treat it as any other date, and the views mark it. Validating a rule writes `validatedAt`, `validatedBy`
+- **The catalogue's rules are validated** (G-633). **A rule a firm adds, or changes, computes at once and says so.**
+  The event shows the computed date with «regola non validata», the alerts treat it as any other date, and the views
+  mark it. Validating a rule writes `validatedAt`, `validatedBy`
   and a diary entry on every practice that has an event computed by it.
 - **A rule changed after validation goes back to unvalidated**, and so do its events' marks.
 - **Recomputation.** A change to an origin event, a rule, a proceeding's suspension or a holiday recomputes every
@@ -483,8 +578,8 @@ This is the behaviour the owner asked for (G-621, the second part of his proposa
 - **Conflicted copies.** Dropbox creates one when two people edit the same file, or when a file «is left open on
   another user's computer» **[read]**. The app notices a file next to the linked one with «conflicted copy» in its
   name and shows it as a divergence to reconcile, never ignores it.
-- **Warning before linking.** A path inside a folder that a sync client manages gets the warning of the risks
-  section: the data leave the computer.
+- **Warning before linking (G-634).** The workbook may sit anywhere. A path inside a folder that a sync client
+  manages gets the warning of the risks section: the data leave the computer.
 
 #### 5.10 Export and import
 
@@ -529,6 +624,8 @@ For each open event, that is not in a closing state and not in a closed practice
 - **its date was computed by an unvalidated rule**, or the suspension was not stated: shown with the alert, never as
   an alert alone.
 
+Alerts are raised on events only. Tasks keep the planner's reminders, so the same term never rings twice (G-643).
+
 Also: a register diverged from its workbook for more than a day; a link «unavailable» or «locked» for more than a
 day.
 
@@ -547,9 +644,10 @@ day.
   shows the system notification.
 - **The app closed.** Tauri's notification plugin shows desktop notifications at once and schedules them only on
   mobile **[read]**: no notification can be left with the system to fire later. So:
-  - with the app closed, nothing fires;
-  - the lawyer can turn on «Avvisi anche ad app chiusa». The app then starts at login, through the autostart plugin
-    **[read]**, with no window, and the sidecar keeps checking;
+  - with the app truly closed, nothing fires;
+  - so «Avvisi anche ad app chiusa» is **on by default** (G-635). The app starts at login, through the autostart
+    plugin **[read]**, with no window, and the sidecar keeps checking. The first launch says so, and the lawyer can
+    turn it off;
   - at every start the app first shows the alerts it could not show while it was closed.
 - **The text of a notification names no client by default**: «2 scadenze oggi, 1 udienza domani». Details open in
   the app. A setting shows the codes, never the names.
@@ -582,6 +680,10 @@ day.
 | Holidays, lists | `GET`/`PUT /holidays`; `GET`/`PUT /lists/:list` |
 | Diary | `GET /diary?practice=`; `POST /diary` |
 | Excel | `POST /excel/pick` (through the shell, §5.8); `GET /excel`; `POST /excel/check`; `GET /excel/reconcile`; `POST /excel/reconcile` (the choices); `POST /excel/import/preview`; `POST /excel/import/:previewId/apply`; `POST /excel/export`; `DELETE /excel` (unlink, nothing deleted) |
+| Tasks of an event | `GET /events/:code/task-proposals`; `POST /events/:code/tasks` (the confirmed proposals); `GET`/`PUT /task-templates` |
+| Folder | `GET /folder` (state, invalid files, conflicts); `POST /folder/pick` (through the shell, §5.8); `POST /folder/rescan`; `GET /folder/conflicts`; `POST /folder/conflicts` (the choices) |
+| Mirror | `GET /mirror/:code/preview`; `POST /mirror/:code/publish`; `POST /mirror/:code/withdraw`; `GET`/`PUT /mirror/:code/fields` (the `confirm` fields turned on, §11.4) |
+| Classes | `GET /classes` |
 | Alerts | `GET /alerts`; `POST /alerts/:id/snooze`; `GET /alerts/missed` |
 
 - **Every write answers with the new version.** A write naming an old version answers 409.
@@ -595,52 +697,164 @@ day.
   read-only. The switch says that what Claude reads goes to the model's provider.
 - **Writes through the MCP** come later, with the confirmation and trash rules of today's MCP tools.
 
-### 8. Practices as folders: the default this design assumes
+### 8. Practices as folders, editable from the start, laid out for agents (G-629)
 
-The owner asked on 23 November for practices kept «like an Obsidian vault»: a folder per practice, on his own
-computers. One question is still open with him: whether notes edited outside the app are read back. This design
-assumes a default and lists the question (W2).
+The owner decided on 28 November that practices live as folders the lawyer can edit outside the app from the first
+version, and added: «Le cartelle devono avere una struttura ottimale per l'elaborazione tramite agenti». He had asked
+on 23 November for a LexCraft folder of his own, on his computers, «like an Obsidian vault».
 
-- **The constraints.**
-  - G-613 encrypts the database. A folder of readable files is not encrypted: Obsidian itself states «Obsidian
-    doesn't encrypt your local vault» **[read]**.
-  - Rule 23 of `CLAUDE.md` pins highlights and anchored notes to the exact text of `article_text`. A text edited in a
-    file and read back would delete them silently.
-  - Obsidian keeps its block references inside the note itself (`^id`) and refreshes when files change outside it
-    **[read]**: links that live in the files break when another program edits them.
-- **The options.**
-  - (a) Notes are written in the folder and read back. Texts of norms and decisions are never read back. Anchors stay
-    in the database, never in the files.
-  - (b) **The folder is a read-only export.** When the lawyer turns it on, the app writes one folder per practice:
-    Markdown notes, the texts of its sources, a card with its proceedings and events. It rewrites the folder at each
-    change and never reads it back.
-  - (c) The folder is the source of truth and the database an index.
-- **Recommendation: (b) now, (a) later.** (b) keeps the encrypted database as the only truth, cannot touch an anchor,
-  and gives the lawyer readable files when he wants them. (a) can come later through the same divergence engine as
-  the workbook (§5.5), applied to notes only.
-- **Either way the folder is plain text**, with the warning of §5.9.
+The encrypted database stays the hub: the app, the folder and the linked workbook each change it, and the app writes
+the change to the other two.
+
+#### 8.1 The layout
+
+```
+<the LexCraft folder>/
+  AGENTS.md                     how an agent works here; CLAUDE.md points to it
+  README.md                     the same, for a person
+  _lexcraft/                    the app's own files, never edited
+    schema/*.json               a JSON Schema for the front matter of every kind of file
+    conflitti.md                the conflicts waiting for the lawyer (§8.4)
+  Scadenzario/                  views written by the app, read-only
+    Settimana.md  Mese.md  Allarmi.md  Regole.md
+  Pratiche/
+    P-001 Rossi c. Mondo/
+      P-001.md                  the practice: its fields, then its notes
+      P-001-A.md                one file per proceeding
+      Eventi/
+        E-0001.md               one file per event
+      Compiti/
+        <task id>.md            the practice's tasks
+      Diario.md                 append-only, one entry per heading
+      Note/                     free notes, any name
+      Note ancorate/
+        <note id>.md            the passage (read-only) and the note (editable)
+      Fonti/
+        <source>.md             the texts of its norms and decisions, read-only (§8.5)
+      Documenti.md              links to the client's documents where they are, never copies
+```
+
+Why this shape serves an agent:
+
+- **One thing per file, named by its code.** An agent finds a practice, a proceeding or an event by its code, reads
+  and edits one small file, and a conflict stays within one file.
+- **Fields in flat YAML front matter, text in the body.**
+  - The keys are the Italian labels of the layout (`codice`, `cliente`, `controparte`, `stato`, `data`,
+    `calcolato_da`, `regola`…), so the lawyer reads them as the workbook names them.
+  - The JSON Schemas in `_lexcraft/schema/` describe each key in English, with its type and its allowed values. An
+    agent validates a file before writing it; `AGENTS.md` tells it to.
+  - The front matter stays flat because Obsidian's properties do not support nesting **[read]**.
+- **Links are wikilinks.** For example `procedimento: "[[P-001-A]]"` and `calcolato_da: "[[E-0003]]"`. They are
+  Obsidian's default **[read]**, so its graph and backlinks show the practice's structure, the graph the owner asked
+  for on 23 November.
+- **What the app computes is marked.** Keys that begin with `calcolato_` (the effective date, the days left, the
+  alarm) are the app's: an edit to them is ignored and rewritten.
+- **New things need no code.** An agent creates `Eventi/nuovo-<anything>.md` without `codice`. The app assigns the
+  next code, renames the file and logs it.
+- **The week in one file.** An agent reads the week, the month or the alarms in `Scadenzario/` without walking every
+  practice.
+- **The diary is append-only.** An agent adds an entry at the end. A change to an earlier entry is a conflict, because
+  the diary is the practice's history.
+- **Folder names.** By default a code and a short title, readable by the lawyer and the agent. A setting writes codes
+  only, so paths, which appear in logs, indexes and sync clients, carry no names.
+
+#### 8.2 Reading changes back
+
+- **When.** At start-up, when the window gains focus, every two minutes, before the app writes a file, and when the
+  watcher reports a change. The watcher is a hint, as in §5.5.
+- **How.**
+  1. The front matter is read with a safe YAML loader: no custom tags, a size limit.
+  2. It is checked against its schema.
+  3. The change goes through the same model as the API: codes, rules, validations, classes.
+  4. It is logged with the source `folder` (§2.6).
+- **Writing back.** The app rewrites a file only when it changes something in it: a computed key, an assigned code, a
+  change made elsewhere. It never rewrites a file only to reformat it, because an editor or an agent may have it
+  open.
+- **What the app does not do on its own.**
+  - An invalid file (broken YAML, an unknown state, a rule that does not exist) is not applied. It is listed with its
+    reason, and the app writes nothing over it until it is fixed, or until the lawyer restores the app's version.
+  - A deleted file deletes nothing on its own: the app proposes the trash, as for the workbook.
+  - A file moved or renamed keeps its identity, which is the `codice` in its front matter, not its name. The app puts
+    it back in its canonical place and logs the move.
+
+#### 8.3 Who wins, and the other sources
+
+- **One hub.** The folder is the app's side, like the app's own screens. While a branch of the workbook is open
+  (§5.6), changes from the folder go to that branch.
+- **Excel and the folder at once.** A change from either reaches the database first and is written to the other. A
+  conflict between them goes to the same list as any other.
+
+#### 8.4 Conflicts
+
+- **The base.** The app keeps, in the encrypted database, the last version it wrote of each file (`WorkFolderFile`:
+  path, code, fingerprint, content, time).
+- **Field by field.** Fields of the front matter merge one by one. The body merges as a whole, and only if one side
+  changed it. A field changed on both sides, differently, is a conflict.
+- **A conflict never overwrites.**
+  - The file keeps what was written in it.
+  - The database keeps its own value.
+  - The conflict appears in the app's list, with the same choices as for the workbook: keep the app, keep the folder,
+    or keep both.
+  - It also appears in `_lexcraft/conflitti.md`, so an agent sees it too.
+
+#### 8.5 Rule 23: what no edit in the folder can change
+
+- **The texts never come back.** `Fonti/` holds each text exactly as stored, and the app never reads it back.
+  - The app marks those files read-only on disk: no write permission on macOS, the read-only attribute on Windows.
+  - If one changes anyway, the app restores it from the database, keeps the changed copy in
+    `_lexcraft/fonti-modificate/` with its date, and says so.
+- **The anchors live only in the database.** An anchor is the pair (`startOffset`, `text`) of rule 23. A file in
+  `Note ancorate/` shows its passage in a read-only key, `passaggio`, which is rewritten if edited, and the note's text
+  in the body.
+  - Editing the body changes the note.
+  - Nothing changes its anchor.
+- **Highlights** are listed in the practice's file, read-only.
+- **Obsidian's block references.** Obsidian writes `^id` into the note itself **[read]**. In `Note/` that is ordinary
+  text. The read-only files of `Fonti/` cannot receive it.
+- **The test.** Every edit an agent can make leaves every anchor drawable, checked against the anchors contract
+  (`conventions/contract/anchors.json`). The edits tried are: a source's text, a passage, a note's body, a renamed
+  file, a deleted file.
+
+#### 8.6 What the folder exposes
+
+- **Plain text.** G-613 encrypts the database, not the folder.
+  - The app checks that the disk is encrypted (FileVault, BitLocker) and warns when it is not.
+  - A folder inside a synced folder gets G-634's warning.
+- **Any agent reads it all.** An agent with access to the folder reads everything in clear, the clients' names
+  included, and sends what it reads to its model's provider.
+  - The local MCP server's switches (§7.3) do not reach the folder.
+  - `AGENTS.md` says so in its first lines, and the app says so when it creates the folder.
+- **Where it lives.** It is chosen at first launch: one folder per profile, by default `Documenti/LexCraft`.
+- **Between the lawyer's computers** it travels with LexCraft's synchronisation (G-637: end to end encrypted, per
+  register, off by default), not with Dropbox.
 
 ### 9. Stages
 
-Each stage is one or more pull requests, stacked on M1 (#764), with the tests of §10. The web owner confirmed this
-order on 28 November. The porting line builds both the backend and the app's screens, and the web owner reviews
-them, as for M1.
+Each stage is one or more pull requests, stacked on M1 (#764), with the tests of §10. The web owner confirmed the
+order on 28 November; G-629 then brought the folder into the first version, and it takes the third place. The porting
+line builds both the backend and the app's screens, and the web owner reviews them, as for M1.
 
-1. Tables with every field's class (§11.1), codes, rules, holidays, lists, diary, the term engine, the views, the
-   API without Excel, and the marks of personal fields in the API.
-2. Alerts, with the shell's channel for notifications, and the login item as an option.
-3. Export.
-4. Import with its preview.
-5. The linked workbook both ways: log sheet, divergence, reconciliation, branches.
+1. Tables with every field's class and mirror rule (§11.1), codes, the rule catalogue (§4.0), holidays, lists,
+   diary, the term engine, the views, the API without Excel, and the marks of personal fields.
+2. Alerts, on by default with the app closed (G-635), with the shell's channel for notifications; tasks generated by
+   events (G-643).
+3. The practice folder, written and read back, laid out for agents (G-629, §8).
+4. Export.
+5. Import with its preview.
+6. The linked workbook both ways: log sheet, divergence, reconciliation, branches.
+7. The mirror's builder, its preview and its tests on invented data (§11.1–11.5).
+
+8. **Once the encrypted channel of the remote access exists:** the mirror shown live in the web (G-642, G-644).
+   Before the first real user turns it on: the DPIA and the legal opinion (§11.6).
 
 **After the first version:**
 
-- the pseudonymised web mirror (§11.2–11.5), after the DPIA and the legal check (W16);
-- fees and invoices («Preventivi e parcelle»): records only, no payment (D-304, W9);
+- fees and invoices («Preventivi e parcelle»), records only, no payment (G-636, D-304);
 - insolvency claims;
 - the cloud connectors;
-- synchronisation (W10);
-- the folder of §8 (a);
+- synchronisation, for the register only end to end encrypted (G-637);
+- the pseudonymisation primitive on Windows, after the (P1) trial (G-645, §11.7), if the trial has not already
+  brought it into the first version;
 - the MCP switch of §7.3.
 
 ### 10. Tests
@@ -661,8 +875,25 @@ them, as for M1.
   - a PEC receipt at 21:30 and at 06:59;
   - a proceeding with the suspension not stated, giving the earlier date and its mark;
   - a computed origin, refused.
-- **Validation.** An unvalidated rule computes and is marked. Validating writes the diary on each practice. A changed
-  rule goes back to unvalidated. A recomputation logs each change.
+- **Validation.** The catalogue arrives validated. A rule a firm adds computes and is marked. Validating writes the
+  diary on each practice. A changed rule goes back to unvalidated. A recomputation logs each change. A new release's
+  catalogue never overwrites the firm's copy.
+- **Parity.** Every catalogue rule, on every origin day from 2026 to 2030, with the suspension stated yes, no and not
+  stated, gives the date of the transcribed workbook computation (§4.4).
+- **Tasks.** An event proposes its templates' tasks and creates none unconfirmed. A linked task's due date follows a
+  postponement and refuses a change. A planned date past the new due date warns. Closing the event proposes closing
+  its tasks. No task reaches the workbook. Online, `Task` has no `workEventId`.
+- **The folder.** On a folder built in the test:
+  - an edit to a field is applied and logged;
+  - an edit to a `calcolato_` key is ignored and rewritten;
+  - a new event file without a code gets one;
+  - an invalid file is listed and never overwritten;
+  - a deleted file deletes nothing;
+  - a moved file keeps its identity;
+  - a field changed on both sides is a conflict, kept on both sides;
+  - every edit of §8.5 leaves every anchor drawable;
+  - a source changed on disk is restored and its copy kept;
+  - no write reformats an unchanged file.
 - **The workbook.** On synthetic workbooks built in the test, never a firm's file:
   - a round trip that changes one cell leaves every other part byte for byte;
   - no plan writes a formula cell;
@@ -688,10 +919,11 @@ them, as for M1.
   - Missed alerts are shown at start.
   - The notification text names no client.
 - **Data classes.**
-  - Every scalar field of the Work models has a known class.
+  - Every scalar field of the Work models has a known class and mirror rule; a `personal` field is `never` or
+    `confirm`; the docket and decision numbers are `never`.
   - `GET /api/work/classes` matches the schema.
-  - When the mirror is built: the canary test of §11.3; a lapsed confirmation keeps its field home; a publish whose
-    preview changed answers 409; the online schema refuses an unknown field and a `personal` one.
+  - The mirror's builder: the canary test of §11.3; a `confirm` field stays home until turned on; a lapsed
+    confirmation keeps its field home; a publish whose preview changed answers 409; linked tasks are pseudonymised.
 - **Routes.**
   - Each route on the encrypted file, in the CI job «local» of M1, on macOS and Windows.
   - `/api/work` answers 404 online.
@@ -701,59 +933,69 @@ them, as for M1.
 
 The owner's principle of 28 November makes the web the place where practices live pseudonymised, and asks that the
 places of a practice holding personal data be told apart from those that hold none, «così che il web possa essere un
-mirror sicuro». This section designs that line. It builds on G-621: the clear data stay in the app; only what has
-passed the line below may reach the web.
+mirror sicuro». This section designs that line, under the owner's decisions G-638…G-644. It builds on G-621: the
+clear data stay in the app, and only what passes the line below reaches the web.
 
-#### 11.1 Every field has a class
+#### 11.1 Every field has a class and a mirror rule
 
-**The classes.** They describe what a field holds, not the legal status of the whole: a pseudonymised practice is
-still personal data (§11.6).
+**Three classes (G-638).** They describe what a field holds, not the legal status of the whole: a pseudonymised
+practice is still personal data (§11.6).
 
-| Class | Meaning | May reach the web |
+| Class | What it covers |
+|---|---|
+| `personal` | names a person, or identifies a case with other facts: the client, the counterparty, their lawyer and PEC, the judge, the firm's people, the docket and decision numbers, the court and its section, every date and time, amounts and values, the insolvency flag |
+| `pseudonymisable` | free text: titles, subjects, outcomes, notes, diary entries, a dossier's name and description, a task's title and notes |
+| `non-personal` | says nothing about a person on its own: the type, rite and degree of a proceeding, states, the area, a rule's code, a flag such as «peremptory», the references to norms and decisions |
+
+**A mirror rule for each field (G-639).** The owner allowed personal data in clear with the lawyer's confirmation,
+with one limit: «Basta evitare RG e numeri precisi dei provvedimenti». So each field also carries one of four rules:
+
+| Mirror rule | Fields | In the mirror |
 |---|---|---|
-| `personal` | names or reaches a person directly: client, counterparty, their lawyer and PEC, the judge, the firm's people, the docket and decision numbers, which identify a case at the court's registry | never |
-| `indirect` | identifies only combined with other facts: the court and its section, every date and time, amounts and values, the insolvency flag | never by default; only generalised, if W12 allows (§11.4) |
-| `pseudonymisable` | free text: titles, subjects, outcomes, notes, diary entries, a dossier's name and description | only after pseudonymisation on the computer and the lawyer's confirmation, field by field (§11.2) |
-| `non-personal` | says nothing about a person on its own: the type, rite and degree of a proceeding, states, the area, the rule's code, a flag such as «peremptory», the references to norms and decisions | yes |
+| `never` | the names, PECs and people; the judge; the docket number (RG) and the decision numbers; file paths; the pseudonym map | never |
+| `confirm` | the other personal fields: the court and its section, dates and times, amounts and values | in clear, only if the lawyer turns them on for that practice (§11.4) |
+| `pseudonymise` | the `pseudonymisable` fields | only after pseudonymisation and the lawyer's confirmation (§11.2) |
+| `yes` | the `non-personal` fields | yes |
 
-The request of 28 November named three classes; `indirect` is a fourth, and W11 asks whether to keep it.
+**Where they are written.**
 
-- **Without `indirect`**, the court, the dates and the amounts must be put in `personal`, and they never leave, or in
-  `non-personal`, and they leave in clear.
-- **The fourth class names the real risk.** These fields carry nothing alone, but in a lawyer's practice they
-  identify together.
-
-**Where the class is written.**
-
-- **Beside the field, in the schema**, as a documentation comment Prisma keeps with it:
+- **Beside the field, in the schema**, as a documentation comment that Prisma keeps with it:
 
   ```
-  client        String?  /// class: personal
-  type          String   /// class: non-personal
-  notes         String?  /// class: pseudonymisable
+  client        String?  /// class: personal; mirror: never
+  docketNumber  String?  /// class: personal; mirror: never
+  court         String?  /// class: personal; mirror: confirm
+  notes         String?  /// class: pseudonymisable; mirror: pseudonymise
+  type          String   /// class: non-personal; mirror: yes
   ```
 
 - **Which models.** Every model of `prisma/local/work.prisma`, and the Work models of `prisma/schema.prisma` that the
   app holds and the mirror could carry: `Dossier`, `DossierItem`, the notes and highlights, `Task`. A lawyer names a
   dossier after a client today; the class says so.
-- **A test fails** when a scalar field of those models has no class, or an unknown one. Relation fields carry none.
-  The list of Work models is the test's own; a new model of the local fragment is in it by default.
-- **Some fields take the class of another.** `WorkChange.before` and `.after` take the class of the field they log,
-  and are `personal` as a whole, since they are never mirrored. A list item takes the class of its list: the persons
-  list is personal, the courts list is not.
-- **The API serves the classes.** `GET /api/work/classes` returns them, so the web can mark the fields that hold
-  personal data (§11.5).
+- **The tests:**
+  - a scalar field of those models with no class or no mirror rule, or an unknown one, fails;
+  - a `personal` field whose rule is neither `never` nor `confirm` fails;
+  - the docket and decision numbers are named in a test of their own, and must be `never`.
+
+  Relation fields carry neither. The list of Work models is the test's own; a new model of the local fragment is in
+  it by default.
+- **Fields that take another's class.** `WorkChange.before` and `.after` log any field, so they are `personal` and
+  `never` as a whole. A list item takes the class of its list: the persons list is personal, the courts list is not.
+- **The API serves them.** `GET /api/work/classes` returns the classes and rules, so the interface can mark the fields
+  that hold personal data (§11.5).
 
 The first classification of every field is a table in the pull request of stage 1, reviewed by the owner.
 
 #### 11.2 Free text: personal until pseudonymised and confirmed
 
-A free-text field counts as personal. It reaches the web only through three steps on the computer:
+A free-text field reaches the web only through three steps on the computer:
 
-1. **The practice's own names first.** The structured personal fields of the practice are an exact list of the
-   strings to replace: the client, the counterparty, their lawyer, the judge, the firm's people. The app replaces each
-   occurrence with its pseudonym from the map (§11.3), consistently across every text of the practice. This step needs
-   no model.
+1. **The practice's own names first.** The practice's `never` fields are an exact list of strings to replace: the
+   client, the counterparty, their lawyer, the judge, the firm's people.
+   - The app replaces each occurrence with its pseudonym from the map (§11.3), consistently across every text of the
+     practice.
+   - The docket and decision numbers, if a text quotes them, are replaced too.
+   - This step needs no model.
 2. **Pseudocraft for the rest.** Pseudocraft (LexCraft-IT/pseudocraft), the web owner's local pseudonymiser, finds the
    names the practice does not list, and other identifiers (addresses, tax codes, IBANs, phone numbers), with its rules
    and its local models. It runs on the computer and makes no network call at run time.
@@ -764,70 +1006,71 @@ A free-text field counts as personal. It reaches the web only through three step
      - the confirmation screen is the app's.
    - **No pseudonymisation on LexCraft's servers.** The web gets the primitive only later; there is no compute to host
      it today.
-   - **Its README states macOS on Apple Silicon only.** The app ships for Windows x64 too (G-620), so the primitive
-     must run there: §11.7 makes it a requirement and gives its cost. **Until it does, free text does not leave a
-     Windows computer at all**: only `non-personal` fields mirror there.
+   - **Windows too.** The app ships for Windows x64 (G-620), and pseudocraft runs today on macOS on Apple Silicon
+     only. §11.7 makes Windows a requirement and gives its cost. **Until it runs there, free text does not leave a
+     Windows computer**: only the `yes` and `confirm` fields mirror there.
 3. **The lawyer confirms**, field by field, the original beside the pseudonymised text, with every replacement
    highlighted and editable.
    - The confirmation records the pseudonymised text, a fingerprint of the original, pseudocraft's version and the
      time.
    - If the original changes, the confirmation lapses, and the field stays home until it is confirmed again.
 
-**Facts are not names.** Pseudonymisation replaces who; it leaves what happened. A text about a client's illness, or
-a conviction, stays data about health or crimes (arts. 9 and 10 GDPR) after its names are replaced. The confirmation
-screen asks the lawyer to keep such facts out of a mirrored text, and W13 asks whether such texts should never leave.
+**Facts are not names (G-640).** Pseudonymisation replaces who; it leaves what happened. A text about a client's
+illness, or a conviction, stays data about health or crimes (arts. 9 and 10 GDPR) after its names are replaced.
+- Such a text may go once pseudonymised and confirmed.
+- The confirmation screen warns about it: it asks the lawyer to check that the facts left are needed, and it says
+  that they remain data of those categories.
 
 #### 11.3 The pseudonym map never leaves the computer
 
-`WorkPseudonym`, local-only, `personal` as a whole: the original string, the kind (client, counterparty, lawyer,
-judge, person, other), the practice, and its pseudonym («Cliente», «Controparte A», «Avv. B»).
+`WorkPseudonym`, local-only, `personal` and `never` as a whole. It holds the original string, its kind (client,
+counterparty, lawyer, judge, person, other), the practice, and its pseudonym («Cliente», «Controparte A», «Avv. B»).
 
 - **It never leaves the computer.** It is in the encrypted database and in the encrypted backups, so a restore keeps
   the mirror readable. It is never in an export, never in the mirror, and never served by the local MCP server.
-- **A test sends a practice whose personal fields carry canary strings** through the mirror builder, and fails if a
-  canary appears in the payload.
-- **The mirror's own identifier.** A mirrored practice is named online by a random identifier, not by its code
-  P-001. The code is sequential, and the firm's workbook links it to the client. Whether the web shows the code
-  beside it is W15.
+- **The codes are shown (G-641).** The owner: «no i codici sono essenziali». A mirrored practice appears in the web
+  under its codes, P-001, P-001-A, E-0001, as in the firm's workbook.
+- **The canary test.** A practice whose `never` fields carry canary strings, the docket and decision numbers among
+  them, goes through the mirror builder. The test fails if a canary appears in the payload, in any text.
 
-#### 11.4 Generalising indirect fields
+#### 11.4 Personal fields in clear, with the lawyer's confirmation (G-639)
 
-If W12 allows it, an indirect field may leave generalised, never as it is:
+- **The lawyer chooses per practice** which `confirm` fields go in clear: the court and its section, the dates and
+  times, the amounts and values. All are off by default.
+- **The preview shows them as they will appear**, and the lawyer confirms the set for that practice.
+- **The choice is recorded, and can be withdrawn.** It holds for later changes of those fields, until the lawyer
+  withdraws it.
+- **The docket and decision numbers never go.** They are `never` (§11.1), whatever is chosen.
 
-- a court becomes its kind and level («Tribunale», first degree);
-- a date becomes the number of days from another event of the same practice, or a month;
-- an amount becomes a range.
+#### 11.5 What the lawyer sees, and how the mirror travels
 
-The recommendation (W12) is that nothing indirect leaves in the first mirror.
+- **Built and activated now (G-642).** The mirror is part of this design's work, not a later option. Each practice is
+  mirrored only when the lawyer turns it on, practice by practice; it is off by default.
+- **The preview.**
+  - `GET /api/work/mirror/:code/preview` returns the exact payload that would be shown.
+  - The page shows it as the web would, beside what the web shows now.
+  - The fields that stay home are listed with their class.
+- **What is published is exactly the preview.** `POST /api/work/mirror/:code/publish` carries the preview's
+  fingerprint. If anything changed since, it answers 409 and asks for a new preview. Later changes go through the
+  same preview, in a list of what is new.
+- **Live, never stored (G-644).** The web shows a mirrored practice live from the lawyer's computer, over the encrypted
+  channel of the remote access, while the computer is on. Nothing of it is stored on LexCraft's servers.
+  - The relay forwards packets it cannot read.
+  - The web's own research (norms, decisions, notes on the law) stays stored online as today.
+  - The mirror therefore waits for that channel, which the owners are designing separately. Without the computer
+    on, the web shows that the practice is not reachable.
+- **One way.** The mirror runs from the app to the web. Text edited in the web does not come back.
+- **Tasks (G-643).** The tasks linked to an event of a mirrored practice are mirrored with it: their titles and notes
+  are `pseudonymise`.
+- **Who decrypts the mirror.** Whoever serves the page that decrypts it can read it. The page that shows a mirrored
+  practice is therefore served by the app over the channel, as the remote access proposal has it, not by
+  lexcraft.it. The channel's design settles this, and the mirror is not enabled before it.
+- **The marks in the interface.** In the app:
+  - every `personal` field carries a mark;
+  - a `confirm` field turned on for the mirror carries a second one;
+  - so does every `pseudonymisable` field not yet confirmed.
 
-#### 11.5 What the lawyer sees before anything leaves
-
-- **Each practice is mirrored only if the lawyer turns it on**, practice by practice. It is off by default.
-- **The preview.** `GET /api/work/mirror/:code/preview` returns the exact payload that would be sent, and the page
-  shows it as the web would, beside what the web already holds. The fields that stay home are listed with their
-  class.
-- **The publish sends exactly the preview.** `POST /api/work/mirror/:code/publish` carries the preview's fingerprint.
-  If anything changed since, it answers 409 and asks for a new preview.
-- **The mirror runs one way**, from the app to the web.
-  - Text edited in the web does not come back.
-  - A `non-personal` addition, such as a norm or a decision added to the dossier, may come back (W15).
-- **How it travels.** The web owner answered on 28 November that the web and the app synchronise over an encrypted
-  channel while the lawyer's computer is on, «simil remote control»: the relay forwards packets it cannot read. That
-  channel is the remote access the owners are designing separately, and this section waits for it.
-  - What the web may keep on LexCraft's servers is W18. The recommendation is that the pseudonymised part of a work
-    dossier is shown live from the computer and never stored online. The web's own research (norms, decisions,
-    notes on the law) stays stored online as today.
-  - «Nel web devono stare il meno possibile i dati dei clienti» (the web owner, 28 November).
-- **Withdrawing.** The lawyer can withdraw a practice from the web at any time; the online copy is deleted. What the
-  host's own backups keep, and for how long, is part of the legal check.
-- **The server refuses what it does not expect.** The online server accepts a mirror only through a schema that
-  lists the allowed fields. An unknown field, or one whose class is not allowed, is refused, so a bug in the app
-  cannot widen the mirror.
-- **The mirror's online models.** They are named `Mirror*`, hold only allowed fields, and are designed with the
-  DPIA. The test of §1 still keeps every `Work*` model out of the online schema.
-- **The marks in the interface.** In the app every field of class `personal` or `indirect` carries a mark, and so does
-  every `pseudonymisable` field not yet confirmed. In the web a mirrored practice is labelled «pseudonimizzata», never
-  «anonima».
+  In the web a mirrored practice is labelled «pseudonimizzata», never «anonima».
 
 #### 11.6 The legal risk, plainly
 
@@ -839,22 +1082,23 @@ The recommendation (W12) is that nothing indirect leaves in the first mirror.
   - The test is the means «di cui il titolare del trattamento o un terzo può ragionevolmente avvalersi», «tenendo
     conto sia delle tecnologie disponibili al momento del trattamento, sia degli sviluppi tecnologici» **[read]**.
   - Only data that do not, or no longer, allow identification are anonymous, and outside the regulation **[read]**.
-- **In legal practice, context re-identifies.** A court, a few dates and the facts of a case can be matched with a
-  published decision, a court's calendar, a news report or the other side's knowledge.
-  - The removal of names does not reach this risk. Leaving the indirect fields at home reduces it (§11.4); the
-    lawyer's confirmation of each text reduces it further. Neither removes it.
-- **So the mirror is personal data, held by its host.**
+- **In legal practice, context re-identifies.** The court, a few dates and the facts can be matched with a published
+  decision, a court's calendar, a news report or the other side's knowledge. G-639 lets the court, the dates and the
+  amounts go in clear when the lawyer confirms them. That is the context which re-identifies, so the confirmation
+  screen says so.
+- **The mirror is personal data.**
   - The firm remains the controller.
-  - Whoever hosts the mirror, the association or a self-hosted server, processes personal data for the firm. That
-    asks for the contract of art. 28 GDPR, and partly gives back what G-621 avoided.
-  - Art. 35 GDPR asks for a data protection impact assessment «prima di procedere al trattamento» when a processing
-    «può presentare un rischio elevato» **[read]**. It names in particular the large-scale processing of special
-    categories (art. 9) or of data on convictions and offences (art. 10) **[read]**, which free text in legal practice
-    can hold.
-- **Professional secrecy** binds the facts a client confides, not only the names. Whether a pseudonymised copy on a
-  third party's server is compatible with it is part of the legal check.
-- **Before the mirror is built**: a DPIA and a legal check (W16). Until both are done, the classes, the marks and the
-  preview can be built, and nothing is sent.
+  - G-644 keeps the mirror off LexCraft's servers: the relay holds only ciphertext. That narrows what LexCraft
+    processes, but it does not settle the role. Whoever runs the relay and serves the page is part of the processing,
+    and the contract of art. 28 GDPR is a question for the legal opinion.
+- **The DPIA comes before the first real user.** G-642 builds and activates the mirror now, with the DPIA and the
+  legal opinion after. Art. 35 GDPR asks for an impact assessment «prima di procedere al trattamento» when a
+  processing «può presentare un rischio elevato» **[read]**. It names in particular the large-scale processing of
+  special categories (art. 9) or of data on convictions and offences (art. 10) **[read]**, which free text in legal
+  practice can hold. So the mirror may be built and tested on invented data. Both the DPIA and the legal opinion come
+  before the first real user turns it on.
+- **Professional secrecy** binds the facts a client confides, not only the names. Whether a pseudonymised copy shown
+  through a third party's relay is compatible with it is part of the legal opinion.
 
 #### 11.7 The pseudonymisation primitive on macOS and Windows
 
@@ -905,17 +1149,23 @@ design, set before the mirror is enabled on either platform.
 | (P2) A slimmer primitive | the rules and the recognition models through ONNX runtime, without `torch`, the judge optional | 8–12 | it changes pseudocraft's pipeline: it needs the web owner's yes and his end-to-end tests as the measure |
 | (P3) macOS first | free text stays home on Windows until (P1) or (P2) | 0 now | a Windows lawyer mirrors only `non-personal` fields |
 
-**Recommendation:** start with (P1)'s trial. Keep (P1) if the trial meets the thresholds of W19 on the reference
-PC; otherwise (P2). Until then, (P3) holds by itself, since free text needs the primitive.
+**Decided (G-645): (P1)'s trial first**, with these thresholds on the reference Windows PC: one page of text in
+under 30 seconds, and the primitive under 6 GB of memory with the 4B judge. (P1) stays if the trial meets them;
+otherwise (P2). Until then, (P3) holds by itself, since free text needs the primitive.
 
 ## For the web owner
 
 Nothing here changes lexcraft-web until its owner decides; the brief to him is in the owners' private notes. What
-the backend gives the web is §7. Three things the web should know now:
+the backend gives the web is §7. Four things the web should know now:
 
 - **Nothing personal of this design appears online** (G-621). The web shows Work in three levels only when `GET
-  /api/work/status` answers. The only way a practice reaches the web is the pseudonymised mirror of §11, after the
-  lawyer's preview and confirmation, and not before the DPIA.
+  /api/work/status` answers. The only way a practice reaches the web is the pseudonymised mirror of §11:
+  - after the lawyer's preview and confirmation;
+  - shown live from the computer over the encrypted channel, never stored on LexCraft's servers (G-644);
+  - with its codes P-001 visible (G-641);
+  - in a page served by the app over that channel, not by lexcraft.it (§11.5).
+
+  It is built now, and the DPIA and the legal opinion come before the first real user (G-642, §11.6).
 - **The web's own practices and tasks** can be written with a client's name today. The web owner answered on 28
   November with a fourth road:
   - work, study and public dossiers in both the web and the app (`Dossier.kind` has `lavoro` and `studio` today; the
@@ -930,131 +1180,40 @@ the backend gives the web is §7. Three things the web should know now:
 - **Who builds the app's screens**: the porting line, with the web owner's review (his answer of 28 November).
 - **The notifications are the shell's**, not the page's, and the native dialogs too (§5.8).
 
-## Decisions for the owners
+## Decisions taken on 28 November
 
-**W1 · The firm's rules and layout in public code.** G-622 makes the template's structure LexCraft's. Its rules and
-its formulas come from a firm.
-- (a) The structure and the rules may be reused: the rules ship as LexCraft's, unvalidated.
-- (b) The structure only: LexCraft writes its own rules from the norms, and each firm imports its own.
-- (c) Neither in public code.
-- **No recommendation: the answer is the owner's, with the firm.** Until then this design holds to (b) and ships no
-  rule.
+The owner answered every question of this design on 28 November (G-628…G-645). The sections above are written to
+his answers; this table keeps the trail.
 
-**W2 · Practices as folders** (§8). Recommendation: (b) a read-only export now, (a) later.
+| Question | Decision | The owner's words or choice | Where |
+|---|---|---|---|
+| W1 · The firm's rules and layout in public code | **G-628**: the structure and the rules; **G-633**: the rules are validated | «Sì ma sono validate»; «Sono validate, ho solo dimenticato di segnalarlo» | § «What this repository holds», §4.0 |
+| W2 · Practices as folders | **G-629**: editable outside the app from the start | «Le cartelle devono avere una struttura ottimale per l'elaborazione tramite agenti» | §8 |
+| W3 · Where the local-only tables live | **G-630**: the local fragment | (B) | §1 |
+| W4 · Where the row fingerprints live | **G-631**: in the encrypted database | (a) | §2.7, §5.5 |
+| W5 · The branch | **G-632**: as written | — | §5.6 |
+| W6 · Unvalidated rules | **G-633**: the catalogue's rules are validated; a rule a firm adds or changes computes, marked, until validated | — | §4.6 |
+| W7 · Where the linked workbook may sit | **G-634**: anywhere, with a warning inside a synced folder | (a) | §5.9 |
+| W8 · Alerts with the app closed | **G-635**: on by default | (b) | §6.3 |
+| W9 · The first version's order; fees | **G-636**: fees and invoices as records only, after the first version | — | §9 |
+| W10 · Does the register synchronise | **G-637**: only end to end encrypted, per register, off by default | (b) | §8.6, later design |
+| W11 · How many data classes | **G-638**: three; the court, the dates and the amounts are personal | (a) | §11.1 |
+| W12 · Indirect data in the mirror | **G-639**: in clear with the lawyer's confirmation, never the docket and decision numbers | «Basta evitare RG e numeri precisi dei provvedimenti» | §11.1, §11.4 |
+| W13 · Text about health or crimes | **G-640**: it may go after pseudonymisation and confirmation, with a warning | (a) | §11.2 |
+| W15 · The mirror's shape | **G-641**: the codes are shown in the web; one way | «no i codici sono essenziali» | §11.3, §11.5 |
+| W16 · DPIA and legal check | **G-642**: build and activate the mirror; the DPIA and the legal opinion after | — | §11.5, §11.6 |
+| W17 · Events and tasks | **G-643**: the event generates the tasks | — | §2.8 |
+| W18 · What the web keeps | **G-644**: shown live from the computer, never stored on LexCraft's servers | (a) | §11.5 |
+| W19 · The primitive on Windows | **G-645**: the (P1) trial first, with the thresholds | — | §11.7 |
 
-**W3 · Where the local-only tables live** (§1). Recommendation: (B), the local fragment.
+W14 was answered by the web owner (§ «Answers of 28 November»).
 
-**W4 · Where the row fingerprints live.**
-- (a) In the encrypted database.
-- (b) In a hidden sheet of the workbook.
-- **Recommendation: (a).** A hidden sheet travels with the file, and anyone can edit it.
+**What is still open:**
 
-**W5 · The branch** (§5.6). The main register stays the common base, the workbook's content becomes a read-only
-`excel` register, and the first write after a warning forks a branch. Recommendation: as written.
-
-**W6 · Unvalidated rules** (§4.6).
-- (a) They compute and alert, marked «regola non validata».
-- (b) They compute nothing until validated.
-- **Recommendation: (a).** Under (b) a register imported on day one would show no deadline at all.
-
-**W7 · Where the linked workbook may sit** (§5.9).
-- (a) Anywhere, with a warning inside a synced folder.
-- (b) Never inside a synced folder.
-- (c) Anywhere, with no warning.
-- **Recommendation: (a).** A firm that shares its register through Dropbox today must be able to keep doing it,
-  knowingly.
-
-**W8 · Alerts with the app closed** (§6.3).
-- (a) An option, off by default: the app starts at login with no window.
-- (b) On by default.
-- (c) Never.
-- **Recommendation: (a)**, with the notifications' text naming no client by default.
-
-**W9 · The first version's order** (§9). Fees and invoices only as records, after the first version: D-304's
-reserve says «in Work nessuna schermata dedicata ai pagamenti». Recommendation: as written. The web owner agreed on 28
-November, to the order and to a sheet that only records fees, invoices and payments.
-
-**W10 · Does the register synchronise at all**, once synchronisation exists (D-163)? On the model the web owner
-answered on 28 November: synchronisation is free when the firm hosts it, and a paid plan on the association's servers.
-Whether the register takes part is still this question.
-- (a) Never: it stays on one computer, with encrypted backups (M4).
-- (b) Only end to end encrypted, per register, off by default.
-- (c) Like any other data.
-- **Recommendation: (b).** It has three costs:
-  - the keys live only on the lawyer's devices: lose them and the 24-word recovery code (G-617), and the data are
-    gone;
-  - the server cannot search;
-  - the server still sees sizes and times.
-
-  Hosting it at the association makes the association a provider the firm must contract with (art. 28 GDPR), even
-  if it holds only ciphertext: a point for the owners' legal check.
-
-**W11 · How many data classes** (§11.1).
-- (a) Three: personal, pseudonymisable, non-personal. The court, the dates and the amounts go into `personal`.
-- (b) Four, with `indirect` for what identifies only in combination: the court, the dates, the amounts.
-- **Recommendation: (b).** In legal practice context is the risk, and a class that names it keeps it visible in the
-  schema, in the interface and in every review. Under (a) the same fields stay home anyway, but nothing says why.
-
-**W12 · Indirect fields in the mirror** (§11.4).
-- (a) Never.
-- (b) Only generalised: a court's kind, relative days, ranges.
-- (c) In clear, with the lawyer's confirmation.
-- **Recommendation: (a) in the first mirror**, (b) only if the DPIA allows it. (c) brings back the context that
-  re-identifies.
-
-**W13 · Free text about health or crimes** (§11.2).
-- (a) It may leave once pseudonymised and confirmed, with the warning on the confirmation screen.
-- (b) A text the lawyer marks as holding such facts never leaves.
-- (c) No free text leaves in the first mirror at all.
-- **Recommendation: (b)**, unless the DPIA says (c).
-
-**W14 · Pseudocraft as the pseudonymiser** (§11.2). **Answered by the web owner on 28 November:**
-- its core as a library, and its code as the base of the desktop primitive;
-- the subjects in LexCraft's encrypted table, passed in at each call;
-- the web only later.
-
-What remains is the Windows requirement, W19.
-
-**W15 · The mirror's shape** (§11.3, §11.5).
-- One way, app to web. A `non-personal` addition made in the web, such as a norm or a decision added to the
-  dossier, may come back.
-- A random identifier online. The code P-001 is not shown in the web unless the lawyer asks.
-- **Recommendation: as written.**
-
-**W16 · A DPIA and a legal check before the mirror** (§11.6).
-- **What to settle:**
-  - who is controller and who processor;
-  - the contract of art. 28;
-  - professional secrecy;
-  - the host's backups and their retention;
-  - the categories of arts. 9 and 10;
-  - the words the app and the site may use. «Pseudonimizzata», never «anonima».
-- **Recommendation:** classes, marks and preview are built now; nothing is sent before both are done.
-
-**W17 · Events and tasks.** Open: the web owner will discuss it with the owner. His leaning: «evento genera compiti».
-- **(a) The event generates the tasks.** In the app an event creates its preparation tasks.
-  - The task's due date is the event's effective date, read-only, and follows a postponement.
-  - Its planned date is the lawyer's.
-  - The link lives in a local-only table (`WorkEventTask`), so the online `Task` model does not change.
-  - In the web, tasks stay as they are, without events.
-- **(b) Tasks and events stay apart**, with at most a reference from a task to an event.
-- **Recommendation: (a)**, as the web owner leans. The link stays local, and a task never moves its own due date: it
-  follows the event's.
-
-**W18 · What the web keeps of a work dossier** (§11.5).
-- (a) The pseudonymised part is shown live from the computer over the encrypted channel, and never stored on
-  LexCraft's servers; the web's own research is stored as today.
-- (b) A pseudonymised copy is stored online and refreshed when the computer is on.
-- **Recommendation: (a).** It matches «il meno possibile» and the web owner's channel. It leaves the relay holding only
-  ciphertext, which narrows the processing W16 has to assess. The cost: the practice is visible in the web only while
-  the computer is on.
-
-**W19 · The pseudonymisation primitive on Windows** (§11.7). The requirement is set; the road and the thresholds are
-not.
-- The thresholds (P1) must meet on the reference Windows PC: a proposal is one page of text in under 30 seconds and
-  the primitive under 6 GB of memory with the 4B judge.
-- The road: (P1), (P2) or (P3), with the costs of §11.7.
-- **Recommendation:** (P1)'s trial first, with those thresholds; (P2) only if it fails.
+- **Whether the app's new section replaces «Pratiche»**, a question for the web owner (§ «For the web owner»).
+- **The encrypted channel of the remote access**, which the mirror needs (§11.5). It has its own design, still to
+  write.
+- **The DPIA and the legal opinion**, which come before the first real user (§11.6).
 
 ## Answers of 28 November
 
@@ -1063,21 +1222,22 @@ them:
 
 | Question | Answer | Where |
 |---|---|---|
-| The web's practices and tasks | a fourth road: work, study and public dossiers in web and app; Work in the web for work research, apart from Learn; sync over the encrypted channel with the computer on; as little client data in the web as possible | § «For the web owner», §11.5, W18 |
+| The web's practices and tasks | a fourth road: work, study and public dossiers in web and app; Work in the web for work research, apart from Learn; sync over the encrypted channel with the computer on; as little client data in the web as possible | § «For the web owner», §11.5, G-644 |
 | The words; the app's section | «Dossier di lavoro» in both; whether the app's section replaces «Pratiche» is open | § «For the web owner» |
-| Events and tasks | open, to discuss with the owner; leaning «evento genera compiti» | W17 |
+| Events and tasks | «evento genera compiti», with the details of §2.8; then decided by the owner (G-643) | §2.8 |
 | Codes | the template's format: P-001, P-001-A, E-0001 | §2 |
 | The order of stages | the spec's | §9 |
 | Who builds the app's screens | the porting line; the web owner reviews | §9, § «For the web owner» |
-| Fees and invoices and D-304 | records only, no payment: it respects D-304 | W9 |
-| Synchronisation | free when the firm hosts it; a paid plan on the association's servers (D-163) | W10 |
-| Pseudocraft | its core as a library, the subjects in LexCraft's table, the base of the desktop primitive; the web later | §11.2, §11.7, W14 |
+| Fees and invoices and D-304 | records only, no payment: it respects D-304 (and G-636) | §9 |
+| Synchronisation | free when the firm hosts it; a paid plan on the association's servers (D-163) | G-637 |
+| Pseudocraft | its core as a library, the subjects in LexCraft's table, the base of the desktop primitive; the web later | §11.2, §11.7 |
 
 ## Not in this change
 
 - Any code: this is the design, for the owner's yes.
 - Any change to lexcraft-web or lexcraft-mcp.
-- The template, its rows, its rules or its formulas.
+- The template file and its list of courts. The rule catalogue enters with stage 1 (G-628), and the transcription of
+  the workbook's computation lives only in the parity test.
 
 ## Sources
 
@@ -1117,6 +1277,7 @@ art. 4(5), art. 35(1) and (3), recital 26: https://eur-lex.europa.eu/eli/reg/201
 - **Obsidian:**
   - no encryption of the vault: https://obsidian.md/help/sync/security
   - links and block identifiers: https://obsidian.md/help/links
+  - properties (flat, no nesting): https://obsidian.md/help/properties
   - external changes: https://obsidian.md/help/data-storage
 
 **In this repository:**
