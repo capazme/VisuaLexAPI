@@ -14,7 +14,10 @@
     "db:seed": "tsx src/utils/seed.ts",
     "db:reset-admin": "tsx src/utils/reset-admin-password.ts",
     "test": "dotenv -e .env.test -- vitest run",
-    "test:watch": "dotenv -e .env.test -- vitest"
+    "test:watch": "dotenv -e .env.test -- vitest",
+    "local:schema": "tsx scripts/local-schema.ts",
+    "local:generate": "prisma generate --config prisma.local.config.ts",
+    "pretest": "prisma generate --config prisma.local.config.ts"
   },
   "keywords": [
     "visualex",
@@ -46,6 +49,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@prisma/adapter-better-sqlite3": "7.10.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
@@ -54,6 +58,7 @@
     "@types/node": "^20.10.5",
     "@types/supertest": "^7.2.0",
     "@vitest/coverage-v8": "^4.1.12",
+    "better-sqlite3": "npm:better-sqlite3-multiple-ciphers@13.2.0",
     "dotenv-cli": "^11.0.0",
     "nock": "^14.0.15",
     "supertest": "^7.2.2",
@@ -62,6 +67,7 @@
     "vitest": "^4.1.12"
   },
   "overrides": {
-    "effect": "3.22.4"
+    "effect": "3.22.4",
+    "better-sqlite3": "npm:better-sqlite3-multiple-ciphers@13.2.0"
   }
 }
