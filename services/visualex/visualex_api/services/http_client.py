@@ -71,11 +71,16 @@ class ThrottledHttpClient:
     MAX_PAUSE_WAIT = 30.0
 
     def __init__(self) -> None:
-        self._semaphore = asyncio.Semaphore(HTTP_MAX_CONCURRENCY)
+        # One queue per source host (owner, G-647): HTTP_MAX_CONCURRENCY requests at once and
+        # HTTP_MIN_INTERVAL between two, toward each host, as the one queue gave every source
+        # before. Normattiva keeps its 3 and its half second; a CELLAR or a court's request no
+        # longer waits behind Normattiva's queue. Keyed by host, not by `source`, so two callers
+        # that name the same host differently share its queue.
+        self._semaphores: Dict[str, asyncio.Semaphore] = {}
         self._session: Optional[aiohttp.ClientSession] = None
         self._session_lock = asyncio.Lock()
-        self._request_lock = asyncio.Lock()
-        self._last_request_at = 0.0
+        self._request_locks: Dict[str, asyncio.Lock] = {}
+        self._last_request_at: Dict[str, float] = {}
         # source → the monotonic time before which no request goes to it: the last
         # Retry-After a rate-limit answer stated, honoured by the next request even when the
         # call that received it had no attempt left to spend it on. Our own backoff stays
@@ -152,10 +157,11 @@ class ThrottledHttpClient:
         retry_after: Optional[float] = None
         # Wait out a pause before taking a slot, so a paused source does not hold one.
         await self._respect_source_pause(source)
-        async with self._semaphore:
+        host = _host_of(url) or ""
+        async with self._semaphore_for(host):
             while attempt <= retries:
                 await self._respect_source_pause(source)
-                await self._respect_min_interval()
+                await self._respect_min_interval(host)
                 client = session or await self._get_session()
                 try:
                     async with client.request(method, url, **kwargs) as response:
@@ -249,12 +255,22 @@ class ThrottledHttpClient:
             )
             await asyncio.sleep(remaining)
 
-    async def _respect_min_interval(self) -> None:
-        async with self._request_lock:
-            elapsed = time.monotonic() - self._last_request_at
+    def _semaphore_for(self, host: str) -> asyncio.Semaphore:
+        semaphore = self._semaphores.get(host)
+        if semaphore is None:
+            semaphore = self._semaphores[host] = asyncio.Semaphore(HTTP_MAX_CONCURRENCY)
+        return semaphore
+
+    async def _respect_min_interval(self, host: str = "") -> None:
+        """HTTP_MIN_INTERVAL between two requests to the same host."""
+        lock = self._request_locks.get(host)
+        if lock is None:
+            lock = self._request_locks[host] = asyncio.Lock()
+        async with lock:
+            elapsed = time.monotonic() - self._last_request_at.get(host, 0.0)
             if elapsed < HTTP_MIN_INTERVAL:
                 await asyncio.sleep(HTTP_MIN_INTERVAL - elapsed)
-            self._last_request_at = time.monotonic()
+            self._last_request_at[host] = time.monotonic()
 
     @staticmethod
     def _stated_retry_after(headers: Optional[Dict[str, str]]) -> Optional[float]:
