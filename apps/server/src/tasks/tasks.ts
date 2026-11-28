@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { addDays, romeDay } from '../lingo/studyDay';
 import { dateToDay, dayToDate } from '../lingo/studyDays';
 import { dayOfMonth, landsOnDay, nextOccurrence, RECURRENCE_RULES, type RecurrenceRule } from './recurrence';
+import { advisoryXactLock, forUpdate, utcNow } from '../lib/sqlDialect';
 
 /**
  * The planner's tasks (wave 1; the answers on the task model, 1–4, 7, 11, 13). Every function takes
@@ -119,7 +120,7 @@ async function liveTask(tx: Prisma.TransactionClient, userId: string, id: string
 
 /** Locks the user's task row for the rest of the transaction: two ticks at once run one after the other. */
 async function lockTask(tx: Prisma.TransactionClient, userId: string, id: string): Promise<void> {
-  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM tasks WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
+  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM tasks WHERE id = ${id} AND user_id = ${userId}${forUpdate()}`;
   if (rows.length !== 1) throw new AppError(404, NOT_FOUND);
 }
 
@@ -129,7 +130,7 @@ async function lockTask(tx: Prisma.TransactionClient, userId: string, id: string
  */
 async function lockedParent(tx: Prisma.TransactionClient, userId: string, id: string): Promise<Task> {
   const message = 'Compito principale non trovato.';
-  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM tasks WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
+  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM tasks WHERE id = ${id} AND user_id = ${userId}${forUpdate()}`;
   if (rows.length !== 1) throw new AppError(404, message);
   return liveTask(tx, userId, id, message);
 }
@@ -142,7 +143,7 @@ async function lockedParent(tx: Prisma.TransactionClient, userId: string, id: st
 async function lockDossiers(tx: Prisma.TransactionClient, userId: string, ids: (string | null)[]): Promise<void> {
   const wanted = [...new Set(ids.filter((id): id is string => id !== null))].sort();
   if (wanted.length === 0) return;
-  await tx.$queryRaw`SELECT id FROM dossiers WHERE id IN (${Prisma.join(wanted)}) AND user_id = ${userId} ORDER BY id FOR UPDATE`;
+  await tx.$queryRaw`SELECT id FROM dossiers WHERE id IN (${Prisma.join(wanted)}) AND user_id = ${userId} ORDER BY id${forUpdate()}`;
 }
 
 /**
@@ -150,7 +151,7 @@ async function lockDossiers(tx: Prisma.TransactionClient, userId: string, ids: (
  * loop before the other's write and close one together. Taken first, before any row lock.
  */
 async function lockParentChanges(tx: Prisma.TransactionClient, userId: string): Promise<void> {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('tasks:parent:' || ${userId}::text))`;
+  await advisoryXactLock(tx, `tasks:parent:${userId}`);
 }
 
 /** The task and every task under it, at any depth, as ids (the user's rows only). */
@@ -423,16 +424,18 @@ export async function reorderTasks(userId: string, taskIds: string[]): Promise<v
     // Locked in id order: a move to another list in flight finishes first, and is then seen here.
     const rows = await tx.$queryRaw<{ id: string; dossier_id: string | null; parent_id: string | null }[]>`
       SELECT id, dossier_id, parent_id FROM tasks
-      WHERE id = ANY(${ids}::text[]) AND user_id = ${userId} AND deleted_at IS NULL
-      ORDER BY id FOR UPDATE`;
+      WHERE id IN (${Prisma.join(ids)}) AND user_id = ${userId} AND deleted_at IS NULL
+      ORDER BY id${forUpdate()}`;
     if (rows.length !== ids.length) throw new AppError(404, NOT_FOUND);
     const lists = new Set(rows.map((row) => `${row.dossier_id ?? ''}|${row.parent_id ?? ''}`));
     if (lists.size > 1) throw new AppError(400, 'Si ordinano i compiti di una lista alla volta.');
-    // `updated_at` is a TIMESTAMP holding UTC, as Prisma writes it.
+    // One statement, in SQL both the online Postgres and the desktop app's SQLite take (G-612, spec §5): the
+    // position of each id from a CASE (each one cast, since Postgres cannot type a bare parameter there),
+    // `updated_at` from the dialect's UTC now (on Postgres the same expression as before).
     await tx.$executeRaw`
-      UPDATE tasks AS t SET position = (o.ord - 1)::int, updated_at = (now() AT TIME ZONE 'UTC')
-      FROM unnest(${ids}::text[]) WITH ORDINALITY AS o(id, ord)
-      WHERE t.id = o.id AND t.user_id = ${userId}`;
+      UPDATE tasks SET position = CASE id ${Prisma.join(ids.map((id, position) => Prisma.sql`WHEN ${id} THEN CAST(${position} AS INTEGER)`), ' ')} END,
+        updated_at = ${utcNow()}
+      WHERE id IN (${Prisma.join(ids)}) AND user_id = ${userId}`;
   });
 }
 

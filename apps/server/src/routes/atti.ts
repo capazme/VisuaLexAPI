@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
 import { prisma } from '../lib/prisma';
+import { forNoKeyUpdate } from '../lib/sqlDialect';
 
 /**
  * Atti: the acts a lawyer drafts in Work,
@@ -103,7 +104,7 @@ router.post('/', wrap(async (req, res) => {
   // The count and the create in one transaction, the user's row locked: two creates at once cannot both pass the cap.
   // NO KEY UPDATE serializes the creates without holding up the user's other writes that only reference the row.
   const atto = await prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM users WHERE id = ${userId} FOR NO KEY UPDATE`;
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM users WHERE id = ${userId}${forNoKeyUpdate()}`;
     if (locked.length === 0) throw new AppError(404, 'Account non trovato.'); // deleted while this create waited
     if ((await tx.atto.count({ where: { userId } })) >= MAX_ATTI_PER_USER) {
       throw new AppError(

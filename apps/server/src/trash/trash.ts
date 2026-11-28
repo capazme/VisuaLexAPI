@@ -9,6 +9,7 @@ import { countingModules } from '../lingo/courses';
 import { LIMITS } from '../schemas/lingo/corso';
 import { deleteDossierFileRows, removeDossierDir } from '../pratica/fileStore';
 import { assertDossierRoom } from '../utils/dossierCaps';
+import { advisoryXactLock, forNoKeyUpdate, forUpdate, jsonValue } from '../lib/sqlDialect';
 
 /**
  * The trash (MCP second round, spec §4.3): what a connected application
@@ -99,7 +100,7 @@ const expiry = (from: Date) => new Date(from.getTime() + TRASH_RETENTION_MS);
  * and the delete. False when the dossier is not the user's.
  */
 async function lockDossier(tx: Prisma.TransactionClient, userId: string, dossierId: string): Promise<boolean> {
-  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM dossiers WHERE id = ${dossierId} AND user_id = ${userId} FOR UPDATE`;
+  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM dossiers WHERE id = ${dossierId} AND user_id = ${userId}${forUpdate()}`;
   return rows.length === 1;
 }
 
@@ -113,7 +114,7 @@ async function lockedProposals(tx: Prisma.TransactionClient, userId: string, ite
   await tx.$queryRaw`
     SELECT id FROM highlights
     WHERE user_id = ${userId} AND dossier_item_id IN (${Prisma.join(itemIds)}) AND created_by_client_id IS NOT NULL
-    ORDER BY id FOR UPDATE`;
+    ORDER BY id${forUpdate()}`;
   return tx.highlight.findMany({
     where: { userId, dossierItemId: { in: itemIds }, createdByClientId: { not: null } },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -196,9 +197,9 @@ export async function trashDossier(
     // Its tasks are locked too, before they are read: a change in flight (an edit, a tick, a task
     // moved to the trash) is committed first and lands in the payload, and one that comes after
     // waits and then finds no task. Otherwise the payload would keep the task as it was.
-    await tx.$queryRaw`SELECT id FROM tasks WHERE dossier_id = ${dossierId} AND user_id = ${userId} ORDER BY id FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM tasks WHERE dossier_id = ${dossierId} AND user_id = ${userId} ORDER BY id${forUpdate()}`;
     // Its entries too, for an assistant's note whose state or text changes in flight (D7b).
-    await tx.$queryRaw`SELECT id FROM dossier_items WHERE dossier_id = ${dossierId} ORDER BY id FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM dossier_items WHERE dossier_id = ${dossierId} ORDER BY id${forUpdate()}`;
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
       include: {
@@ -264,7 +265,7 @@ export async function trashDossierItems(
     const wanted = [...new Set(itemIds)];
     // The entries are locked before they are read: a state change or an edit of an assistant's note in flight
     // (D7b, which locks the entry's row alone) lands in the payload, one that comes after finds no entry.
-    await tx.$queryRaw`SELECT id FROM dossier_items WHERE id IN (${Prisma.join(wanted)}) AND dossier_id = ${dossierId} ORDER BY id FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM dossier_items WHERE id IN (${Prisma.join(wanted)}) AND dossier_id = ${dossierId} ORDER BY id${forUpdate()}`;
     const items = await tx.dossierItem.findMany({ where: { id: { in: wanted }, dossierId }, orderBy: { position: 'asc' } });
     if (items.length === 0) throw new AppError(404, 'Nessuna delle voci indicate è in questa pratica.');
     const moved = items.map((item) => item.id);
@@ -310,7 +311,7 @@ export async function trashLingoCards(
     const wanted = [...new Set(cardIds)];
     // Lock the rows first, in id order: an edit in flight (PATCH) finishes before the payload is read, and one
     // that comes after waits, then finds no card.
-    await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id IN (${Prisma.join(wanted)}) AND autore_id = ${userId} ORDER BY id FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM lingo_cards WHERE id IN (${Prisma.join(wanted)}) AND autore_id = ${userId} ORDER BY id${forUpdate()}`;
     const cards = await tx.lingoCard.findMany({ where: { id: { in: wanted }, autoreId: userId }, include: CARD_PAYLOAD, orderBy: { createdAt: 'asc' } });
     const movable = cards.filter((card) => PERSONAL_STATES.includes(card.stato));
     const moved = movable.map((card) => card.id);
@@ -544,7 +545,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       // republish take them (the copy, then the entry they rewrite): the other way round, a restore and
       // one of those would deadlock.
       const copyId = entry.kind === 'DOSSIER' ? (entry.payload as { publishedCopyId?: unknown }).publishedCopyId : null;
-      if (typeof copyId === 'string' && copyId) await tx.$queryRaw`SELECT id FROM shared_environments WHERE id = ${copyId} FOR UPDATE`;
+      if (typeof copyId === 'string' && copyId) await tx.$queryRaw`SELECT id FROM shared_environments WHERE id = ${copyId}${forUpdate()}`;
       // The entry goes first, as the one claim on it: a purge, the sweep or another restore that took
       // it meanwhile is waited for and then leaves nothing to delete, a 404; a refusal further on rolls
       // the deletion back. Its payload is the one the deletion returns, read after any wait: an admin's
@@ -552,7 +553,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       const claimed = await tx.$queryRaw<{ payload: Prisma.JsonValue }[]>`
         DELETE FROM trash_entries WHERE id = ${entry.id} AND user_id = ${userId} RETURNING payload`;
       if (claimed.length === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
-      const payload = claimed[0].payload;
+      const payload = jsonValue<Prisma.JsonValue>(claimed[0].payload);
 
       if (entry.kind === 'DOSSIER') {
         // `tasks` is absent from an entry trashed before the planner.
@@ -845,10 +846,10 @@ async function moduleRows(tx: Prisma.TransactionClient, moduleIds: string[], exa
 /** Locks a course's modules, then their cards, in id order: an edit or a card in flight lands in the payload or after it. */
 async function lockModulesAndCards(tx: Prisma.TransactionClient, corsoId: string, moduloId?: string) {
   const modules = moduloId
-    ? await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi_moduli WHERE id = ${moduloId} AND corso_id = ${corsoId} FOR UPDATE`
-    : await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi_moduli WHERE corso_id = ${corsoId} ORDER BY id FOR UPDATE`;
+    ? await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi_moduli WHERE id = ${moduloId} AND corso_id = ${corsoId}${forUpdate()}`
+    : await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi_moduli WHERE corso_id = ${corsoId} ORDER BY id${forUpdate()}`;
   const ids = modules.map((m) => m.id);
-  if (ids.length > 0) await tx.$queryRaw`SELECT id FROM lingo_cards WHERE modulo_id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+  if (ids.length > 0) await tx.$queryRaw`SELECT id FROM lingo_cards WHERE modulo_id IN (${Prisma.join(ids)}) ORDER BY id${forUpdate()}`;
   return ids;
 }
 
@@ -861,7 +862,7 @@ async function lockModulesAndCards(tx: Prisma.TransactionClient, corsoId: string
 export async function trashLingoCorso(userId: string, corsoId: string, by: DeletedBy): Promise<{ trashId: string; dossier: { id: string; name: string } | null }> {
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi WHERE id = ${corsoId} AND autore_id = ${userId} FOR UPDATE`;
+    const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM lingo_corsi WHERE id = ${corsoId} AND autore_id = ${userId}${forUpdate()}`;
     if (locked.length === 0) throw new AppError(404, 'Percorso non trovato.');
     const moduleIds = await lockModulesAndCards(tx, corsoId);
     const corso = await tx.lingoCorso.findUniqueOrThrow({ where: { id: corsoId } });
@@ -906,7 +907,7 @@ export async function trashLingoCorso(userId: string, corsoId: string, by: Delet
 export async function trashLingoCorsoModulo(userId: string, corsoId: string, moduloId: string, by: DeletedBy): Promise<{ trashId: string }> {
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRaw<{ titolo: string }[]>`SELECT titolo FROM lingo_corsi WHERE id = ${corsoId} AND autore_id = ${userId} FOR UPDATE`;
+    const locked = await tx.$queryRaw<{ titolo: string }[]>`SELECT titolo FROM lingo_corsi WHERE id = ${corsoId} AND autore_id = ${userId}${forUpdate()}`;
     if (locked.length === 0) throw new AppError(404, 'Percorso non trovato.');
     const ids = await lockModulesAndCards(tx, corsoId, moduloId);
     if (ids.length === 0) throw new AppError(404, 'Modulo non trovato.');
@@ -980,7 +981,7 @@ async function restoreLingoCorso(tx: Prisma.TransactionClient, userId: string, p
     esiti: Row[];
   };
   // The limits hold on the way back too: the user may have written others meanwhile.
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('lingo_corsi:' || ${userId}::text))`;
+  await advisoryXactLock(tx, `lingo_corsi:${userId}`);
   if ((await tx.lingoCorso.count({ where: { autoreId: userId } })) >= LIMITS.coursesPerUser) {
     throw new AppError(409, `Hai già ${LIMITS.coursesPerUser} percorsi: eliminane uno prima di ripristinare questo.`);
   }
@@ -1018,7 +1019,7 @@ async function restoreLingoCorsoModulo(tx: Prisma.TransactionClient, userId: str
   const p = payload as unknown as StoredModuleRows & { modulo: Row & { id: string; corsoId: string; sostituisceId: string | null }; correzioni: string[] };
   // Locked as a module's addition locks it: the limits below cannot be passed by a module added at the same time.
   const course = await tx.$queryRaw<{ moduli_previsti: number }[]>`
-    SELECT moduli_previsti FROM lingo_corsi WHERE id = ${p.modulo.corsoId} AND autore_id = ${userId} FOR NO KEY UPDATE`;
+    SELECT moduli_previsti FROM lingo_corsi WHERE id = ${p.modulo.corsoId} AND autore_id = ${userId}${forNoKeyUpdate()}`;
   if (course.length === 0) throw new AppError(404, 'Il percorso di questo modulo non c’è più.');
   const modules = await tx.lingoCorsoModulo.findMany({ where: { corsoId: p.modulo.corsoId }, select: { id: true, sostituisceId: true } });
   const withdrawn = await tx.lingoCorsoModuloStato.findMany({
