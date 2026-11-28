@@ -221,6 +221,35 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     return result, count, from_copy
 
 
+async def tree_is_cached(normurn) -> bool:
+    """Whether the persistent cache holds a Normattiva tree `get_tree` would read for the
+    existence check (its own variant or the widest), without decoding it."""
+    for key in (f"{normurn}|link=False|details=False|metadata=True|{_TREE_FORMAT}", _full_key(normurn, False)):
+        if await _tree_cache.stamp(key) is not None:
+            return True
+    return False
+
+
+async def seed_tree_from_page(normurn, text) -> bool:
+    """Store the act's tree read from a page that carries the act's index, as `_tree_from_page`
+    stores the act page's (the widest variant, without links); True when stored.
+
+    An article's page carries the same index as the act's page: identical trees on 27 of 27
+    pairs measured (c.c., c.p.c., c.p., l. 241/1990, d.lgs. 231/2001, the 18 articles of l.
+    24/2017; owner, G-646). So the first read of an act needs the article's page only, which it
+    downloads anyway, instead of the act's page first (6.6 s for a code). A page with no index
+    stores nothing, and `get_tree` reads the act's page as before."""
+    if _source_of(normurn) != "normattiva" or not isinstance(text, str) or len(text) < 500:
+        return False
+    soup = BeautifulSoup(text, 'html.parser')
+    result, count, metadata = await _parse_normattiva_tree(soup, normurn, False, True, return_metadata=True)
+    if count <= 0:
+        return False
+    await _tree_cache.set(_full_key(normurn, False), {"result": result, "count": count, "metadata": metadata})
+    logging.info(f"Stored the act's tree read from an article's page: {count} articles")
+    return True
+
+
 # "art. 1" in the tree's links, or "art 1" without the dot, as some annexes write it
 # (d.lgs. 36/2023, Allegato I.4): the dotless ones used to be dropped from the tree.
 _ARTICLE_LABEL_PREFIX = re.compile(r'^\s*art(?:\.\s*|\s+)', re.IGNORECASE)
