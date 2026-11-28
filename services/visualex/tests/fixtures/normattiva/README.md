@@ -139,5 +139,10 @@ A trimmed capture of 2026-10-30, for reading one part (`NormattivaScraper.read_p
   then a fragment with `div.bodyTesto`), cut byte for byte to its first three commas (701-703): the
   `art-comma-div-akn` blocks from comma 704 to 800 are removed, everything else is as served.
 
+- `art2043_cc_fragment.html`, `art2044_cc_fragment.html`: the fragments of artt. 2043 and 2044
+  c.c. (`/atto/caricaArticolo?…`, the current versions), captured on 2026-11-28 in a session
+  opened on art. 2043's whole page, as served (G-652; T133). The extractor's text on each equals
+  its text on the whole page.
+
 The extractor's output for every file here is frozen (CLAUDE.md gotcha 23:
 `article_text` is the offset space of every stored highlight and note).
