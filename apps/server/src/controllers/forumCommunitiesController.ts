@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { LingoMateria, Prisma } from '@prisma/client';
+import { LingoMateria, Prisma } from '../lib/db';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';

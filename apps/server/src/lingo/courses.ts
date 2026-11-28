@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Prisma, type LingoCorsoObiettivo, type LingoCorsoTipoDomanda } from '@prisma/client';
+import { Prisma, type LingoCorsoObiettivo, type LingoCorsoTipoDomanda } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { citeStoredItem } from '../norms/decisionCitation';

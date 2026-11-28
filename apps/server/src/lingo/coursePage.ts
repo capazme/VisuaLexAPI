@@ -1,4 +1,4 @@
-import type { LingoMateria, Prisma } from '@prisma/client';
+import type { LingoMateria, Prisma } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { LIMITS } from '../schemas/lingo/corso';

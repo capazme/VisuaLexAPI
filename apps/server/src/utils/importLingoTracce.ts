@@ -19,7 +19,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import {
   isImportable,

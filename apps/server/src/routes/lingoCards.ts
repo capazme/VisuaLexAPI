@@ -1,4 +1,4 @@
-import { LingoCardStato, LingoCardTipo, LingoMateria, type Prisma } from '@prisma/client';
+import { LingoCardStato, LingoCardTipo, LingoMateria, type Prisma } from '../lib/db';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';

@@ -27,7 +27,8 @@
   "license": "MPL-2.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.0",
-    "@prisma/client": "^5.20.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
     "@types/multer": "^2.1.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -40,7 +41,7 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.1.1",
     "pdfjs-dist": "6.5.438",
-    "prisma": "^5.22.0",
+    "prisma": "7.10.1",
     "rate-limiter-flexible": "^9.1.1",
     "zod": "^4.6.7"
   },
@@ -59,5 +60,8 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "effect": "3.22.4"
   }
 }

@@ -1,4 +1,4 @@
-import { LingoMateria } from '@prisma/client';
+import { LingoMateria } from '../lib/db';
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';

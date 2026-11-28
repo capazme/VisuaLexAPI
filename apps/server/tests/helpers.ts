@@ -1,11 +1,12 @@
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/lib/db';
+import { createPgAdapter } from '../src/lib/pgAdapter';
 import jwt from 'jsonwebtoken';
 import expressApp from '../src/app';
 import { createWebSession, sessionCookieName } from '../src/auth/webSession';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPgAdapter(process.env.DATABASE_URL ?? '') });
 
 // ONE persistent listening server for the whole suite. Passing the bare Express
 // app to `request(app)` makes supertest spin up (and tear down) a fresh ephemeral

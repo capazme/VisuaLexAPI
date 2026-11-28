@@ -1,4 +1,4 @@
-import type { LingoPreferenzeStudio, Prisma } from '@prisma/client';
+import type { LingoPreferenzeStudio, Prisma } from '../lib/db';
 import { DEFAULT_NUOVE_AL_GIORNO } from './reviewQueue';
 
 /** The reviews that make a day count until the user changes it (Studia progress spec D7). */

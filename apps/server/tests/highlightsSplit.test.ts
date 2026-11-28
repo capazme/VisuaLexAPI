@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../src/lib/db';
 import { app, authHeader, createSharedEnv, createTestUser, prisma, request } from './helpers';
 import { prisma as appPrisma } from '../src/lib/prisma';
 

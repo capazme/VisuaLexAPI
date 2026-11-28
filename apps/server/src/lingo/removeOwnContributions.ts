@@ -1,4 +1,4 @@
-import type { LingoCardStato, Prisma } from '@prisma/client';
+import type { LingoCardStato, Prisma } from '../lib/db';
 import { AppError } from '../middleware/errorHandler';
 import { canTransition } from './cardStates';
 

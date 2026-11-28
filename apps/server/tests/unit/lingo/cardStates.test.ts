@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { LingoCardStato } from '@prisma/client';
+import type { LingoCardStato } from '../../../src/lib/db';
 import { allowedTransitions, canTransition } from '../../../src/lingo/cardStates';
 
 const STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA', 'DA_RIVEDERE', 'ARCHIVIATA'];

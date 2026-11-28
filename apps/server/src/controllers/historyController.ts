@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { boundedText, refuseTooLong } from '../utils/bodyLimits';
-import type { SearchHistory } from '@prisma/client';
+import type { SearchHistory } from '../lib/db';
 import { AppError } from '../middleware/errorHandler';
 import { readDecisionKey } from '../norms/decisionKey';
 

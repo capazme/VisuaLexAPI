@@ -13,17 +13,17 @@ import { SCHEMA_FINGERPRINT, assertTestDatabase, deletionOrder, emptyingStatemen
 export default async function setup(project: TestProject): Promise<void> {
   assertTestDatabase();
   // The child gets this process's environment, whose DATABASE_URL the guard has just read
-  // (dotenv-cli put `.env.test`'s there; Prisma's CLI loads a `.env` only for names not set).
+  // (dotenv-cli put `.env.test`'s there; `prisma.config.ts` loads a `.env` only for names not set).
   // Its output is kept, so a failed reset throws with Prisma's own words.
-  execSync('npx prisma migrate reset --force --skip-seed', { stdio: 'pipe', env: process.env });
+  // Prisma 7 seeds only on `prisma db seed`: the reset takes no `--skip-seed` any more (the flag is gone).
+  execSync('npx prisma migrate reset --force', { stdio: 'pipe', env: process.env });
 
-  // Prisma loads a development `apps/server/.env` at the import and at the construction
-  // (`tests/devEnvGuard.ts`); the test files run in processes forked from this one, so
-  // whatever it adds goes at once, as `tests/setup.ts` does in each of them. The import
-  // stays dynamic and after `known`: a static one would load that `.env` before it.
+  // The test files run in processes forked from this one and inherit its environment: whatever the
+  // imports below add to it goes at once (`tests/devEnvGuard.ts`). Prisma 7 itself loads no `.env`.
   const known = new Set(Object.keys(process.env));
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
+  const { PrismaClient } = await import('../src/lib/db');
+  const { createPgAdapter } = await import('../src/lib/pgAdapter');
+  const prisma = new PrismaClient({ adapter: createPgAdapter(process.env.DATABASE_URL ?? '') });
   dropAddedSince(known);
   try {
     const tables = await prisma.$queryRaw<{ name: string }[]>`

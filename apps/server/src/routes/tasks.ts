@@ -1,4 +1,4 @@
-import { Prisma, TaskOrigin, TaskRecurrenceFrom } from '@prisma/client';
+import { Prisma, TaskOrigin, TaskRecurrenceFrom } from '../lib/db';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { z, ZodError } from 'zod';
 import { authenticate } from '../middleware/auth';

@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 
 /**
  * The Community's row locks (spec 2026-10-20 §5.5): deciding and writing are one step. Every write that

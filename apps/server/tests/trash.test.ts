@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../src/lib/db';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
 import { exchangeCode, startAuthorization, tokenExchange } from './oauth/oauthHelpers';
 import { spendDelegatedCounter } from '../src/middleware/delegated';

@@ -1,6 +1,6 @@
 import type { OAuthClientInformationFull, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { InvalidGrantError, InvalidScopeError, InvalidTargetError } from '@modelcontextprotocol/sdk/server/auth/errors.js';
-import type { OAuthGrant, OAuthToken, Prisma } from '@prisma/client';
+import type { OAuthGrant, OAuthToken, Prisma } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { randomSecret, sha256 } from './hash';
 import { DELETE_SCOPE, IGNORED_SCOPES } from './config';

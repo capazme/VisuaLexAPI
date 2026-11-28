@@ -1,4 +1,4 @@
-import { LingoCardStato, LingoGiudizio, Prisma } from '@prisma/client';
+import { LingoCardStato, LingoGiudizio, Prisma } from '../lib/db';
 import { SOGLIE_PREDEFINITE, Soglie, stateAfterVotes } from './validationRule';
 
 /**

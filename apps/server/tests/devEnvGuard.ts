@@ -3,16 +3,13 @@ import { resolve } from 'node:path';
 
 /**
  * The suite's environment is `.env.test` (through `dotenv -e .env.test`) and what the setup
- * assigns, never a development `.env`. Two things can still load `apps/server/.env` into a
- * run: `@prisma/client`, when it was generated in a checkout that has one, and
- * `dotenv.config()` in `src/config.ts`. The setup turns the second off (a mock), wraps the
- * first so that whatever it loads is taken out at once (`dropAddedSince`, at the import and at
- * every construction: `src/lib/prisma.ts` and `tests/helpers.ts` build clients after the setup),
- * and drops, for the families the suite configures, every `OAUTH_*` and `MERLT_*` that
+ * assigns, never a development `.env`. Since Prisma 7 (G-612) the generated client loads no `.env`;
+ * the one loader left is `dotenv.config()` in `src/config.ts`, which the setup turns off (a mock).
+ * The setup still drops, for the families the suite configures, every `OAUTH_*` and `MERLT_*` that
  * `.env.test` does not name, wherever it came from (a shell export too). A development MCP secret once won this way, and every OAuth
- * exchange answered `invalid_client` in the main checkout only. The global setup's own client,
- * in vitest's main process, whose environment the test processes inherit, has what it loads
- * taken out the same way (`dropAddedSince` around its import and construction, `tests/globalSetup.ts`).
+ * exchange answered `invalid_client` in the main checkout only. The global setup, in vitest's main
+ * process, whose environment the test processes inherit, takes out whatever its imports add
+ * (`dropAddedSince`, `tests/globalSetup.ts`).
  */
 export const GUARDED = /^(OAUTH|MERLT)_/;
 
@@ -27,9 +24,9 @@ export function envTestKeys(file = resolve(process.cwd(), '.env.test')): Set<str
 }
 
 /**
- * Deletes every variable that appeared since `before` was taken: what Prisma's own dotenv
- * loaded from a development `.env` (it adds the names that are missing, at import and again
- * at every `new PrismaClient()`). Returns the names dropped.
+ * Deletes every variable that appeared since `before` was taken. Prisma 5's own dotenv used to add
+ * the names a development `.env` had; Prisma 7 adds none, and this stays as the guard. Returns the
+ * names dropped.
  */
 export function dropAddedSince(before: ReadonlySet<string>, env: NodeJS.ProcessEnv = process.env): string[] {
   const added = Object.keys(env).filter((name) => !before.has(name));

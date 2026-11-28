@@ -1,4 +1,4 @@
-import type { LingoMateria, Prisma } from '@prisma/client';
+import type { LingoMateria, Prisma } from '../lib/db';
 import { AppError } from '../middleware/errorHandler';
 
 type Db = Pick<Prisma.TransactionClient, 'user'>;

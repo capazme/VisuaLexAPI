@@ -9,11 +9,13 @@ import { fileURLToPath } from 'node:url';
 // max_connections. The one client is src/lib/prisma.ts and everything under
 // src/ imports it; the test harness (setup.ts, helpers.ts) keeps its own.
 const SRC = fileURLToPath(new URL('../src', import.meta.url));
+// The generated client (src/generated, G-612) constructs PrismaClient inside its own files.
+const GENERATED = join(SRC, 'generated');
 
 function tsFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return tsFiles(path);
+    if (entry.isDirectory()) return path === GENERATED ? [] : tsFiles(path);
     return entry.name.endsWith('.ts') ? [path] : [];
   });
 }

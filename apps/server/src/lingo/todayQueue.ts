@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 import { courseDayFor, reviewScope } from './reviewQueue';
 import { readPreferences } from './studyPreferences';
 import { startOfRomeDay } from './studyDay';

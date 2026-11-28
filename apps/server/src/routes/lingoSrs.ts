@@ -1,4 +1,4 @@
-import { LingoMateria, Prisma } from '@prisma/client';
+import { LingoMateria, Prisma } from '../lib/db';
 import { Router } from 'express';
 import { z } from 'zod';
 import { isSwitchOn } from '../assistant/switches';

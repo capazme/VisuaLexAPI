@@ -1,11 +1,17 @@
 // VisuaLex Platform Database Schema
+// Prisma 7 (G-612): the client is generated into src/generated/prisma, compiled with the rest of src/,
+// and reaches Postgres through @prisma/adapter-pg (src/lib/prisma.ts). The URL is in prisma.config.ts.
+// Imports without an extension, so tsc's CommonJS build, tsx and vitest all resolve them.
 generator client {
-  provider = "prisma-client-js"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  runtime             = "nodejs"
+  importFileExtension = ""
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============================================
@@ -579,7 +585,7 @@ model Dossier {
   snapshots        DossierSnapshot[]
   // The planner's tasks filed under this dossier (the dossier is the project, answer 1).
   tasks            Task[]
-  // The acts drafted on this dossier (Atti, draft for Alfred): SetNull when the dossier goes.
+  // The acts drafted on this dossier (Atti): SetNull when the dossier goes.
   atti             Atto[]
   // Its copy in the Forum, if published: seen by its owner only, never in the public content.
   publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
@@ -2338,7 +2344,7 @@ model Task {
   @@map("tasks")
 }
 
-// ─── Atti (DRAFT for Alfred and Guglielmo, 15-11-2026; not merged without their yes) ───
+// ─── Atti (designed 15-11-2026) ───
 // A lawyer's act being drafted (atto di citazione, appello, memoria...): its text, the dossier whose
 // sources it rests on, and where it stands. One row per act; versions, the AI's proposals and the
 // trash are open questions (docs/superpowers/specs/2026-11-15-atti-backend-draft.md).

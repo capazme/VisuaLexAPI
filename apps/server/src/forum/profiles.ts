@@ -1,4 +1,4 @@
-import { LingoMateria, type Prisma } from '@prisma/client';
+import { LingoMateria, type Prisma } from '../lib/db';
 import { z } from 'zod';
 import { isSwitchOn } from '../assistant/switches';
 import { AppError } from '../middleware/errorHandler';

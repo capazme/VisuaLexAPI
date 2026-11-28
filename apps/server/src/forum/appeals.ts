@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 
 // The author's appeal to the owners against a hiding (spec 2026-11-14-forum-community-server-design §C,
 // D-267): what the moderation routes and a glossa's page need of it.

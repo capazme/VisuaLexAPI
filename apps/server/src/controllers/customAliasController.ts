@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AliasType } from '@prisma/client';
+import { AliasType } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { boundedText, parseBody } from '../utils/bodyLimits';

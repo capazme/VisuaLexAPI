@@ -1,4 +1,4 @@
-import type { LingoMateria } from '@prisma/client';
+import type { LingoMateria } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { maturity } from './cardMaturity';
 import { courseDayFor, reviewedCardsQuery, reviewScope } from './reviewQueue';

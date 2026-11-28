@@ -1,4 +1,4 @@
-import { LingoTestoChiave, type LingoTestoVersione, type Prisma } from '@prisma/client';
+import { LingoTestoChiave, type LingoTestoVersione, type Prisma } from '../lib/db';
 
 /**
  * The texts a person must accept (spec decision 22). A text is never edited: an

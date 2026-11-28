@@ -1,3 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './db';
+import { createPgAdapter } from './pgAdapter';
 
-export const prisma = new PrismaClient();
+// The one PrismaClient of the server (tests/prismaClient.test.ts): Postgres through node-postgres (G-612).
+export const prisma = new PrismaClient({ adapter: createPgAdapter(process.env.DATABASE_URL ?? '') });

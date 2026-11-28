@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LingoMateria } from '@prisma/client';
+import type { LingoMateria } from '../src/lib/db';
 import { delegated } from './delegatedHelper';
 import { app, createTestUser, credits, prisma, request, session, setClock, type Headers, type TestUser } from './xpHelpers';
 import { LESSONS_PER_DAY, LESSON_MIN_CARDS } from '../src/lingo/lessons';

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { z, ZodError } from 'zod';
-import type { Prisma, PraticaFileAzione } from '@prisma/client';
+import type { Prisma, PraticaFileAzione } from '../lib/db';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
@@ -262,7 +262,8 @@ async function deposit(req: Request, res: Response, file: { buffer: Buffer; orig
           versione,
           autore: provenance.createdByClientId ? 'claude' : 'utente',
           ...provenance,
-          chiaveCifrata,
+          // Prisma 7 types Bytes as a Uint8Array over its own ArrayBuffer; a Buffer may sit on a shared one.
+          chiaveCifrata: Uint8Array.from(chiaveCifrata),
         },
         select: PUBLIC,
       });

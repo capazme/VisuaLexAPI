@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../lib/db';
 
 export type CardRow = Prisma.LingoCardGetPayload<{ include: { ancore: true } }>;
 

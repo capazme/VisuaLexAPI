@@ -1,4 +1,4 @@
-import { Prisma, type Task, type TaskOrigin, type TaskRecurrenceFrom } from '@prisma/client';
+import { Prisma, type Task, type TaskOrigin, type TaskRecurrenceFrom } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { addDays, romeDay } from '../lingo/studyDay';

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Request, Response } from 'express';
-import { Prisma, type User } from '@prisma/client';
+import { Prisma, type User } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { boundedText, parseBody } from '../utils/bodyLimits';

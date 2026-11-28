@@ -1,4 +1,4 @@
-import type { LingoCardStato, LingoMateria, Prisma } from '@prisma/client';
+import type { LingoCardStato, LingoMateria, Prisma } from '../lib/db';
 import { isSwitchOn } from '../assistant/switches';
 import { review, type Rating, type SrsState } from '../srs/fsrsEngine';
 import { dayToDate } from './studyDays';

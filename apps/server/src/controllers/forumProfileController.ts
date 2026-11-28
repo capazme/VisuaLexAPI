@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Request, Response } from 'express';
-import { Prisma, type ForumProfile } from '@prisma/client';
+import { Prisma, type ForumProfile } from '../lib/db';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';

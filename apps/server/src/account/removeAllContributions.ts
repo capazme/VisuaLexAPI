@@ -1,4 +1,4 @@
-import type { LingoCardStato } from '@prisma/client';
+import type { LingoCardStato } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { deleteOwnCommentIn, deleteOwnThreadIn } from '../controllers/communityController';
 import { maybeSweepCommunity } from '../forum/sweep';

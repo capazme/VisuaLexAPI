@@ -1,4 +1,4 @@
-import type { MerltConsentLevel, Prisma } from '@prisma/client';
+import type { MerltConsentLevel, Prisma } from '../../lib/db';
 import { prisma } from '../../lib/prisma';
 
 /**

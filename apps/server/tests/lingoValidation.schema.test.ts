@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../src/lib/db';
 import { request, app, createTestUser, authHeader, prisma, type TestUser } from './helpers';
 
 async function proposedCard(authorId: string) {

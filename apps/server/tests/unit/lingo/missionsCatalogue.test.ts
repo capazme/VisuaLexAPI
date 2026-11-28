@@ -1,4 +1,4 @@
-import { LingoMissione } from '@prisma/client';
+import { LingoMissione } from '../../../src/lib/db';
 import { describe, expect, it } from 'vitest';
 import { MISSIONS, XP_DAILY_CEILING } from '../../../src/lingo/missions';
 import { periodOf } from '../../../src/lingo/xpLedger';

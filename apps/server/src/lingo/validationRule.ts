@@ -1,4 +1,4 @@
-import type { LingoCardStato, LingoGiudizio } from '@prisma/client';
+import type { LingoCardStato, LingoGiudizio } from '../lib/db';
 
 /**
  * The two thresholds of the community's validation. Their values are set by an

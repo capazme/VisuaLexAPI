@@ -1,4 +1,4 @@
-import { Prisma, type LingoFonteXp, type LingoMateria, type LingoMissione } from '@prisma/client';
+import { Prisma, type LingoFonteXp, type LingoMateria, type LingoMissione } from '../lib/db';
 import { CONSOLIDATED_DAYS, maturity } from './cardMaturity';
 import { levelOf } from './levels';
 import { courseDayFor, reviewScope } from './reviewQueue';

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../lib/db';
 
 /**
  * The sentence a validation refusal answers with, as `detail`: «Invalid request: field (message; message), …».

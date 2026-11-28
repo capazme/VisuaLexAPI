@@ -1,4 +1,4 @@
-import { LingoGiudizio, LingoMateria, Prisma } from '@prisma/client';
+import { LingoGiudizio, LingoMateria, Prisma } from '../lib/db';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';

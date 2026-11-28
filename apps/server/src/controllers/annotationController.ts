@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AnnotationType } from '@prisma/client';
+import { AnnotationType } from '../lib/db';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { boundedText, parseBody } from '../utils/bodyLimits';
