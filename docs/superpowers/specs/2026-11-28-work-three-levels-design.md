@@ -14,6 +14,8 @@ practices-as-folders and the local deadline register». The decisions it rests o
 - **The owner's principle of 28 November** on the web as a pseudonymised mirror: «il web è quindi lo spazio dove
   vivono le pratiche pseudonimizzate. Dobbiamo fare in modo che si distinguano bene nella pratica i punti dove ci
   sono dati personali e i punti in cui non ci sono, così che il web possa essere un mirror sicuro». §11 designs it.
+- **The web owner's answers of 28 November** to the questions of his brief, folded in where they apply and listed in
+  «Answers of 28 November».
 
 This document designs the backend. The screens are lexcraft-web's and wait for its owner (§ «For the web owner»).
 The decisions still open are in «Decisions for the owners». Each fact is marked **[read]** in a source listed at the
@@ -138,8 +140,9 @@ Conventions:
   comparing wrongly (M1 §2). A term is a civil day with no time zone, and text compares correctly as text. A CHECK
   holds the format.
 - **Money is integer cents.**
-- **Codes are the identity a workbook row is matched by.** They are unique per register and never reused once
-  deleted. A deleted row goes to the trash, as every Work row does.
+- **Codes are the identity a workbook row is matched by.** They follow the template's format, confirmed by the web
+  owner on 28 November: P-001, P-001-A, E-0001. A format the firm chooses comes later. Codes are unique per register
+  and never reused once deleted. A deleted row goes to the trash, as every Work row does.
 - **Every row has a `version`**, increased at each write, and `updatedAt`. The change log (§2.6) records each write.
 - **Every field carries a data class** (personal, indirect, pseudonymisable, non-personal), written beside it in the
   schema and checked by a test (§11.1).
@@ -619,7 +622,9 @@ assumes a default and lists the question (W2).
 
 ### 9. Stages
 
-Each stage is one or more pull requests, stacked on M1 (#764), with the tests of §10.
+Each stage is one or more pull requests, stacked on M1 (#764), with the tests of §10. The web owner confirmed this
+order on 28 November. The porting line builds both the backend and the app's screens, and the web owner reviews
+them, as for M1.
 
 1. Tables with every field's class (§11.1), codes, rules, holidays, lists, diary, the term engine, the views, the
    API without Excel, and the marks of personal fields in the API.
@@ -752,10 +757,16 @@ A free-text field counts as personal. It reaches the web only through three step
 2. **Pseudocraft for the rest.** Pseudocraft (LexCraft-IT/pseudocraft), the web owner's local pseudonymiser, finds the
    names the practice does not list, and other identifiers (addresses, tax codes, IBANs, phone numbers), with its rules
    and its local models. It runs on the computer and makes no network call at run time.
-   - Its README states that it runs on macOS on Apple Silicon. **Until it runs on Windows, free text does not leave a
+   - **How LexCraft uses it**, as the web owner answered on 28 November:
+     - its core, the pipeline and the subjects' register, as a library;
+     - its code as the base of the desktop app's own pseudonymisation primitive, without its review window;
+     - the subjects held in LexCraft's encrypted table (§11.3) and passed in at each call;
+     - the confirmation screen is the app's.
+   - **No pseudonymisation on LexCraft's servers.** The web gets the primitive only later; there is no compute to host
+     it today.
+   - **Its README states macOS on Apple Silicon only.** The app ships for Windows x64 too (G-620), so the primitive
+     must run there: §11.7 makes it a requirement and gives its cost. **Until it does, free text does not leave a
      Windows computer at all**: only `non-personal` fields mirror there.
-   - How LexCraft calls it is the web owner's to say (W14): a local process with a text interface, or its core as a
-     library. The app does not install it on its own.
 3. **The lawyer confirms**, field by field, the original beside the pseudonymised text, with every replacement
    highlighted and editable.
    - The confirmation records the pseudonymised text, a fingerprint of the original, pseudocraft's version and the
@@ -797,9 +808,16 @@ The recommendation (W12) is that nothing indirect leaves in the first mirror.
   class.
 - **The publish sends exactly the preview.** `POST /api/work/mirror/:code/publish` carries the preview's fingerprint.
   If anything changed since, it answers 409 and asks for a new preview.
-- **The mirror runs one way**, from the app to the web, through the local server and the lawyer's account (M3).
+- **The mirror runs one way**, from the app to the web.
   - Text edited in the web does not come back.
   - A `non-personal` addition, such as a norm or a decision added to the dossier, may come back (W15).
+- **How it travels.** The web owner answered on 28 November that the web and the app synchronise over an encrypted
+  channel while the lawyer's computer is on, «simil remote control»: the relay forwards packets it cannot read. That
+  channel is the remote access the owners are designing separately, and this section waits for it.
+  - What the web may keep on LexCraft's servers is W18. The recommendation is that the pseudonymised part of a work
+    dossier is shown live from the computer and never stored online. The web's own research (norms, decisions,
+    notes on the law) stays stored online as today.
+  - «Nel web devono stare il meno possibile i dati dei clienti» (the web owner, 28 November).
 - **Withdrawing.** The lawyer can withdraw a practice from the web at any time; the online copy is deleted. What the
   host's own backups keep, and for how long, is part of the legal check.
 - **The server refuses what it does not expect.** The online server accepts a mirror only through a schema that
@@ -838,6 +856,58 @@ The recommendation (W12) is that nothing indirect leaves in the first mirror.
 - **Before the mirror is built**: a DPIA and a legal check (W16). Until both are done, the classes, the marks and the
   preview can be built, and nothing is sent.
 
+#### 11.7 The pseudonymisation primitive on macOS and Windows
+
+The app ships for Apple Silicon and Windows x64 from its first version (G-620). A lawyer on Windows must be able to
+mirror free text as a lawyer on a Mac can, so **the primitive must run on both**. That is a requirement of this
+design, set before the mirror is enabled on either platform.
+
+**What pseudocraft is today** **[read]**, from its project file and installation guide:
+
+- **The stack.** A Python 3.12 core with `torch`, `transformers`, `onnxruntime` and `llama-cpp-python`, built with
+  Metal on macOS. PyInstaller is in its build group.
+- **Hardware.** At least 8 GB of memory. A 4B «judge» model on 8 GB; a 9B one is offered only from 16 GB.
+- **Disk.** About 1 GB for the application and about 5 GB for the models (10.5 GB with the 9B).
+- **Models.** Downloaded at first launch, each checked against its SHA-256. The judge uses the GPU through Metal.
+- **Platform.** macOS on Apple Silicon only, by its own statement. No macOS-only library appears in its
+  dependencies, but it has not been tried on Windows.
+
+**Requirements:**
+
+1. **The same pipeline on both platforms.** On a corpus of synthetic texts, the rules and the recognition models
+   give the same replacements on macOS and on Windows. The judge runs with a fixed seed and no sampling. Where it
+   still differs, the field goes to the lawyer's confirmation as every field does.
+2. **A separate process, on demand.** The primitive runs as a second sidecar, started when the lawyer opens the
+   confirmation screen and stopped after a few idle minutes.
+   - It speaks JSON over stdin and stdout with the local server: no port.
+   - It is outside the app's memory threshold (G-618), which holds for the app without it. Before starting, the app
+     checks the free memory and says so if it is short.
+3. **Models only on request.** The models are downloaded only when the lawyer turns the mirror on, from a source fixed
+   in the app, each checked against its SHA-256. No other network call.
+4. **An optional component.** The primitive is not in the installer, which stays near M1's estimate of about 50 MB.
+   It installs on first use and can be removed with its models.
+5. **Signed like the app.** Every native library inside is signed: Windows with the OV certificate (G-619), macOS
+   when the Developer ID arrives.
+6. **Below 8 GB, no judge.** The rules and the recognition models still run, the confirmation screen asks for a closer
+   look, and nothing changes in what the lawyer must confirm.
+7. **Licences.** Pseudocraft is under MPL-2.0, as LexCraft is, and the notices at the head of its files are kept (MPL
+   §3.4) **[read]**. It already checks its dependencies' licences with a script **[read]**. The licences of the models
+   go into the app's notices.
+
+**What it costs**, in working days of one line **[estimated]**:
+
+| Road | What | Days | Limits |
+|---|---|---|---|
+| (P1) Pseudocraft's core as it is, packaged for both platforms | a trial on the real Windows PC (G-620): the core built with PyInstaller, pseudocraft's end-to-end tests, time per page and memory with the 4B judge on the CPU | 1–2 | — |
+| | the sidecar's protocol and its client in the local server | 2–3 | — |
+| | packaging for both platforms as an optional component, signing the Python native libraries, builds on the macOS and Windows runners. The tests with models run on the real PC, not in CI | 4–6 | — |
+| | **total** | **7–11** | the heaviest component: about 1 GB plus 5 GB of models; on Windows the judge runs on the CPU unless a GPU backend works there, to be measured |
+| (P2) A slimmer primitive | the rules and the recognition models through ONNX runtime, without `torch`, the judge optional | 8–12 | it changes pseudocraft's pipeline: it needs the web owner's yes and his end-to-end tests as the measure |
+| (P3) macOS first | free text stays home on Windows until (P1) or (P2) | 0 now | a Windows lawyer mirrors only `non-personal` fields |
+
+**Recommendation:** start with (P1)'s trial. Keep (P1) if the trial meets the thresholds of W19 on the reference
+PC; otherwise (P2). Until then, (P3) holds by itself, since free text needs the primitive.
+
 ## For the web owner
 
 Nothing here changes lexcraft-web until its owner decides; the brief to him is in the owners' private notes. What
@@ -846,9 +916,18 @@ the backend gives the web is §7. Three things the web should know now:
 - **Nothing personal of this design appears online** (G-621). The web shows Work in three levels only when `GET
   /api/work/status` answers. The only way a practice reaches the web is the pseudonymised mirror of §11, after the
   lawyer's preview and confirmation, and not before the DPIA.
-- **The web's own practices and tasks** can be written with a client's name today. Under the owner's principle of
-  28 November they become the place of pseudonymised practices (§11). Until the mirror exists, their free-text
-  fields are `pseudonymisable` and can carry the mark of §11.5. What else to do with them is his question.
+- **The web's own practices and tasks** can be written with a client's name today. The web owner answered on 28
+  November with a fourth road:
+  - work, study and public dossiers in both the web and the app (`Dossier.kind` has `lavoro` and `studio` today; the
+    public dossier is the published copy);
+  - in the web, Work serves research for one's work, kept apart from personal study (Learn);
+  - the web and the app synchronise over the encrypted channel while the computer is on (§11.5);
+  - as little client data in the web as possible.
+
+  Until the mirror exists, the free-text fields of a web work dossier are `pseudonymisable` and can carry the mark of
+  §11.5. In the app a practice hangs on a work dossier (§1); whether the app's new section replaces «Pratiche» is
+  still open.
+- **Who builds the app's screens**: the porting line, with the web owner's review (his answer of 28 November).
 - **The notifications are the shell's**, not the page's, and the native dialogs too (§5.8).
 
 ## Decisions for the owners
@@ -892,9 +971,12 @@ its formulas come from a firm.
 - **Recommendation: (a)**, with the notifications' text naming no client by default.
 
 **W9 · The first version's order** (§9). Fees and invoices only as records, after the first version: D-304's
-reserve says «in Work nessuna schermata dedicata ai pagamenti». Recommendation: as written.
+reserve says «in Work nessuna schermata dedicata ai pagamenti». Recommendation: as written. The web owner agreed on 28
+November, to the order and to a sheet that only records fees, invoices and payments.
 
-**W10 · Does the register synchronise at all**, once synchronisation exists (D-163)?
+**W10 · Does the register synchronise at all**, once synchronisation exists (D-163)? On the model the web owner
+answered on 28 November: synchronisation is free when the firm hosts it, and a paid plan on the association's servers.
+Whether the register takes part is still this question.
 - (a) Never: it stays on one computer, with encrypted backups (M4).
 - (b) Only end to end encrypted, per register, off by default.
 - (c) Like any other data.
@@ -926,12 +1008,12 @@ reserve says «in Work nessuna schermata dedicata ai pagamenti». Recommendation
 - (c) No free text leaves in the first mirror at all.
 - **Recommendation: (b)**, unless the DPIA says (c).
 
-**W14 · Pseudocraft as the pseudonymiser** (§11.2), a question for the web owner, who wrote it.
-- How LexCraft calls it: a local process with a text interface, or its core as a library.
-- Where the subjects live: LexCraft's map passed in at each call, or its own register kept in step.
-- When it runs on Windows.
+**W14 · Pseudocraft as the pseudonymiser** (§11.2). **Answered by the web owner on 28 November:**
+- its core as a library, and its code as the base of the desktop primitive;
+- the subjects in LexCraft's encrypted table, passed in at each call;
+- the web only later.
 
-Until it does, free text stays home on Windows.
+What remains is the Windows requirement, W19.
 
 **W15 · The mirror's shape** (§11.3, §11.5).
 - One way, app to web. A `non-personal` addition made in the web, such as a norm or a decision added to the
@@ -948,6 +1030,48 @@ Until it does, free text stays home on Windows.
   - the categories of arts. 9 and 10;
   - the words the app and the site may use. «Pseudonimizzata», never «anonima».
 - **Recommendation:** classes, marks and preview are built now; nothing is sent before both are done.
+
+**W17 · Events and tasks.** Open: the web owner will discuss it with the owner. His leaning: «evento genera compiti».
+- **(a) The event generates the tasks.** In the app an event creates its preparation tasks.
+  - The task's due date is the event's effective date, read-only, and follows a postponement.
+  - Its planned date is the lawyer's.
+  - The link lives in a local-only table (`WorkEventTask`), so the online `Task` model does not change.
+  - In the web, tasks stay as they are, without events.
+- **(b) Tasks and events stay apart**, with at most a reference from a task to an event.
+- **Recommendation: (a)**, as the web owner leans. The link stays local, and a task never moves its own due date: it
+  follows the event's.
+
+**W18 · What the web keeps of a work dossier** (§11.5).
+- (a) The pseudonymised part is shown live from the computer over the encrypted channel, and never stored on
+  LexCraft's servers; the web's own research is stored as today.
+- (b) A pseudonymised copy is stored online and refreshed when the computer is on.
+- **Recommendation: (a).** It matches «il meno possibile» and the web owner's channel. It leaves the relay holding only
+  ciphertext, which narrows the processing W16 has to assess. The cost: the practice is visible in the web only while
+  the computer is on.
+
+**W19 · The pseudonymisation primitive on Windows** (§11.7). The requirement is set; the road and the thresholds are
+not.
+- The thresholds (P1) must meet on the reference Windows PC: a proposal is one page of text in under 30 seconds and
+  the primitive under 6 GB of memory with the 4B judge.
+- The road: (P1), (P2) or (P3), with the costs of §11.7.
+- **Recommendation:** (P1)'s trial first, with those thresholds; (P2) only if it fails.
+
+## Answers of 28 November
+
+The web owner answered the questions of his brief on 28 November. Where they change this design, the section names
+them:
+
+| Question | Answer | Where |
+|---|---|---|
+| The web's practices and tasks | a fourth road: work, study and public dossiers in web and app; Work in the web for work research, apart from Learn; sync over the encrypted channel with the computer on; as little client data in the web as possible | § «For the web owner», §11.5, W18 |
+| The words; the app's section | «Dossier di lavoro» in both; whether the app's section replaces «Pratiche» is open | § «For the web owner» |
+| Events and tasks | open, to discuss with the owner; leaning «evento genera compiti» | W17 |
+| Codes | the template's format: P-001, P-001-A, E-0001 | §2 |
+| The order of stages | the spec's | §9 |
+| Who builds the app's screens | the porting line; the web owner reviews | §9, § «For the web owner» |
+| Fees and invoices and D-304 | records only, no payment: it respects D-304 | W9 |
+| Synchronisation | free when the firm hosts it; a paid plan on the association's servers (D-163) | W10 |
+| Pseudocraft | its core as a library, the subjects in LexCraft's table, the base of the desktop primitive; the web later | §11.2, §11.7, W14 |
 
 ## Not in this change
 
@@ -971,7 +1095,8 @@ current text:
 **GDPR (Regulation (EU) 2016/679), read on 28 November 2026** on EUR-Lex through the same service, Italian text:
 art. 4(5), art. 35(1) and (3), recital 26: https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita
 
-**Pseudocraft**, its README in LexCraft-IT/pseudocraft (platform and interfaces), read on 28 November 2026.
+**Pseudocraft**, in LexCraft-IT/pseudocraft, read on 28 November 2026: its README (platform, interfaces, licence),
+`pyproject.toml` (dependencies, build group) and `docs/installazione.md` (memory, disk, models).
 
 **OWASP, read on 28 November 2026:**
 
