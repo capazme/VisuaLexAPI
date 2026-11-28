@@ -348,7 +348,15 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 in-process, cold then warm, and prints where each one's time goes (network per host, our
 throttle and retry waits, parsing, Playwright, cache); `--compare <earlier run>` checks the
 returned article and decision texts byte for byte (root rule 23). It talks to the real
-sources: a few runs, never a loop, never on the deployment host.
+sources: a few runs, never a loop, never on the deployment host. `--record <dir>` keeps every
+source answer (a scratch folder, never git: decisions carry personal data); `--replay <dir>`
+answers from them. Load tests run only on recorded answers: `scripts/replay_server.py` is the API
+as production runs it (Hypercorn, one worker) with every request answered from the recording
+after its recorded latency (`replay_net.py`, the one door every collector uses,
+`aiohttp.ClientSession`), and `GET /__replay/stats` counts what would have reached each source;
+`scripts/replay_load.py` sends N users at once (`warm`, `cold-same`, `cold-distinct`) and prints
+the percentiles, reads per second and source requests per 100 reads. Baseline, targets and plan:
+`docs/superpowers/specs/2026-11-28-collectors-speed-design.md`.
 
 ## Key API Endpoints
 

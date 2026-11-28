@@ -81,6 +81,11 @@ CASES: list[tuple[str, str, str, dict]] = [
      {"corte": "corte_giustizia_ue", "numero": 634, "anno": 2021}),
     ("search_2043_cc", "POST", "/search_decisions",
      {"norma": {"tipo_atto": "codice civile", "numero_articolo": "2043"}, "archivio": "civile"}),
+    ("cds_2270_2019", "POST", "/fetch_decision",
+     {"corte": "consiglio_di_stato", "numero": 2270, "anno": 2019}),
+    # A whole short act, every article, as «Apri tutto» asks for it (l. 24/2017, 18 articles).
+    ("l24_2017_whole", "POST", "/stream_article_text",
+     {"act_type": "legge", "date": "2017-03-08", "act_number": "24", "article": "1-18"}),
 ]
 
 
@@ -310,6 +315,15 @@ async def main_async(args) -> int:
     workdir.mkdir(exist_ok=True)
     os.chdir(workdir)
 
+    if args.record:
+        sys.path.insert(0, str(HERE))
+        from replay_net import install_recorder
+        install_recorder(Path(args.record).resolve())
+    if args.replay:
+        sys.path.insert(0, str(HERE))
+        from replay_net import install_replayer
+        install_replayer(Path(args.replay).resolve(), latency=args.replay_latency)
+
     import structlog
     structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING))
     logging.getLogger().setLevel(logging.WARNING)
@@ -348,6 +362,10 @@ def main() -> int:
                         help="labels of the passes run in this process, in order")
     parser.add_argument("--corte-cost-bundle", help="a copy of P_json2001_oggi.zip to seed")
     parser.add_argument("--compare", help="an earlier run's --out: compare the texts byte for byte")
+    parser.add_argument("--record", help="a scratch folder: keep every source answer for replay_net (never in git)")
+    parser.add_argument("--replay", help="a folder --record filled: answer from it, no source is reached")
+    parser.add_argument("--replay-latency", default="recorded",
+                        help="with --replay: 'recorded' (default) or a fixed number of seconds")
     return asyncio.run(main_async(parser.parse_args()))
 
 
