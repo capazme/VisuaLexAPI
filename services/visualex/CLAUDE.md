@@ -926,7 +926,9 @@ Breaking one of these breaks the product. Read before editing.
 1. **Scraper fragility** — every scraper depends on third-party HTML. Breakage
    means the site changed.
 2. **Async context** — never block the Python event loop; wrap blocking calls in
-   `asyncio.to_thread()`.
+   `asyncio.to_thread()`. The cold parses of a Normattiva page are in a thread: an article's text
+   (`estrai_da_html` → `estrai_testo`) and an act's tree (`parse_normattiva_tree`); a code's
+   page held the loop up to 279 ms before (21 ms now, T133).
 3. **Rate limiting** — per-IP, configured in `config.py`; 429 when exceeded.
 4. **Playwright** — needed for PDF export (`playwright install chromium`);
    always via `PlaywrightManager`. Date completion no longer uses it.

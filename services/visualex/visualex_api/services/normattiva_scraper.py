@@ -218,6 +218,14 @@ class NormattivaScraper(BaseScraper):
     async def estrai_da_html(
         self, atto: str, comma: Optional[str] = None, get_link_dict: bool = False
     ) -> Union[str, Dict[str, Any]]:
+        """The article's text in a Normattiva page (`estrai_testo`), read in a thread: parsing a
+        page of a code (2.6 MB) takes 0.2-0.4 s of CPU, which on the event loop held every other
+        request for as long (T133). The same function on the same page: the text is the same."""
+        return await asyncio.to_thread(self.estrai_testo, atto, comma, get_link_dict)
+
+    def estrai_testo(
+        self, atto: str, comma: Optional[str] = None, get_link_dict: bool = False
+    ) -> Union[str, Dict[str, Any]]:
         try:
             soup: BeautifulSoup = self.parse_document(atto)
             corpo: Optional[Tag] = soup.find('div', class_=self.selectors.BODY_TESTO)
