@@ -66,6 +66,7 @@ from visualex_api.services.decisions.resolver import (
 )
 from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, read_request_date, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
+from visualex_api.tools.page_memo import PAGE_MEMO
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details, has_fixed_urn_without_date
@@ -1388,11 +1389,19 @@ class NormaController:
         notes = parts = None
         try:
             cache = getattr(scraper, 'cache', None)
-            raw = await cache.get(url) if cache is not None and url else None
-            # A part's page (its key holds PART_KEY_MARK) has no tree: the article page has.
-            tree_raw = await cache.get(article_page_key(url)) if raw and PART_KEY_MARK in url else None
-            if isinstance(raw, str) and raw:
-                notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo, tree_raw)
+            if cache is not None and url and PART_KEY_MARK not in url:
+                # Read once per stored page (`page_memo`), not at every read of the article.
+                extras = await PAGE_MEMO.derive(
+                    cache, url, "extras", (nv.numero_articolo,),
+                    lambda raw: _read_page_extras(raw, nv.numero_articolo))
+                if extras is not None:
+                    notes, parts = extras
+            else:
+                raw = await cache.get(url) if cache is not None and url else None
+                # A part's page (its key holds PART_KEY_MARK) has no tree: the article page has.
+                tree_raw = await cache.get(article_page_key(url)) if raw and PART_KEY_MARK in url else None
+                if isinstance(raw, str) and raw:
+                    notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo, tree_raw)
         except Exception as exc:  # noqa: BLE001 - best effort: the text already read stands
             log.warning("Page extras could not be read", error=str(exc), url=str(url)[:100])
         fields = {**update_notes_fields(notes), **parts_fields(parts)}

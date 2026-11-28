@@ -17,7 +17,6 @@ not import the scraper.
 """
 from __future__ import annotations
 
-import asyncio
 import html
 import re
 from datetime import date, datetime, timedelta, timezone
@@ -30,6 +29,7 @@ from bs4 import BeautifulSoup, Tag
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..tools.exceptions import ValidationError
 from ..tools.text_op import parse_date
+from ..tools.page_memo import PAGE_MEMO
 from .akn_parser import comparable_article_key
 
 log = structlog.get_logger()
@@ -309,11 +309,12 @@ async def read_validity(
     if cache is None or not urn:
         return None
     try:
-        raw = await cache.get(urn)
-        if not isinstance(raw, str) or not raw:
-            return None
-        return await asyncio.to_thread(
-            extract_validity, raw, article=article, requested_date=requested_date,
+        # Computed once per stored page (`page_memo`): the state depends on today, so the day
+        # is part of the answer's name, and passed to the extractor that judges it.
+        today = _today_in_rome()
+        return await PAGE_MEMO.derive(
+            cache, urn, "validity", (article, requested_date, today.isoformat()),
+            lambda raw: extract_validity(raw, article=article, requested_date=requested_date, today=today),
         )
     except Exception as exc:  # noqa: BLE001 - best effort by contract
         log.warning("Validity could not be read", error=str(exc), urn=str(urn)[:100])

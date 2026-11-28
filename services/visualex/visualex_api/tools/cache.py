@@ -40,6 +40,13 @@ class PersistentCache:
     async def set(self, key: str, value: Any) -> None:
         await asyncio.to_thread(self._write_to_disk, key, value)
 
+    async def stamp(self, key: str) -> Optional[float]:
+        """The write time of `key`'s entry, from its first bytes, or None when `get` would
+        answer nothing (no entry, an expired one) or the head cannot be read. It identifies
+        the stored value: an entry written again gets a new stamp. Like `get`, it refreshes
+        the file's modification time, which `prune` reads as its last use."""
+        return await asyncio.to_thread(self._stamp_on_disk, key)
+
     async def delete(self, key: str) -> None:
         path = self._path_for_key(key)
         try:
@@ -76,6 +83,24 @@ class PersistentCache:
         except OSError:
             pass
         return payload.get("data")
+
+    def _stamp_on_disk(self, key: str) -> Optional[float]:
+        path = self._path_for_key(key)
+        try:
+            with path.open("rb") as handle:
+                head = _HEAD.match(handle.read(64))
+        except OSError:  # no entry
+            return None
+        if head is None:
+            return None
+        timestamp = float(head.group(1))
+        if time.time() - timestamp > self.ttl:
+            return None  # `get` deletes it and answers nothing
+        try:
+            os.utime(path)
+        except OSError:
+            pass
+        return timestamp
 
     def _write_to_disk(self, key: str, value: Any) -> None:
         """Write to a temporary file in the same folder, then rename it over the entry: a
