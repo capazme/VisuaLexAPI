@@ -367,8 +367,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     after the timestamp and read by `get`, `stamp` and the sweep; an entry without one keeps
     the namespace's): a Normattiva page at a past day (`!vig=<day>` before today in Rome) or
     of the original (`@originale`) is kept 30 days, as the decisions are (owner, G-648;
-    `normattiva_scraper.dated_page_ttl`, `store_page`); the text in force and a text at
-    today keep `PERSISTENT_CACHE_TTL`, since the next version may come into force tomorrow.
+    `normattiva_scraper.dated_page_ttl`, `store_page`), but only once the extractor found the
+    article's text in it (a part's page once `_part_text` checked it); the text in force and a
+    text at today keep `PERSISTENT_CACHE_TTL`, since the next version may come into force tomorrow.
     `stamp(key)` reads an entry's write time from its head (None when `get` would answer
     nothing; it counts as a use for the prune): it names the stored value. `tools/page_memo.py`
     keeps, in memory and bounded, what a stored page says under that stamp, so a Normattiva

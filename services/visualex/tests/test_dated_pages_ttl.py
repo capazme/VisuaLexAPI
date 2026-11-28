@@ -133,3 +133,26 @@ async def test_a_page_at_a_past_day_is_stored_for_30_days_and_today_s_for_a_day(
     assert "!vig=2010-01-01" in dated_url
     assert stored_ttl(cache, dated_url) == DATED_PAGE_TTL
     assert stored_ttl(cache, current_url) is None
+
+
+async def test_a_dated_page_without_the_article_s_text_is_kept_a_day_as_before(today, scraper, cache):
+    async def empty_page(url, *, source="base_scraper"):
+        return '<html><body>Servizio momentaneamente non disponibile</body></html>'
+
+    async def no_akn(*args, **kwargs):
+        return None
+
+    scraper.request_document = empty_page
+    dated = NormaVisitata(norma=Norma(tipo_atto="codice civile"), numero_articolo="1284",
+                          versione="vigente", data_versione="2010-01-01")
+    with patch.object(scraper_module, "fetch_act_article", no_akn):
+        with pytest.raises(Exception):
+            await scraper.get_document(dated)
+    assert stored_ttl(cache, dated.urn) is None
+
+
+async def test_the_original_is_stored_for_30_days(today, scraper, cache):
+    original = NormaVisitata(norma=Norma(tipo_atto="codice civile"), numero_articolo="1284", versione="originale")
+    _, url = await scraper.get_document(original)
+    assert url.endswith("@originale")
+    assert stored_ttl(cache, url) == DATED_PAGE_TTL

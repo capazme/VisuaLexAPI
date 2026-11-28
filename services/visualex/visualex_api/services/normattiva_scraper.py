@@ -123,12 +123,17 @@ class NormattivaScraper(BaseScraper):
         log.info("Requesting URL", urn=urn[:100])
 
         cache_key = urn
+        keep_long = False
         html_content: str = await self.cache.get(cache_key)
         if html_content:
             log.info("Cache hit", source="normattiva_persistent")
         else:
             html_content = await self.request_document(urn, source="normattiva")
-            await store_page(self.cache, cache_key, html_content, urn)
+            # A dated article's page is kept 30 days only once the extractor found its text in
+            # it (below); until then, and for anything else, it is stored as it always was.
+            keep_long = bool(normavisitata.numero_articolo) and dated_page_ttl(urn) is not None
+            if not keep_long:
+                await self.cache.set(cache_key, html_content)
 
         if not html_content:
             log.error("Document not found or malformed", urn=urn)
@@ -146,6 +151,8 @@ class NormattivaScraper(BaseScraper):
                 document_text = None
 
             if not document_text or not document_text.strip():
+                if keep_long:
+                    await self.cache.set(cache_key, html_content)  # no text in it: a day, as before
                 # Last resort. This text differs from the HTML rendering — it
                 # transliterates accents and carries a markdown heading — so it
                 # is served only when the alternative is an error, and the
@@ -165,6 +172,8 @@ class NormattivaScraper(BaseScraper):
                     return AknArticleText(akn_text), urn
                 raise ParsingError(f"Impossibile estrarre il testo dell'articolo da {urn}")
 
+            if keep_long:
+                await store_page(self.cache, cache_key, html_content, urn)
             return document_text, urn
         else:
             log.info("Returning full document text")
@@ -208,7 +217,7 @@ class NormattivaScraper(BaseScraper):
         async with new_session(cookie_jar=aiohttp.CookieJar(), timeout=timeout) as session:
             article_page = (await http_client.request("GET", nv.urn, source="normattiva", session=session)).text
             if article_page and not await self.cache.get(nv.urn):
-                await store_page(self.cache, nv.urn, article_page, nv.urn)
+                await self.cache.set(nv.urn, article_page)
             parts = await asyncio.to_thread(extract_parts, article_page or "", article=nv.numero_articolo)
             part = self._listed_part(nv, parts)
             page = (await http_client.request("GET", part["url"], source="normattiva", session=session)).text
