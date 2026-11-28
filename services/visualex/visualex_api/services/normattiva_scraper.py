@@ -16,6 +16,7 @@ from ..tools.config import HTTP_TIMEOUT
 from ..tools.exceptions import DocumentNotFoundError, IndexUnavailableError, ParsingError, ResourceNotFoundError
 from ..tools.text_op import parse_date
 from ..tools.selectors import NormattivaSelectors
+from ..tools.single_flight import call_key, single_flight
 from .akn_fetch import fetch_act_article
 from .http_client import http_client, new_session
 from .normattiva_parts import extract_parts, part_cache_key, part_range, ranges_in_words
@@ -78,7 +79,10 @@ class NormattivaScraper(BaseScraper):
         log.info("Normattiva scraper initialized")
         self.cache = get_cache_manager().get_persistent("normattiva")
 
+    # Readers asking for the same text at once share one read (one request, one parse): the
+    # memory cache answers the hits, the single flight joins the misses that arrive together.
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer(), skip_cache_func=_is_akn_result)
+    @single_flight(call_key)
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:
         log.info("Fetching Normattiva document", norma=str(normavisitata))
         if normavisitata.parte:

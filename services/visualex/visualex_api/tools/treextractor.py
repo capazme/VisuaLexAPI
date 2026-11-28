@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from bs4 import BeautifulSoup, NavigableString, Tag
 import logging
 import re
@@ -11,6 +12,7 @@ from .cache_manager import get_cache_manager
 from .egress import is_allowed
 from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
+from .single_flight import call_key, single_flight
 from ..services.akn_parser import comparable_article_key, normalize_article_key
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..services import eurlex_fetch
@@ -75,7 +77,10 @@ def _no_tree(result):
     return isinstance(result, tuple) and len(result) >= 2 and result[1] == 0
 
 
+# Callers asking for the same tree at once share one read; each follower gets its own copy, as a
+# cache hit would give it (the lists and dicts of a tree are the caller's to change).
 @cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer(), skip_cache_func=_no_tree)
+@single_flight(call_key, share=copy.deepcopy)
 async def get_tree(normurn, link=False, details=False, return_metadata=False):
     """
     Recupera l'albero degli articoli da un URN normativo e ne estrae le informazioni.
