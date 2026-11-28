@@ -39,6 +39,33 @@ class PageMemo:
     def clear(self) -> None:
         self._answers.clear()
 
+    MISSING = _MISSING
+
+    async def key_for(self, cache: Any, key: str, what: str, args: tuple) -> Optional[tuple]:
+        """The name of an answer about the page `cache` holds under `key` now, or None when the
+        page has no stamp (none, expired, a backend without stamps): then nothing is kept."""
+        stamp_of = getattr(cache, "stamp", None)
+        stamp: Optional[float] = await stamp_of(key) if stamp_of is not None else None
+        if stamp is None:
+            return None
+        return (str(getattr(cache, "directory", id(cache))), key, stamp, what, args)
+
+    def hit(self, memo_key: tuple) -> Any:
+        """A copy of the answer kept under `memo_key`, or `MISSING`."""
+        answer = self._answers.get(memo_key, _MISSING)
+        if answer is _MISSING:
+            return _MISSING
+        self._answers.move_to_end(memo_key)
+        return copy.deepcopy(answer)
+
+    def put(self, memo_key: tuple, answer: Any) -> None:
+        # A page written between the stamp and the read is the newer one; its answer stored
+        # under the older stamp is never asked for again (that stamp is gone from disk).
+        self._answers[memo_key] = copy.deepcopy(answer)
+        self._answers.move_to_end(memo_key)
+        while len(self._answers) > self.max_entries:
+            self._answers.popitem(last=False)
+
     async def derive(
         self,
         cache: Any,
@@ -50,26 +77,17 @@ class PageMemo:
         """`compute(page)` for the page `cache` holds under `key`, run in a thread, or None when
         there is no page (not a string, or empty). `what` and `args` name the answer: two
         answers of one page differ by them."""
-        stamp_of = getattr(cache, "stamp", None)
-        stamp: Optional[float] = await stamp_of(key) if stamp_of is not None else None
-        memo_key = None
-        if stamp is not None:
-            memo_key = (str(getattr(cache, "directory", id(cache))), key, stamp, what, args)
-            answer = self._answers.get(memo_key, _MISSING)
+        memo_key = await self.key_for(cache, key, what, args)
+        if memo_key is not None:
+            answer = self.hit(memo_key)
             if answer is not _MISSING:
-                self._answers.move_to_end(memo_key)
-                return copy.deepcopy(answer)
+                return answer
         raw = await cache.get(key)
         if not isinstance(raw, str) or not raw:
             return None
         answer = await asyncio.to_thread(compute, raw)
         if memo_key is not None:
-            # A page written between the stamp and the read is the newer one; its answer stored
-            # under the older stamp is never asked for again (that stamp is gone from disk).
-            self._answers[memo_key] = copy.deepcopy(answer)
-            self._answers.move_to_end(memo_key)
-            while len(self._answers) > self.max_entries:
-                self._answers.popitem(last=False)
+            self.put(memo_key, answer)
         return answer
 
 
