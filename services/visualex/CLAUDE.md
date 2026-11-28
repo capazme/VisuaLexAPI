@@ -18,7 +18,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `BROWSER_WAIT_SECONDS` (20) raises a `NetworkError` (`status_code` 503) whose words say to retry:
   the reader sees them as the article's error, `/fetch_tree` as a 500; `tests/test_eurlex_browser_slots.py`),
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
-  `http_client.py` (the shared throttled aiohttp client — TLS verification on;
+  `http_client.py` (the shared throttled aiohttp client — TLS verification on; one queue per
+  source host (owner, G-647): `HTTP_MAX_CONCURRENCY` requests at once and `HTTP_MIN_INTERVAL`
+  between two toward each host, as the one queue gave every source before, so Normattiva keeps
+  its 3 and its half second and no other source waits behind it (an EU article cold behind 12
+  c.c. articles: 17.0 → 1.0 s, T133); keyed by host, so callers naming a host differently share it;
   `request(..., session=s)` sends one request on the caller's own session, for a page that
   opens only with the cookies of the page before it, with the same rate limit, host check
   and retries; `request(..., max_retries=n)` lowers the retry budget for a caller that paces
