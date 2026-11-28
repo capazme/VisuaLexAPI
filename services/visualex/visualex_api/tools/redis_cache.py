@@ -93,13 +93,14 @@ class RedisCache:
             log.debug("Redis get error", error=str(exc), key=key[:50])
             return None
 
-    async def set(self, key: str, value: Any) -> None:
+    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+        """`ttl` gives this entry a lifetime of its own, as `PersistentCache.set` does."""
         client = await self._get_client()
         if client is None:
             return
         try:
             payload = json.dumps({"timestamp": time.time(), "data": value})
-            await client.setex(self._make_key(key), self.ttl, payload)
+            await client.setex(self._make_key(key), int(ttl) if ttl is not None else self.ttl, payload)
         except Exception as exc:
             log.debug("Redis set error", error=str(exc), key=key[:50])
 

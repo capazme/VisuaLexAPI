@@ -20,6 +20,7 @@ from ..tools.single_flight import call_key, single_flight
 from .akn_fetch import fetch_act_article
 from .http_client import http_client, new_session
 from .normattiva_parts import extract_parts, part_cache_key, part_range, ranges_in_words
+from .normattiva_validity import today_in_rome
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -37,6 +38,37 @@ def _akn_vigenza(version_date) -> "str | None":
         return parse_date(version_date).replace("-", "")
     except Exception:  # noqa: BLE001 - an unreadable day was refused before the request
         return None
+
+
+# A text at a past day, or the original, does not change: its page is kept 30 days, as the
+# decisions are (owner, G-648). The text in force (no day) and a text at today keep the
+# namespace's day (PERSISTENT_CACHE_TTL): the next version can come into force tomorrow.
+DATED_PAGE_TTL = 30 * 24 * 3600
+_DATED = re.compile(r"!vig=(\d{4}-\d{2}-\d{2})")
+
+
+def dated_page_ttl(urn) -> "int | None":
+    """The lifetime of the page stored for `urn`: `DATED_PAGE_TTL` for the original
+    (`@originale`) or a day before today in Rome (`!vig=<day>`), None (the namespace's) for
+    anything else. A part's key («<URN>#commi701-800») is its article's URN with a mark."""
+    if not isinstance(urn, str):
+        return None
+    if "@originale" in urn:
+        return DATED_PAGE_TTL
+    day = _DATED.search(urn)
+    if day and day.group(1) < today_in_rome().isoformat():
+        return DATED_PAGE_TTL
+    return None
+
+
+async def store_page(cache, key: str, page: str, urn) -> None:
+    """Keep a Normattiva page under `key`, with the lifetime `dated_page_ttl(urn)` gives; an
+    undated page is stored as it always was."""
+    ttl = dated_page_ttl(urn)
+    if ttl is None:
+        await cache.set(key, page)
+    else:
+        await cache.set(key, page, ttl=ttl)
 
 
 def _asks_for_original(normavisitata) -> bool:
@@ -96,7 +128,7 @@ class NormattivaScraper(BaseScraper):
             log.info("Cache hit", source="normattiva_persistent")
         else:
             html_content = await self.request_document(urn, source="normattiva")
-            await self.cache.set(cache_key, html_content)
+            await store_page(self.cache, cache_key, html_content, urn)
 
         if not html_content:
             log.error("Document not found or malformed", urn=urn)
@@ -176,12 +208,12 @@ class NormattivaScraper(BaseScraper):
         async with new_session(cookie_jar=aiohttp.CookieJar(), timeout=timeout) as session:
             article_page = (await http_client.request("GET", nv.urn, source="normattiva", session=session)).text
             if article_page and not await self.cache.get(nv.urn):
-                await self.cache.set(nv.urn, article_page)
+                await store_page(self.cache, nv.urn, article_page, nv.urn)
             parts = await asyncio.to_thread(extract_parts, article_page or "", article=nv.numero_articolo)
             part = self._listed_part(nv, parts)
             page = (await http_client.request("GET", part["url"], source="normattiva", session=session)).text
         text = await self._part_text(page, nv)
-        await self.cache.set(part_cache_key(nv.urn, nv.parte), page)
+        await store_page(self.cache, part_cache_key(nv.urn, nv.parte), page, nv.urn)
         log.info("Read a part of a split article", norma=str(nv), progressivo=part["progressivo"])
         return page, text
 

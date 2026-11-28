@@ -10,9 +10,11 @@ from typing import Any, Optional
 
 from .config import PERSISTENT_CACHE_DIR, PERSISTENT_CACHE_TTL
 
-# The head `_write_to_disk` gives every entry: the write time comes first, so a sweep reads it
-# from the first bytes instead of decoding the whole entry (a Normattiva page is 2.6 MB).
-_HEAD = re.compile(rb'\{"timestamp": (-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?), "data": ')
+# The head `_write_to_disk` gives every entry: the write time comes first, then the entry's own
+# lifetime when it has one (`set(..., ttl=)`), so a sweep reads both from the first bytes instead
+# of decoding the whole entry (a Normattiva page is 2.6 MB).
+_NUMBER = rb'-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?'
+_HEAD = re.compile(rb'\{"timestamp": (' + _NUMBER + rb'), (?:"ttl": (' + _NUMBER + rb'), )?"data": ')
 # An entry being written: `<digest>.<random>.tmp` until it is renamed to `<digest>.json`.
 _TEMPORARY = ".tmp"
 _TEMPORARY_MAX_AGE = 3600
@@ -37,8 +39,10 @@ class PersistentCache:
     async def get(self, key: str) -> Optional[Any]:
         return await asyncio.to_thread(self._read_from_disk, key)
 
-    async def set(self, key: str, value: Any) -> None:
-        await asyncio.to_thread(self._write_to_disk, key, value)
+    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+        """Store `value` under `key`. `ttl` gives this entry a lifetime of its own (seconds);
+        None keeps the namespace's."""
+        await asyncio.to_thread(self._write_to_disk, key, value, ttl)
 
     async def stamp(self, key: str) -> Optional[float]:
         """The write time of `key`'s entry, from its first bytes, or None when there is no
@@ -72,7 +76,7 @@ class PersistentCache:
             return None
 
         timestamp = payload.get("timestamp")
-        if timestamp is None or (time.time() - timestamp) > self.ttl:
+        if timestamp is None or (time.time() - timestamp) > self._lifetime(payload.get("ttl")):
             try:
                 path.unlink()
             except OSError:
@@ -90,13 +94,13 @@ class PersistentCache:
         path = self._path_for_key(key)
         try:
             with path.open("rb") as handle:
-                head = _HEAD.match(handle.read(64))
+                head = _HEAD.match(handle.read(96))
         except OSError:  # no entry
             return None
         if head is None:
             return None
         timestamp = float(head.group(1))
-        if time.time() - timestamp > self.ttl:
+        if time.time() - timestamp > self._lifetime(head.group(2)):
             return None  # `get` deletes it and answers nothing
         try:
             os.utime(path)
@@ -104,13 +108,23 @@ class PersistentCache:
             pass
         return timestamp
 
-    def _write_to_disk(self, key: str, value: Any) -> None:
+    def _lifetime(self, own) -> float:
+        """An entry's lifetime: its own when it was stored with one, else the namespace's."""
+        try:
+            return float(own) if own is not None else self.ttl
+        except (TypeError, ValueError):
+            return self.ttl
+
+    def _write_to_disk(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         """Write to a temporary file in the same folder, then rename it over the entry: a
         reader or a sweep sees the old entry or the new one, never one still being written
         (which would read as broken and be deleted). The temporary name does not end in
         `.json`, so no sweep or prune takes it for an entry."""
         path = self._path_for_key(key)
         payload = {"timestamp": time.time(), "data": value}
+        if ttl is not None:
+            # Before "data", so the head carries it (`_HEAD`); json keeps the insertion order.
+            payload = {"timestamp": payload["timestamp"], "ttl": int(ttl), "data": value}
         fd, temporary = tempfile.mkstemp(dir=self.directory, prefix=f"{path.stem}.", suffix=_TEMPORARY)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -141,8 +155,8 @@ class PersistentCache:
         now = time.time()
         removed = freed = 0
         for path in self.directory.glob("*.json"):
-            timestamp = self._written_at(path)
-            if timestamp is None or now - timestamp > self.ttl:
+            timestamp, own = self._head_of(path)
+            if timestamp is None or now - timestamp > self._lifetime(own):
                 try:
                     size = path.stat().st_size
                     path.unlink()
@@ -160,19 +174,27 @@ class PersistentCache:
 
     @staticmethod
     def _written_at(path: Path) -> Optional[float]:
-        """The entry's write time: from its head when it has the one `_write_to_disk` gives,
-        else from the whole entry decoded. None when it cannot be read as `{"timestamp": …}`."""
+        """The entry's write time (`_head_of`)."""
+        return PersistentCache._head_of(path)[0]
+
+    @staticmethod
+    def _head_of(path: Path) -> tuple[Optional[float], Optional[float]]:
+        """The entry's write time and its own lifetime (None: the namespace's), from its head
+        when it has the one `_write_to_disk` gives, else from the whole entry decoded. The time
+        is None when the entry cannot be read as `{"timestamp": …}`."""
         try:
             with path.open("rb") as handle:
-                head = _HEAD.match(handle.read(64))
+                head = _HEAD.match(handle.read(96))
             if head:
-                return float(head.group(1))
+                return float(head.group(1)), (float(head.group(2)) if head.group(2) else None)
             with path.open("r", encoding="utf-8") as handle:
                 payload = json.load(handle)
         except (ValueError, OSError):  # not JSON, not UTF-8, unreadable
-            return None
+            return None, None
         timestamp = payload.get("timestamp") if isinstance(payload, dict) else None
-        return timestamp if isinstance(timestamp, (int, float)) else None
+        own = payload.get("ttl") if isinstance(payload, dict) else None
+        return (timestamp if isinstance(timestamp, (int, float)) else None,
+                own if isinstance(own, (int, float)) else None)
 
     def prune(self, max_idle: float, max_bytes: int) -> tuple[int, int, int]:
         """Delete the entries not read nor written for `max_idle` seconds, then the least

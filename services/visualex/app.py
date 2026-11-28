@@ -27,7 +27,7 @@ from visualex_api.tools.config import (
 )
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.http_client import http_client
-from visualex_api.services.normattiva_scraper import NormattivaScraper, text_source_of
+from visualex_api.services.normattiva_scraper import NormattivaScraper, store_page, text_source_of
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services import eurlex_fetch
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn, sweep_exported_pdfs
@@ -1422,7 +1422,7 @@ class NormaController:
             page = await scraper.request_document(url, source="normattiva")
             if not page:
                 return False
-            await cache.set(url, page)
+            await store_page(cache, url, page, url)
             return True
         except Exception as exc:  # noqa: BLE001 - the text already read still stands
             log.warning("Page could not be read again for its validity", url=str(url)[:120], error=str(exc))
