@@ -94,7 +94,8 @@ async def test_normattiva_still_gets_three_requests_at_once(client):
 
 async def test_two_names_for_one_host_share_its_queue(client):
     instance, session = client
-    calls = [asyncio.create_task(instance.request("GET", NORMATTIVA.format(n), source=name))
+    spellings = [NORMATTIVA, NORMATTIVA.replace("www.normattiva.it", "WWW.Normattiva.IT:443")]
+    calls = [asyncio.create_task(instance.request("GET", spellings[n % 2].format(n), source=name))
              for n, name in enumerate(["normattiva", "tree", "act_dates", "normattiva", "tree"])]
     await asyncio.sleep(0.01)
     assert session.active["www.normattiva.it"] == 3
@@ -103,7 +104,7 @@ async def test_two_names_for_one_host_share_its_queue(client):
 
 
 async def test_the_half_second_holds_per_host(monkeypatch):
-    monkeypatch.setattr(http_module, "HTTP_MIN_INTERVAL", 0.05)
+    monkeypatch.setattr(http_module, "HTTP_MIN_INTERVAL", 0.2)
     instance = ThrottledHttpClient()
     session = Session()
     for gate in session.gates.values():
@@ -116,6 +117,6 @@ async def test_the_half_second_holds_per_host(monkeypatch):
     await asyncio.gather(*(instance.request("GET", NORMATTIVA.format(n), source="normattiva") for n in range(3)),
                          instance.request("GET", CELLAR, source="cellar"))
     normattiva = sorted(t for host, t in session.started if host == "www.normattiva.it")
-    assert all(b - a >= 0.045 for a, b in zip(normattiva, normattiva[1:]))
+    assert all(b - a >= 0.19 for a, b in zip(normattiva, normattiva[1:]))
     cellar = [t for host, t in session.started if host == "publications.europa.eu"]
-    assert cellar[0] - normattiva[0] < 0.045  # CELLAR's first request did not wait for Normattiva's spacing
+    assert cellar[0] - normattiva[0] < 0.1  # CELLAR's first request did not wait for Normattiva's spacing
