@@ -34,18 +34,28 @@ export function parseChecks(text: string): CheckClause[] {
   return out;
 }
 
-/** The DDL with the adapter's datetime default and each table's CHECKs; refuses a CHECK whose table is not there. */
-export function localSql(diffSql: string, checks: CheckClause[]): string {
+/**
+ * The DDL with the adapter's datetime default and each table's CHECKs.
+ * - For `init.sql` every table of checks.sql must be created, or it throws.
+ * - For a migration (`{ migration: true }`) only the tables it creates get theirs. SQLite changes a table by
+ *   rebuilding it, and Prisma names the copy `new_<table>` before the rename, so that copy gets them too.
+ */
+export function localSql(diffSql: string, checks: CheckClause[], { migration = false }: { migration?: boolean } = {}): string {
   let sql = diffSql.replace(/DEFAULT CURRENT_TIMESTAMP/g, `DEFAULT ${ADAPTER_NOW}`);
   const byTable = new Map<string, CheckClause[]>();
   for (const check of checks) byTable.set(check.table, [...(byTable.get(check.table) ?? []), check]);
   for (const [table, clauses] of byTable) {
-    const start = sql.indexOf(`CREATE TABLE "${table}" (`);
-    if (start < 0) throw new Error(`checks.sql names table "${table}", which the local schema does not create`);
-    const end = sql.indexOf('\n);', start);
-    if (end < 0) throw new Error(`no end of CREATE TABLE "${table}"`);
-    const added = clauses.map((c) => `,\n    ${c.clause}`).join('');
-    sql = sql.slice(0, end) + added + sql.slice(end);
+    for (const name of migration ? [table, `new_${table}`] : [table]) {
+      const start = sql.indexOf(`CREATE TABLE "${name}" (`);
+      if (start < 0) continue;
+      const end = sql.indexOf('\n);', start);
+      if (end < 0) throw new Error(`no end of CREATE TABLE "${name}"`);
+      const added = clauses.map((c) => `,\n    ${c.clause}`).join('');
+      sql = sql.slice(0, end) + added + sql.slice(end);
+    }
+    if (!migration && !sql.includes(`CREATE TABLE "${table}" (`)) {
+      throw new Error(`checks.sql names table "${table}", which the local schema does not create`);
+    }
   }
   return sql;
 }

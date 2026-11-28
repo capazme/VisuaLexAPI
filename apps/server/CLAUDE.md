@@ -32,7 +32,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `schema.prisma` runs `npm run local:schema` in the same pull request.
   `prisma/local/checks.sql` is hand-written: the SQLite twins of the CHECK
   constraints on the tables the local mode writes, which `tests/local/checks.test.ts`
-  holds to the live Postgres ones. `npm test` generates the local client
+  holds to the live Postgres ones. After a change to `schema.prisma`, `npm run
+  local:schema` then `npm run local:migration -- <name>` writes
+  `prisma/local/migrations/<timestamp>_<name>/migration.sql` (the diff from the
+  last commit's local schema); the desktop app applies pending ones at start-up
+  after an encrypted backup (`src/local/migrate.ts`), with foreign keys off around
+  the transaction. The local client (`src/local/database.ts`) is built only in
+  `LEXCRAFT_MODE=local`, by `src/lib/prisma.ts`, behind one lock on its single
+  connection (spec §3). `npm test` generates the local client
   (`pretest`, into `src/generated/prisma-local`). `better-sqlite3` is
   `better-sqlite3-multiple-ciphers` (SQLite3MultipleCiphers) through
   `overrides`: a development dependency of the server, and the one the Prisma
