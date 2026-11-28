@@ -365,8 +365,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     a sweep never meets one half written; a temporary a crash left goes after an hour.
     An entry may carry a lifetime of its own (`set(key, value, ttl=)`, written in its head
     after the timestamp and read by `get`, `stamp` and the sweep; an entry without one keeps
-    the namespace's): a Normattiva page at a past day (`!vig=<day>` before today in Rome) or
-    of the original (`@originale`) is kept 30 days, as the decisions are (owner, G-648;
+    the namespace's): a Normattiva page at a date at least 30 days before today in Rome
+    (`!vig=<day>`) or of the original (`@originale`) is kept 30 days, as the decisions are
+    (owner, G-648, G-653: Normattiva consolidates an amendment days or weeks late, so a more
+    recent date keeps the day;
     `normattiva_scraper.dated_page_ttl`, `store_page`), but only once the extractor found the
     article's text in it (a part's page once `_part_text` checked it); the text in force and a
     text at today keep `PERSISTENT_CACHE_TTL`, since the next version may come into force tomorrow.

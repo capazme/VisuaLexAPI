@@ -46,16 +46,18 @@ def written_at(seconds_ago):
 # --- which pages ---------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("urn,expected", [
-    (CC + "!vig=2010-01-01", DATED_PAGE_TTL),        # a past day
-    (CC + "!vig=2026-11-27", DATED_PAGE_TTL),        # yesterday
-    (CC + "@originale", DATED_PAGE_TTL),             # the original
+    (CC + "!vig=2010-01-01", DATED_PAGE_TTL),        # long past
+    (CC + "!vig=2026-10-29", DATED_PAGE_TTL),        # exactly 30 days back
+    (CC + "!vig=2026-10-30", None),                  # 29 days back: maybe not consolidated yet
+    (CC + "!vig=2026-11-27", None),                  # yesterday: a day, as before (G-653)
+    (CC + "@originale", DATED_PAGE_TTL),             # the original, always
     (CC + "!vig=2010-01-01#commi701-800", DATED_PAGE_TTL),  # a part of a dated article
     (CC + "!vig=2026-11-28", None),                  # today: the next version may start tomorrow
     (CC + "!vig=", None),                            # the text in force
     (CC, None),
     (None, None),
 ])
-async def test_only_a_past_day_or_the_original_lives_30_days(today, urn, expected):
+async def test_only_a_date_a_month_back_or_the_original_lives_30_days(today, urn, expected):
     assert dated_page_ttl(urn) == expected
 
 

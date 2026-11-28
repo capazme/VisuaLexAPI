@@ -1,5 +1,6 @@
 import asyncio
 import re
+from datetime import timedelta
 import warnings
 from typing import Tuple, Optional, Union, Dict, Any
 
@@ -40,24 +41,29 @@ def _akn_vigenza(version_date) -> "str | None":
         return None
 
 
-# A text at a past day, or the original, does not change: its page is kept 30 days, as the
-# decisions are (owner, G-648). The text in force (no day) and a text at today keep the
-# namespace's day (PERSISTENT_CACHE_TTL): the next version can come into force tomorrow.
+# A text at a date at least 30 days back, or the original, is kept 30 days, as the decisions are
+# (owner, G-648 and G-653). A more recent date keeps the namespace's day, as the text in force
+# and a text at today do: Normattiva consolidates an amendment days or weeks after it comes into
+# force, so a page at a recent date may still lack it.
 DATED_PAGE_TTL = 30 * 24 * 3600
+DATED_PAGE_MIN_AGE_DAYS = 30
 _DATED = re.compile(r"!vig=(\d{4}-\d{2}-\d{2})")
 
 
 def dated_page_ttl(urn) -> "int | None":
     """The lifetime of the page stored for `urn`: `DATED_PAGE_TTL` for the original
-    (`@originale`) or a day before today in Rome (`!vig=<day>`), None (the namespace's) for
-    anything else. A part's key («<URN>#commi701-800») is its article's URN with a mark."""
+    (`@originale`) or a date at least `DATED_PAGE_MIN_AGE_DAYS` before today in Rome
+    (`!vig=<day>`), None (the namespace's) for anything else. A part's key («<URN>#commi701-800»)
+    is its article's URN with a mark."""
     if not isinstance(urn, str):
         return None
     if "@originale" in urn:
         return DATED_PAGE_TTL
     day = _DATED.search(urn)
-    if day and day.group(1) < today_in_rome().isoformat():
-        return DATED_PAGE_TTL
+    if day:
+        threshold = (today_in_rome() - timedelta(days=DATED_PAGE_MIN_AGE_DAYS)).isoformat()
+        if day.group(1) <= threshold:
+            return DATED_PAGE_TTL
     return None
 
 
