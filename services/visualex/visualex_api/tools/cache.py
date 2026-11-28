@@ -41,10 +41,12 @@ class PersistentCache:
         await asyncio.to_thread(self._write_to_disk, key, value)
 
     async def stamp(self, key: str) -> Optional[float]:
-        """The write time of `key`'s entry, from its first bytes, or None when `get` would
-        answer nothing (no entry, an expired one) or the head cannot be read. It identifies
-        the stored value: an entry written again gets a new stamp. Like `get`, it refreshes
-        the file's modification time, which `prune` reads as its last use."""
+        """The write time of `key`'s entry, from its first bytes, or None when there is no
+        entry, it has expired, or its head cannot be read. Only the head is read: an entry
+        damaged further on (writes are atomic, so only from outside) still has a stamp, where
+        `get` would delete it. The stamp identifies the stored value: an entry written again
+        gets a new one. Like `get`, it refreshes the file's modification time, which `prune`
+        reads as its last use."""
         return await asyncio.to_thread(self._stamp_on_disk, key)
 
     async def delete(self, key: str) -> None:

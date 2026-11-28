@@ -198,3 +198,29 @@ async def test_the_page_extras_are_those_of_the_page_read_once(cache, monkeypatc
     for _ in range(4):
         assert await NormaController._page_extras_for(scraper, nv, URL, "testo") == expected
     assert runs == [1]
+
+
+async def test_a_parts_page_is_read_the_old_way(cache, monkeypatch):
+    """A part's key holds PART_KEY_MARK: its notes come from its page and its parts from the
+    article's page, so it is not kept under one page's stamp."""
+    article = page("art1284_cc_in_force_update_notes_trimmed.html")
+    await cache.set(URL, article)
+    part_url = URL + app_module.PART_KEY_MARK + "701-800"
+    await cache.set(part_url, article)
+    scraper = NormattivaScraper.__new__(NormattivaScraper)
+    scraper.cache = cache
+    nv = SimpleNamespace(numero_articolo="1284", parte="701-800")
+    runs = []
+    original = app_module._read_page_extras
+
+    def counting(*args, **kwargs):
+        runs.append(args)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(app_module, "_read_page_extras", counting)
+    for _ in range(2):
+        fields = await NormaController._page_extras_for(scraper, nv, part_url, "testo")
+        assert fields["testo_parziale"] is True
+    assert len(runs) == 2
+    assert runs[0][2] == article  # the article's page, for the parts
+    assert len(PAGE_MEMO) == 0
