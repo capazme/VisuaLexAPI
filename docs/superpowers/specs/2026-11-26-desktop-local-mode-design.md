@@ -218,12 +218,23 @@ A script (`apps/server/scripts/local-schema.ts`) reads `prisma/schema.prisma` an
 
   The first launch creates the schema in one transaction: one statement at a time with `fullfsync` took 1.3–1.5 s
   in the trial **[measured]**.
-- **One instance.** Two processes on one file would each think they hold the only connection. The sidecar sets
-  `PRAGMA locking_mode=EXCLUSIVE` before it enters WAL, and writes once at start-up (the opening time, in a local
-  table), so it holds the file's lock from the start and not from the first request.
-  - In the trial, with the pragma set before WAL and a write made, a second process was refused («database is
-    locked») while the first held the file, and read it once the first had closed **[measured]**.
-  - A test starts a second process right after start-up.
+- **One instance.** Two processes on one file would each think they hold the only connection.
+  - The data folder has its own lock, `lexcraft.db.lock`. It is a small SQLite file in rollback-journal mode with
+    `locking_mode=EXCLUSIVE`, written once. The sidecar takes it before anything opens the database (the migrations
+    and the client both take it, once per process) and keeps it until it closes.
+  - The operating system releases it when the process ends, however it ends, so a crash leaves no stale lock. The
+    file holds a pid and a time, never data.
+  - A second process is refused with «another LexCraft process has this data folder open».
+  - Why not the database's own lock: the trial relied on `locking_mode=EXCLUSIVE` on the database itself, in WAL
+    mode. It refused a second process on macOS and on both Windows runners **[measured]**, but Linux CI let a
+    second process read the file while the first held it **[measured, #760]**. The lock file behaves the same on
+    every system. The database keeps its exclusive mode as well.
+  - Tests:
+    - a second process started right after start-up is refused, and so is the test's own process;
+    - twenty plain processes trying the lock are refused;
+    - the folder opens again once the first has exited.
+
+    The test ran 100 times out of 100 on macOS.
   - The shell also refuses a second window (Tauri's single-instance plugin).
 
 ### 5. The SQL only Postgres understands
@@ -263,26 +274,50 @@ the encrypted schema **[measured]**:
 the 17 November trial, whose port checks all passed.
 
 - **The handshake with the shell.**
-  - The shell starts it with the data folder and the built web folder; the database key and a launch secret arrive
-    on stdin.
+  - The shell starts it with the data folder and the built web folder. On stdin, one line: `key=<64 hex>
+    launch=<secret>`, the database key and a secret the shell makes for this launch.
   - It answers with one line on stdout once it listens on `127.0.0.1`: `LEXCRAFT_READY port=… ready_ms=…`.
-  - When stdin closes, however the shell ended, it closes the database and exits.
-- **The port.** A fixed port with a few fallbacks, so the page's origin, and with it the web's local storage, stays
-  the same across launches. Each request must carry:
-  - the window's cookie, set once by `/__lexcraft/open?k=<launch secret>`, a secret valid for one use;
+  - When stdin closes, however the shell ended, it closes the database and exits. This holds during start-up too.
+  - The server's own secrets (its JWT secret, the act files' key) are derived from the database key (HKDF), so
+    nothing secret is written in the data folder. The process works from the data folder, and in local mode no
+    `.env` is read.
+- **The window's cookies.**
+  - The shell calls `POST /__lexcraft/session` with `Authorization: Bearer <launch secret>` and receives two cookies:
+    `lexcraft_window`, a random value made for this launch, and the local profile's web session.
+  - It sets them in the window's own cookie store (Tauri's `Webview::set_cookie`, HttpOnly, SameSite=Strict,
+    Path=/), then loads `http://127.0.0.1:<port>/`.
+  - The launch secret never travels in a URL. A request that looks like a browser's (an `Origin` or any `Sec-Fetch-*`
+    header) is refused even with it.
+  - Each exchange ends the profile's earlier sessions, so a cookie a window kept from an earlier launch opens
+    nothing.
+  - (This replaces the trial's `/__lexcraft/open?k=<secret>`, a one-use secret in the window's first address.)
+- **The port.** It listens on `127.0.0.1` only. A fixed port with a few fallbacks, so the page's origin, and with it
+  the web's local storage, stays the same across launches. Each request must carry:
   - a `Host` of `127.0.0.1:<port>`; any other is refused with 421, against DNS rebinding;
-  - no cross-site `Origin` or `Sec-Fetch-Site`.
+  - no foreign `Origin`, and no `Sec-Fetch-Site` of `cross-site` or `same-site` (403);
+  - the window's cookie (403 without it).
 
-  Anything else gets 403 **[measured in the trials]**.
+  No CORS header is ever sent: the page is same-origin, and no other page may read an answer **[tested, #762]**.
+- **What the shell must do.** Cookies ignore ports, so a window sent to another `127.0.0.1` port would hand its
+  cookies to whoever listens there.
+  - The shell uses the port of the READY line, never a constant.
+  - It blocks every navigation off that exact origin (Tauri's `on_navigation`) and opens external links in the
+    system browser.
 - **The local profile (G-514).** At first launch the server creates one local user, with no usable password. The
-  launch secret's exchange creates a web session for that user (the cookie session of G-455, `auth/webSession.ts`),
-  so the web is signed in without a form. Locally:
-  - `/api/auth/login`, `/register` and the password routes answer that they are not needed;
+  exchange above creates its web session (the cookie session of G-455, `auth/webSession.ts`), which lasts as long as
+  the launch. Locally:
+  - `/api/auth/login`, `/register`, the refresh, sign-out and the password routes answer that they are not needed;
   - the account for Forum and Learn arrives with M3.
+- **The web on the session cookie, before M2.** The web signs in without a form only once it has moved to the
+  session cookie (step 2 of A.1, G-455): it relies on the cookie and sends `X-VisuaLex-Client: web` on writes. The
+  web pinned today still keeps JWT tokens in its local storage. That step lands in lexcraft-web before the first
+  internal app, with no local stopgap; the M1 tests act as the moved web.
 - **What answers where.**
   - The Work routes run as they are.
   - The source routes (`/fetch_article_text` and the others the web calls) answer from the local text copy, or 503
-    «serve la rete» until M3 forwards them.
+    «serve la rete» until M3 forwards them. The Work routes that would resolve a reference through the Python API
+    (a norm or a decision added by reference, an entry's text) reach no source either: in M1 nothing leaves the
+    process, not even for the Python API's default address, which another program on the computer could hold.
   - The online sections (Forum, Learn, the experts, OAuth, administration) answer 503 «sezione online» before
     reaching the database.
   - The background jobs that belong online (the MERL-T watchdog and erasure worker, the Forum sweeper, the norm
@@ -339,7 +374,9 @@ the 17 November trial, whose port checks all passed.
   - the live CHECKs equal to `checks.sql` after a migration;
   - a second process refused;
   - the dialect seam's guard;
-  - the handshake and the port's checks (from the trial's flow).
+  - the handshake and the port's checks, one by one and on the real process: a request without the cookie, with
+    another `Host`, from a foreign `Origin`, with the secret in a URL, each refused; loopback only; no CORS header;
+    no source reached; a killed shell leaves no server running.
 - **The trial's flow, kept as a script.** 19 checks: open a practice, read a text from the local copy, highlight,
   note, trash and restore an entry and a whole practice, restart and read everything back, and the port's
   refusals. It passed 19 of 19 on the encrypted file **[measured]** and becomes the local job's smoke test.
@@ -592,6 +629,10 @@ How each milestone follows current practice, with its source:
     carries native addons only as files written out at run time **[read]**.
   - The page is served by the sidecar on `127.0.0.1` with the checks of section 6. Tauri's own localhost plugin
     warns of «considerable security risks» and is not used **[read]**.
+  - The shell does what section 6 asks of it: the exchange of the launch secret for the window's cookies, set with
+    `Webview::set_cookie` (in Tauri 2.11.1's source **[read]**; M2 checks it on WebKit and WebView2), the READY
+    line's port, and no navigation off the page's origin.
+  - The web is on the session cookie by then (section 6).
 - **M3, the account.** It follows OAuth for native apps (RFC 8252): the system browser, a loopback redirect, PKCE,
   against the server's existing OAuth authorization server. The local server keeps the refresh token in the
   keychain and adds it to the requests it forwards; the web does not change.

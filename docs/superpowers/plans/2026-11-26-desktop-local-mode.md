@@ -24,7 +24,8 @@ better-sqlite3-multiple-ciphers; GitHub Actions on `macos-latest` and `windows-l
 **Decided:** the road and the encryption (G-612, G-613); the line (G-614); M1 in this repository first, the app's
 repository after it is merged (G-615); Apple Silicon and Windows x64 from the first version (26 November). The test
 harness creates a fresh test database per run (PR 1b), and AI sessions run the server suite in CI only until it is
-in: Prisma 7 refuses its database reset when an AI agent runs it, and that safeguard is never worked around. **Status (26 November 2026):** PR 1 is open (#757) and waits for this spec to be accepted.
+in: Prisma 7 refuses its database reset when an AI agent runs it, and that safeguard is never worked around. **Status (27 November 2026):** the spec is accepted and merged; PRs 1 to 5 are open, stacked (#757, #758, #759, #760,
+#761, #762); PR 1 merges first, in a release of its own.
 
 **Open:** D1 (the backup key), D2 (the session's memory threshold), D3 (the Windows signing identity) and D4 (the
 Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Developer account (G-616) touches M5.
@@ -46,10 +47,10 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
   `macos-latest` and on `windows-latest`. Nothing in `src/local/` assumes a POSIX path, a Unix socket or a signal
   Windows lacks.
 - **Shared and reviewed areas.**
-  - `.github/workflows/ci.yml` changes in PR 1, PR 2 and PR 6. Each is reserved in the owners' coordination register
+  - `.github/workflows/ci.yml` changes in PR 1b (one comment line) and PR 6. Each is reserved in the owners' coordination register
     before its branch touches the file.
   - CODEOWNERS asks the other owner to review `apps/server/prisma/` (the schema's generator block in PR 1,
-    `prisma/local/` in PRs 2, 3 and 5) and `.github/`. The Dockerfile is not covered; PR 1 asks for that review
+    `prisma/local/` in PRs 2 and 3) and `.github/`. The Dockerfile is not covered; PR 1 asks for that review
     anyway, since it changes the image. The author merges at green CI.
   - **No Postgres migration** in M1. The online database does not change.
 - **Never run `prisma migrate dev` or `prisma migrate reset` by hand** (the shared hook refuses them). Until PR 1b,
@@ -110,7 +111,7 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
 - Modify: `apps/server/Dockerfile`. The build stage copies `prisma.config.ts` too, which the `migrate` target's
   `prisma migrate deploy` reads its URL from. No `node_modules/.prisma` is copied any more: the generated client is
   inside `dist/`.
-- Modify: `.github/workflows/ci.yml` (`npx prisma generate` keeps working through the config)
+- `.github/workflows/ci.yml` does not change: `npx prisma generate` keeps working through the config
 - Modify: `apps/server/.gitignore` (`src/generated/`)
 - Test: `apps/server/tests/prisma7.test.ts`
 
@@ -191,15 +192,17 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
 - Create: `apps/server/prisma/local/init.sql` (from `prisma migrate diff --from-empty --to-schema`, post-processed,
   committed)
 - Create: `apps/server/prisma.local.config.ts`
-- Modify: `apps/server/package.json` (scripts `local:schema`, `local:generate`, `local:check`; the development
-  dependencies `@prisma/adapter-better-sqlite3` and `better-sqlite3-multiple-ciphers` with its `overrides` entry,
-  which Task 3's tests already need)
-- Modify: `.github/workflows/ci.yml` (in the server job: `npm run local:check`; reserved, see Global Constraints)
+- Modify: `apps/server/package.json` (scripts `local:schema`, `local:generate`, and `pretest` generating the local
+  client; the development dependencies `@prisma/adapter-better-sqlite3` and `better-sqlite3-multiple-ciphers` with
+  its `overrides` entry, which Task 3's tests already need)
+- The staleness check is a test (`tests/local/schema.test.ts`), so it runs in the server job as it is: `ci.yml` does
+  not change in PR 2.
 - Test: `apps/server/tests/local/schema.test.ts`
 
 **Interfaces:**
 - Produces: `npm run local:schema`, which rewrites both files.
-- Produces: `npm run local:check`, which fails with the diff when a committed file differs.
+- Produces: `tests/local/schema.test.ts`, which fails when a committed file differs from what `local:schema` would
+  write.
 - Produces: `src/generated/prisma-local`, generated with `compilerBuild = "small"`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -237,7 +240,7 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
   - `a task violating each CHECK is refused by the local file`.
 - [ ] **Step 2: Run them; they fail** (today's `init.sql` writes `CURRENT_TIMESTAMP` and has no CHECK).
 - [ ] **Step 3: Implement** the post-processing and `checks.sql`.
-- [ ] **Step 4: Run them.** Expected: PASS. **Step 5:** `npm run local:check` is clean.
+- [ ] **Step 4: Run them.** Expected: PASS. **Step 5:** `tests/local/schema.test.ts` passes.
 - [ ] **Step 6: Commit** `feat(local): one datetime format and the local tables' CHECKs (spec §2)`
 
 ---
@@ -303,11 +306,13 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
   - Otherwise it backs up, sets `foreign_keys=OFF`, applies the pending migrations in one transaction, runs
     `foreign_key_check` before `COMMIT`, then `integrity_check`, then `foreign_keys=ON`. Each migration is recorded
     in `_lexcraft_migrations`.
-  - Either way it writes the opening time to a local table, so the exclusive lock is held from start-up.
+  - Before anything opens the file it takes the data folder's lock (`holdInstanceLock`, spec §4).
 - Produces: `backupLocal(prisma, { dataDir, label })`, which runs `VACUUM INTO` into
   `backups/<iso>-<label>.db` and returns the path. The copy keeps the database key for now; M4 adds the rekey to
   the backup key (spec D1).
-- Produces: `PRAGMA locking_mode=EXCLUSIVE`, set in `connect()` before the key check and before `journal_mode=WAL`.
+- Produces: `PRAGMA locking_mode=EXCLUSIVE`, set in `connect()` before the key check and before `journal_mode=WAL`,
+  and the lock file `lexcraft.db.lock` (spec §4), taken by `migrateLocal` and by the client's `connect()`, released by
+  its `dispose()`.
 
 - [ ] **Step 1: Write the failing tests**
   - `a new file gets the whole schema in one transaction` (the table count, plus `_lexcraft_migrations` empty);
@@ -316,7 +321,8 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
   - `a migration that rebuilds dossiers leaves every dossier_items row`;
   - `after a migration that rebuilds tasks, its live CHECKs equal checks.sql and its datetime defaults keep the format`;
   - `the backup is encrypted, opens with the key and has the same rows`;
-  - `a second process cannot open the file right after start-up`, before any request, in a child process.
+  - `a second process is refused while the first holds the data folder, and opens it once the first is gone`, in
+    child processes, with twenty plain processes trying the lock.
 - [ ] **Step 2: Run them; they fail.**
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run them.** Expected: PASS.
@@ -363,29 +369,33 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
 ### Task 7: The handshake, the port's checks, the local profile, the online sections
 
 **Files:**
-- Create: `apps/server/src/local/main.ts` (entry), `apps/server/src/local/guards.ts` (cookie, Host, Origin),
+- Create: `apps/server/src/local/main.ts` (entry), `apps/server/src/local/server.ts` (the local server's order),
+  `apps/server/src/local/guards.ts` (Host, Origin, the shell's exchange, the window's cookie),
   `apps/server/src/local/profile.ts`, `apps/server/src/local/online.ts` (the 503s), `apps/server/src/local/sources.ts`
-  (the text copy; 503 when a text is not kept)
-- Modify: `apps/server/src/app.ts` (in local mode, the online routers are replaced by `online.ts` before
+  (503 «serve la rete» until M3)
+- Modify: `apps/server/src/app.ts` (in local mode, no CORS; the online routers are replaced by `online.ts` before
   authentication; the sign-in routes answer with the copy above)
-- Modify: `apps/server/src/index.ts` (the online background jobs do not start in local mode)
-- Create: `apps/server/scripts/build-local.mjs` (esbuild bundle of `src/local/main.ts` with the local client;
-  native modules beside it)
+- Modify: `apps/server/src/index.ts` (it refuses local mode, so the online background jobs never start there)
+- Modify: `apps/server/src/config.ts` (no `.env` in local mode), `apps/server/src/norms/resolveReference.ts` (no
+  source reached in local mode)
 - Test: `apps/server/tests/local/entry.test.ts`, `apps/server/tests/local/guards.test.ts`
 
 **Interfaces:**
 - Consumes: Tasks 4–5.
 - Produces: the stdin contract. The first line carries `key=<64 hex> launch=<secret>`. The process answers on stdout
   `LEXCRAFT_READY port=<n> ready_ms=<t>`, and exits when stdin closes.
-- Produces: `GET /__lexcraft/open?k=<launch>`. It works once; it creates a web session for the local profile
-  (`auth/webSession.ts`), sets its cookie and redirects to `/`.
+- Produces: `POST /__lexcraft/session` with `Authorization: Bearer <launch>`, for the shell only (refused with an
+  `Origin` or a `Sec-Fetch-*` header). It ends the profile's earlier web sessions, creates one
+  (`auth/webSession.ts`), and returns the window's cookies for the shell to set (spec §6).
 
 - [ ] **Step 1: Write the failing tests** (the entry is started as a child process with a temporary data folder)
   - `it answers READY and serves /api/health only with the window's cookie`;
-  - `a wrong or reused launch secret: 403`;
+  - `a missing or wrong launch secret, or the secret in a URL: 403`;
   - `another Host: 421`;
   - `a cross-site Origin: 403`;
-  - `/api/auth/me answers the local profile after /__lexcraft/open`;
+  - `it listens on the loopback address only`, and no response carries a CORS header;
+  - `/api/auth/me answers the local profile after the shell's exchange`;
+  - `no source is reached`: a stand-in Python API named in `LEGAL_API_URL` receives no request;
   - `POST /api/auth/login answers 403 with "Nell'app sul computer non serve accedere."`;
   - `GET /api/forum/... answers 503 with the online copy, without touching the database`;
   - `a source not kept locally: 503 "Per questo testo serve la rete."`;
@@ -397,9 +407,10 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
 - [ ] **Step 2: Run them; they fail.**
 - [ ] **Step 3: Implement**, from the trial's sidecar (`main.ts`, `shell.ts`), minus its trial-only parts.
 - [ ] **Step 4: Run them.** Expected: PASS.
-- [ ] **Step 5: Run the trial's flow script** against the built bundle (19 checks; the script moves into
-  `apps/server/scripts/local-flow.mjs`). Expected: 19 / 19.
+- [ ] **Step 5: An independent review that attacks the port's checks.**
 - [ ] **Step 6: Commit** `feat(local): the local entry point, its port's checks and the local profile (G-514, spec §6)`
+
+The bundle and the trial's flow script move to Task 8, where CI runs them on both platforms.
 
 ---
 
@@ -415,6 +426,11 @@ Windows machine for the manual pass) touch M4 and M5, not M1. The Apple Develope
   `LEXCRAFT_TEST_DB=local`: a fresh encrypted file per run under the OS temp folder, a random key, and the guard's
   twin (the file must sit under the temp folder).
 - Create: `apps/server/tests/local/work-files.txt`, the list of Work test files the job runs, each by name.
+- Create: `apps/server/scripts/build-local.mjs` (esbuild bundle of `src/local/main.ts` with the local client; native
+  modules beside it; `esbuild` becomes a development dependency) and `apps/server/scripts/local-flow.mjs` (the
+  trial's flow, against the bundle, through the shell's exchange).
+- The job is not a required check: making it one is a ruleset change for the owners, proposed once it has run green
+  for a while.
 - Test: the job itself.
 
 - [ ] **Step 1: Make the setup's local branch** and run `tests/local/` with it locally. Expected: PASS.
