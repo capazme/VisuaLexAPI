@@ -11,6 +11,9 @@ practices-as-folders and the local deadline register». The decisions it rests o
 - **G-563**: scheduled jobs (alerts, digests) exist only in the desktop app.
 - G-612–G-615 (today's server on one encrypted SQLite file, the porting line, local mode in the core first); G-514
   (a local profile); G-516 (a local MCP server, M6); D-105 (privacy by design); D-163 (synchronisation, later).
+- **The owner's principle of 28 November** on the web as a pseudonymised mirror: «il web è quindi lo spazio dove
+  vivono le pratiche pseudonimizzate. Dobbiamo fare in modo che si distinguano bene nella pratica i punti dove ci
+  sono dati personali e i punti in cui non ci sono, così che il web possa essere un mirror sicuro». §11 designs it.
 
 This document designs the backend. The screens are lexcraft-web's and wait for its owner (§ «For the web owner»).
 The decisions still open are in «Decisions for the owners». Each fact is marked **[read]** in a source listed at the
@@ -40,6 +43,10 @@ app ships with no term rule of its own.
 5. **Whatever Claude reads leaves the computer.** The local MCP server (M6) does not expose the register unless the
    lawyer turns it on for that client (§7.3).
 6. **Notifications show on a locked screen.** Their text names no client by default (§6.3).
+7. **A pseudonymised mirror is not anonymous.** Pseudonymised data remain personal data under the GDPR
+   (art. 4(5), recital 26). In a lawyer's practice the real risk is identification from context: the court, the
+   dates, the facts, a decision later published. The web mirror of §11 is personal data held by whoever hosts it.
+   It needs a DPIA and a legal check before it is built, and it is never called anonymous.
 
 ## What the lawyer gets, and what the first version leaves out
 
@@ -61,6 +68,8 @@ app ships with no term rule of its own.
 - cloud connectors (WebDAV first, then the others of the owner's proposal) and synchronisation between computers
   (D-163, W10);
 - colleagues writing in the same register through the app (G-570); today they share the workbook;
+- the pseudonymised web mirror (§11), which waits for a DPIA and a legal check; the data classes and their marks are
+  in the first version;
 - formulas in an exported workbook: it carries values;
 - a code format the firm chooses (2026/001);
 - practices as folders of readable files (§8: the default is a read-only export, later);
@@ -132,6 +141,8 @@ Conventions:
 - **Codes are the identity a workbook row is matched by.** They are unique per register and never reused once
   deleted. A deleted row goes to the trash, as every Work row does.
 - **Every row has a `version`**, increased at each write, and `updatedAt`. The change log (§2.6) records each write.
+- **Every field carries a data class** (personal, indirect, pseudonymisable, non-personal), written beside it in the
+  schema and checked by a test (§11.1).
 
 #### 2.1 Registers and branches
 
@@ -610,7 +621,8 @@ assumes a default and lists the question (W2).
 
 Each stage is one or more pull requests, stacked on M1 (#764), with the tests of §10.
 
-1. Tables, codes, rules, holidays, lists, diary, the term engine, the views, the API without Excel.
+1. Tables with every field's class (§11.1), codes, rules, holidays, lists, diary, the term engine, the views, the
+   API without Excel, and the marks of personal fields in the API.
 2. Alerts, with the shell's channel for notifications, and the login item as an option.
 3. Export.
 4. Import with its preview.
@@ -618,6 +630,7 @@ Each stage is one or more pull requests, stacked on M1 (#764), with the tests of
 
 **After the first version:**
 
+- the pseudonymised web mirror (§11.2–11.5), after the DPIA and the legal check (W16);
 - fees and invoices («Preventivi e parcelle»): records only, no payment (D-304, W9);
 - insolvency claims;
 - the cloud connectors;
@@ -669,20 +682,173 @@ Each stage is one or more pull requests, stacked on M1 (#764), with the tests of
   - A snooze never passes the deadline.
   - Missed alerts are shown at start.
   - The notification text names no client.
+- **Data classes.**
+  - Every scalar field of the Work models has a known class.
+  - `GET /api/work/classes` matches the schema.
+  - When the mirror is built: the canary test of §11.3; a lapsed confirmation keeps its field home; a publish whose
+    preview changed answers 409; the online schema refuses an unknown field and a `personal` one.
 - **Routes.**
   - Each route on the encrypted file, in the CI job «local» of M1, on macOS and Windows.
   - `/api/work` answers 404 online.
   - Nothing outside `src/local/` and `src/work/` imports `src/work/`.
+
+### 11. Data classes and the pseudonymised web mirror
+
+The owner's principle of 28 November makes the web the place where practices live pseudonymised, and asks that the
+places of a practice holding personal data be told apart from those that hold none, «così che il web possa essere un
+mirror sicuro». This section designs that line. It builds on G-621: the clear data stay in the app; only what has
+passed the line below may reach the web.
+
+#### 11.1 Every field has a class
+
+**The classes.** They describe what a field holds, not the legal status of the whole: a pseudonymised practice is
+still personal data (§11.6).
+
+| Class | Meaning | May reach the web |
+|---|---|---|
+| `personal` | names or reaches a person directly: client, counterparty, their lawyer and PEC, the judge, the firm's people, the docket and decision numbers, which identify a case at the court's registry | never |
+| `indirect` | identifies only combined with other facts: the court and its section, every date and time, amounts and values, the insolvency flag | never by default; only generalised, if W12 allows (§11.4) |
+| `pseudonymisable` | free text: titles, subjects, outcomes, notes, diary entries, a dossier's name and description | only after pseudonymisation on the computer and the lawyer's confirmation, field by field (§11.2) |
+| `non-personal` | says nothing about a person on its own: the type, rite and degree of a proceeding, states, the area, the rule's code, a flag such as «peremptory», the references to norms and decisions | yes |
+
+The request of 28 November named three classes; `indirect` is a fourth, and W11 asks whether to keep it.
+
+- **Without `indirect`**, the court, the dates and the amounts must be put in `personal`, and they never leave, or in
+  `non-personal`, and they leave in clear.
+- **The fourth class names the real risk.** These fields carry nothing alone, but in a lawyer's practice they
+  identify together.
+
+**Where the class is written.**
+
+- **Beside the field, in the schema**, as a documentation comment Prisma keeps with it:
+
+  ```
+  client        String?  /// class: personal
+  type          String   /// class: non-personal
+  notes         String?  /// class: pseudonymisable
+  ```
+
+- **Which models.** Every model of `prisma/local/work.prisma`, and the Work models of `prisma/schema.prisma` that the
+  app holds and the mirror could carry: `Dossier`, `DossierItem`, the notes and highlights, `Task`. A lawyer names a
+  dossier after a client today; the class says so.
+- **A test fails** when a scalar field of those models has no class, or an unknown one. Relation fields carry none.
+  The list of Work models is the test's own; a new model of the local fragment is in it by default.
+- **Some fields take the class of another.** `WorkChange.before` and `.after` take the class of the field they log,
+  and are `personal` as a whole, since they are never mirrored. A list item takes the class of its list: the persons
+  list is personal, the courts list is not.
+- **The API serves the classes.** `GET /api/work/classes` returns them, so the web can mark the fields that hold
+  personal data (§11.5).
+
+The first classification of every field is a table in the pull request of stage 1, reviewed by the owner.
+
+#### 11.2 Free text: personal until pseudonymised and confirmed
+
+A free-text field counts as personal. It reaches the web only through three steps on the computer:
+
+1. **The practice's own names first.** The structured personal fields of the practice are an exact list of the
+   strings to replace: the client, the counterparty, their lawyer, the judge, the firm's people. The app replaces each
+   occurrence with its pseudonym from the map (§11.3), consistently across every text of the practice. This step needs
+   no model.
+2. **Pseudocraft for the rest.** Pseudocraft (LexCraft-IT/pseudocraft), the web owner's local pseudonymiser, finds the
+   names the practice does not list, and other identifiers (addresses, tax codes, IBANs, phone numbers), with its rules
+   and its local models. It runs on the computer and makes no network call at run time.
+   - Its README states that it runs on macOS on Apple Silicon. **Until it runs on Windows, free text does not leave a
+     Windows computer at all**: only `non-personal` fields mirror there.
+   - How LexCraft calls it is the web owner's to say (W14): a local process with a text interface, or its core as a
+     library. The app does not install it on its own.
+3. **The lawyer confirms**, field by field, the original beside the pseudonymised text, with every replacement
+   highlighted and editable.
+   - The confirmation records the pseudonymised text, a fingerprint of the original, pseudocraft's version and the
+     time.
+   - If the original changes, the confirmation lapses, and the field stays home until it is confirmed again.
+
+**Facts are not names.** Pseudonymisation replaces who; it leaves what happened. A text about a client's illness, or
+a conviction, stays data about health or crimes (arts. 9 and 10 GDPR) after its names are replaced. The confirmation
+screen asks the lawyer to keep such facts out of a mirrored text, and W13 asks whether such texts should never leave.
+
+#### 11.3 The pseudonym map never leaves the computer
+
+`WorkPseudonym`, local-only, `personal` as a whole: the original string, the kind (client, counterparty, lawyer,
+judge, person, other), the practice, and its pseudonym («Cliente», «Controparte A», «Avv. B»).
+
+- **It never leaves the computer.** It is in the encrypted database and in the encrypted backups, so a restore keeps
+  the mirror readable. It is never in an export, never in the mirror, and never served by the local MCP server.
+- **A test sends a practice whose personal fields carry canary strings** through the mirror builder, and fails if a
+  canary appears in the payload.
+- **The mirror's own identifier.** A mirrored practice is named online by a random identifier, not by its code
+  P-001. The code is sequential, and the firm's workbook links it to the client. Whether the web shows the code
+  beside it is W15.
+
+#### 11.4 Generalising indirect fields
+
+If W12 allows it, an indirect field may leave generalised, never as it is:
+
+- a court becomes its kind and level («Tribunale», first degree);
+- a date becomes the number of days from another event of the same practice, or a month;
+- an amount becomes a range.
+
+The recommendation (W12) is that nothing indirect leaves in the first mirror.
+
+#### 11.5 What the lawyer sees before anything leaves
+
+- **Each practice is mirrored only if the lawyer turns it on**, practice by practice. It is off by default.
+- **The preview.** `GET /api/work/mirror/:code/preview` returns the exact payload that would be sent, and the page
+  shows it as the web would, beside what the web already holds. The fields that stay home are listed with their
+  class.
+- **The publish sends exactly the preview.** `POST /api/work/mirror/:code/publish` carries the preview's fingerprint.
+  If anything changed since, it answers 409 and asks for a new preview.
+- **The mirror runs one way**, from the app to the web, through the local server and the lawyer's account (M3).
+  - Text edited in the web does not come back.
+  - A `non-personal` addition, such as a norm or a decision added to the dossier, may come back (W15).
+- **Withdrawing.** The lawyer can withdraw a practice from the web at any time; the online copy is deleted. What the
+  host's own backups keep, and for how long, is part of the legal check.
+- **The server refuses what it does not expect.** The online server accepts a mirror only through a schema that
+  lists the allowed fields. An unknown field, or one whose class is not allowed, is refused, so a bug in the app
+  cannot widen the mirror.
+- **The mirror's online models.** They are named `Mirror*`, hold only allowed fields, and are designed with the
+  DPIA. The test of §1 still keeps every `Work*` model out of the online schema.
+- **The marks in the interface.** In the app every field of class `personal` or `indirect` carries a mark, and so does
+  every `pseudonymisable` field not yet confirmed. In the web a mirrored practice is labelled «pseudonimizzata», never
+  «anonima».
+
+#### 11.6 The legal risk, plainly
+
+- **Pseudonymised data are personal data.** The GDPR defines pseudonymisation as processing such that the data «non
+  possano più essere attribuiti a un interessato specifico senza l'utilizzo di informazioni aggiuntive», kept apart
+  (art. 4(5)) **[read]**. Recital 26: «I dati personali sottoposti a pseudonimizzazione, i quali potrebbero essere
+  attribuiti a una persona fisica mediante l'utilizzo di ulteriori informazioni, dovrebbero essere considerati
+  informazioni su una persona fisica identificabile» **[read]**.
+  - The test is the means «di cui il titolare del trattamento o un terzo può ragionevolmente avvalersi», «tenendo
+    conto sia delle tecnologie disponibili al momento del trattamento, sia degli sviluppi tecnologici» **[read]**.
+  - Only data that do not, or no longer, allow identification are anonymous, and outside the regulation **[read]**.
+- **In legal practice, context re-identifies.** A court, a few dates and the facts of a case can be matched with a
+  published decision, a court's calendar, a news report or the other side's knowledge.
+  - The removal of names does not reach this risk. Leaving the indirect fields at home reduces it (§11.4); the
+    lawyer's confirmation of each text reduces it further. Neither removes it.
+- **So the mirror is personal data, held by its host.**
+  - The firm remains the controller.
+  - Whoever hosts the mirror, the association or a self-hosted server, processes personal data for the firm. That
+    asks for the contract of art. 28 GDPR, and partly gives back what G-621 avoided.
+  - Art. 35 GDPR asks for a data protection impact assessment «prima di procedere al trattamento» when a processing
+    «può presentare un rischio elevato» **[read]**. It names in particular the large-scale processing of special
+    categories (art. 9) or of data on convictions and offences (art. 10) **[read]**, which free text in legal practice
+    can hold.
+- **Professional secrecy** binds the facts a client confides, not only the names. Whether a pseudonymised copy on a
+  third party's server is compatible with it is part of the legal check.
+- **Before the mirror is built**: a DPIA and a legal check (W16). Until both are done, the classes, the marks and the
+  preview can be built, and nothing is sent.
 
 ## For the web owner
 
 Nothing here changes lexcraft-web until its owner decides; the brief to him is in the owners' private notes. What
 the backend gives the web is §7. Three things the web should know now:
 
-- **Nothing of this design appears online** (G-621). The web shows Work in three levels only when `GET
-  /api/work/status` answers.
-- **The web's own practices and tasks** can be written with a client's name today. What to do about them is his
-  question: leave them with a notice, turn them back into study dossiers, or move them to the app.
+- **Nothing personal of this design appears online** (G-621). The web shows Work in three levels only when `GET
+  /api/work/status` answers. The only way a practice reaches the web is the pseudonymised mirror of §11, after the
+  lawyer's preview and confirmation, and not before the DPIA.
+- **The web's own practices and tasks** can be written with a client's name today. Under the owner's principle of
+  28 November they become the place of pseudonymised practices (§11). Until the mirror exists, their free-text
+  fields are `pseudonymisable` and can carry the mark of §11.5. What else to do with them is his question.
 - **The notifications are the shell's**, not the page's, and the native dialogs too (§5.8).
 
 ## Decisions for the owners
@@ -741,6 +907,48 @@ reserve says «in Work nessuna schermata dedicata ai pagamenti». Recommendation
   Hosting it at the association makes the association a provider the firm must contract with (art. 28 GDPR), even
   if it holds only ciphertext: a point for the owners' legal check.
 
+**W11 · How many data classes** (§11.1).
+- (a) Three: personal, pseudonymisable, non-personal. The court, the dates and the amounts go into `personal`.
+- (b) Four, with `indirect` for what identifies only in combination: the court, the dates, the amounts.
+- **Recommendation: (b).** In legal practice context is the risk, and a class that names it keeps it visible in the
+  schema, in the interface and in every review. Under (a) the same fields stay home anyway, but nothing says why.
+
+**W12 · Indirect fields in the mirror** (§11.4).
+- (a) Never.
+- (b) Only generalised: a court's kind, relative days, ranges.
+- (c) In clear, with the lawyer's confirmation.
+- **Recommendation: (a) in the first mirror**, (b) only if the DPIA allows it. (c) brings back the context that
+  re-identifies.
+
+**W13 · Free text about health or crimes** (§11.2).
+- (a) It may leave once pseudonymised and confirmed, with the warning on the confirmation screen.
+- (b) A text the lawyer marks as holding such facts never leaves.
+- (c) No free text leaves in the first mirror at all.
+- **Recommendation: (b)**, unless the DPIA says (c).
+
+**W14 · Pseudocraft as the pseudonymiser** (§11.2), a question for the web owner, who wrote it.
+- How LexCraft calls it: a local process with a text interface, or its core as a library.
+- Where the subjects live: LexCraft's map passed in at each call, or its own register kept in step.
+- When it runs on Windows.
+
+Until it does, free text stays home on Windows.
+
+**W15 · The mirror's shape** (§11.3, §11.5).
+- One way, app to web. A `non-personal` addition made in the web, such as a norm or a decision added to the
+  dossier, may come back.
+- A random identifier online. The code P-001 is not shown in the web unless the lawyer asks.
+- **Recommendation: as written.**
+
+**W16 · A DPIA and a legal check before the mirror** (§11.6).
+- **What to settle:**
+  - who is controller and who processor;
+  - the contract of art. 28;
+  - professional secrecy;
+  - the host's backups and their retention;
+  - the categories of arts. 9 and 10;
+  - the words the app and the site may use. «Pseudonimizzata», never «anonima».
+- **Recommendation:** classes, marks and preview are built now; nothing is sent before both are done.
+
 ## Not in this change
 
 - Any code: this is the design, for the owner's yes.
@@ -759,6 +967,11 @@ current text:
 - l. 742/1969, art. 1: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1969-10-07;742~art1
 - l. 742/1969, art. 3: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1969-10-07;742~art3
 - r.d. 12/1941 (ord. giud.), art. 92: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1941-01-30;12:1~art92
+
+**GDPR (Regulation (EU) 2016/679), read on 28 November 2026** on EUR-Lex through the same service, Italian text:
+art. 4(5), art. 35(1) and (3), recital 26: https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita
+
+**Pseudocraft**, its README in LexCraft-IT/pseudocraft (platform and interfaces), read on 28 November 2026.
 
 **OWASP, read on 28 November 2026:**
 
