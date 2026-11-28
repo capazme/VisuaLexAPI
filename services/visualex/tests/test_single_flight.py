@@ -111,7 +111,44 @@ async def test_a_caller_who_leaves_does_not_stop_the_others():
     assert runs == [1]
 
 
-async def test_followers_get_what_share_makes_of_the_result():
+async def test_a_run_nobody_waits_for_any_more_is_stopped_before_it_reaches_the_source():
+    """A caller whose time limit passes while its request is still queued behind our limit:
+    before, its request was cancelled with it and never sent; it must stay so (review of #T133)."""
+    flights, queue, sent = SingleFlight(), asyncio.Event(), []
+
+    async def queued_request():
+        await queue.wait()  # our limit toward the source is busy
+        sent.append(1)
+        return "page"
+
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(flights.run("k", queued_request), 0.01)
+    queue.set()
+    await asyncio.sleep(0.01)
+    assert sent == []
+    assert len(flights) == 0
+
+
+async def test_a_caller_who_comes_after_the_last_one_left_starts_a_fresh_run():
+    flights, gate, runs = SingleFlight(), asyncio.Event(), []
+
+    async def work():
+        runs.append(1)
+        await gate.wait()
+        return "page"
+
+    leaving = asyncio.create_task(flights.run("k", work))
+    await asyncio.sleep(0)
+    leaving.cancel()
+    await asyncio.sleep(0)
+    arriving = asyncio.create_task(flights.run("k", work))
+    await asyncio.sleep(0)
+    gate.set()
+    assert await arriving == "page"
+    assert runs == [1, 1]
+
+
+async def test_every_caller_gets_what_share_makes_of_the_result():
     flights, gate = SingleFlight(), asyncio.Event()
     result = {"articles": [1, 2]}
 
@@ -123,8 +160,9 @@ async def test_followers_get_what_share_makes_of_the_result():
     follower = asyncio.create_task(flights.run("k", work, share=lambda r: dict(r, copy=True)))
     await asyncio.sleep(0)
     gate.set()
-    assert await leader is result
-    assert await follower == {"articles": [1, 2], "copy": True}
+    first, second = await leader, await follower
+    assert first == second == {"articles": [1, 2], "copy": True}
+    assert first is not result and second is not result and first is not second
 
 
 # --- the shared client -----------------------------------------------------------------------
@@ -135,11 +173,13 @@ class CountingClient(ThrottledHttpClient):
     def __init__(self):
         super().__init__()
         self.sent = []
+        self.delivered = []
         self.gate = asyncio.Event()
 
     async def _send(self, method, url, **kwargs):
         self.sent.append((method, url, kwargs.get("session"), kwargs.get("data")))
-        await self.gate.wait()
+        await self.gate.wait()  # queued behind our limit
+        self.delivered.append(url)
         return HttpResult(text="<html>page</html>", status=200, headers={"Content-Type": "text/html"})
 
 
@@ -172,6 +212,15 @@ async def test_a_get_on_the_callers_session_a_post_and_another_address_go_alone(
     client.gate.set()
     await asyncio.gather(*tasks)
     assert len(client.sent) == 6
+
+
+async def test_a_get_whose_caller_gave_up_in_the_queue_is_never_sent():
+    client = CountingClient()
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(client.request("GET", "https://www.normattiva.it/x", source="normattiva"), 0.01)
+    client.gate.set()
+    await asyncio.sleep(0.01)
+    assert client.delivered == []
 
 
 async def test_the_host_check_still_refuses_an_undeclared_host():

@@ -8,12 +8,14 @@ with the same key while it is in flight awaits it and gets its result, or its ex
 
 - **Nothing is cached here.** A key is forgotten the moment its run ends; the next caller starts a
   new run. The caches stay where they are (the scrapers' memory and persistent caches).
-- **A caller that leaves does not stop the others.** The run is a task of its own, awaited through
-  `asyncio.shield`: a reader who closes the tab cancels its own wait, never the fetch the other
-  readers are waiting for.
-- **Followers may get a copy.** `share` turns the result into what each follower receives (a
-  deep copy, when the result is mutable and callers may change it); the first caller gets the
-  result itself, as it did before.
+- **A caller that leaves does not stop the others; the last one stops the run.** The run is a task
+  of its own, awaited through `asyncio.shield`: a reader who closes the tab, or whose time limit
+  passes, cancels its own wait, never the fetch the other readers are waiting for. When the last
+  caller leaves, the run is cancelled, as the caller's own request was before: a request still
+  queued behind our limit toward the source is never sent for nobody.
+- **Each caller may get a copy.** `share` turns the result into what each caller receives (a deep
+  copy, when the result is mutable and callers may change it), the first caller included, so the
+  result itself stays untouched until every caller has its own.
 - **One event loop per run.** A run is never shared across loops (the test suite opens one per
   test): a run left by a closed loop is replaced.
 """
@@ -24,11 +26,21 @@ import functools
 from typing import Any, Awaitable, Callable, Hashable, Optional
 
 
+class _Run:
+    """One run in flight and how many callers wait on it."""
+
+    __slots__ = ("task", "waiters")
+
+    def __init__(self, task: asyncio.Task) -> None:
+        self.task = task
+        self.waiters = 0
+
+
 class SingleFlight:
     """The runs in flight, by key."""
 
     def __init__(self) -> None:
-        self._runs: dict[Hashable, asyncio.Task] = {}
+        self._runs: dict[Hashable, _Run] = {}
 
     def __len__(self) -> int:
         return len(self._runs)
@@ -40,22 +52,33 @@ class SingleFlight:
         share: Optional[Callable[[Any], Any]] = None,
     ) -> Any:
         loop = asyncio.get_running_loop()
-        task = self._runs.get(key)
-        if task is not None and (task.done() or task.get_loop() is not loop):
-            task = None
-        if task is None:
-            task = loop.create_task(factory())
-            self._runs[key] = task
-            task.add_done_callback(functools.partial(self._finished, key))
-            return await asyncio.shield(task)
-        result = await asyncio.shield(task)
+        entry = self._runs.get(key)
+        if entry is not None and (entry.task.done() or entry.task.get_loop() is not loop):
+            entry = None
+        if entry is None:
+            entry = _Run(loop.create_task(factory()))
+            self._runs[key] = entry
+            entry.task.add_done_callback(functools.partial(self._finished, key, entry))
+        entry.waiters += 1
+        try:
+            result = await asyncio.shield(entry.task)
+        except asyncio.CancelledError:
+            entry.waiters -= 1
+            if entry.waiters == 0 and not entry.task.done():
+                # Nobody waits any more: forget the run first, so a caller who comes now starts
+                # a fresh one instead of joining a run being cancelled, then stop it.
+                if self._runs.get(key) is entry:
+                    del self._runs[key]
+                entry.task.cancel()
+            raise
+        entry.waiters -= 1
         return share(result) if share is not None else result
 
-    def _finished(self, key: Hashable, task: asyncio.Task) -> None:
-        if self._runs.get(key) is task:
+    def _finished(self, key: Hashable, entry: _Run, task: asyncio.Task) -> None:
+        if self._runs.get(key) is entry:
             del self._runs[key]
         if not task.cancelled():
-            # Retrieved here, so a run whose callers all left logs no "exception never retrieved".
+            # Retrieved here, so a run that failed after its callers left logs nothing.
             task.exception()
 
 
