@@ -13,7 +13,9 @@ from unittest.mock import patch
 
 import pytest
 
-from app import NormaController
+from app import NormaController, _read_page_extras
+from visualex_api.services.normattiva_notes import update_notes_fields
+from visualex_api.services.normattiva_parts import parts_fields
 from visualex_api.services import normattiva_scraper as scraper_module
 from visualex_api.services.normattiva_fragments import ActSessions, act_of, fragment_link, fragment_meta_key
 from visualex_api.services.normattiva_parts import extract_parts
@@ -157,10 +159,13 @@ async def test_the_extras_of_a_fragment_take_the_parts_from_the_index(scraper, m
     with patch.object(scraper_module.http_client, "request", source.request):
         await scraper.get_document(cc("2043"))
         text, url = await scraper.get_document(cc("2044"))
-    monkeypatch.setattr("app.normattiva_scraper", scraper)
+    meta = await scraper.cache.get(fragment_meta_key(url))
+    meta["parts"] = []                              # the index lists the article whole
+    await scraper.cache.set(fragment_meta_key(url), meta)
+    PAGE_MEMO.clear()
     fields = await NormaController._page_extras_for(scraper, cc("2044"), url, text)
-    expected = await NormaController._page_extras_for(scraper, cc("2043"), url.replace("2044", "2043"), "x")
-    assert fields.keys() == expected.keys()
+    notes, _ = _read_page_extras(FRAGMENT_2044, "2044")
+    assert fields == {**update_notes_fields(notes), **parts_fields([])}
 
 
 async def test_a_fragment_that_is_not_the_article_reads_the_whole_page(scraper):
@@ -180,6 +185,10 @@ async def test_a_refused_fragment_reads_the_whole_page_and_closes_the_session(sc
         await scraper.get_document(cc("2043"))
         await scraper.get_document(cc("2044"))
     assert len(source.fragments) == 1 and len(source.pages) == 2
+    refused = source.fragments[0][1]
+    assert refused.closed                          # the session the fragment was refused in is gone
+    kept = scraper.sessions.get(act_of(cc("2044").urn))
+    assert kept is not None and kept.session is not refused   # the whole page opened a fresh one
 
 
 async def test_a_dated_article_is_never_read_from_a_fragment(scraper):
@@ -190,3 +199,86 @@ async def test_a_dated_article_is_never_read_from_a_fragment(scraper):
         await scraper.get_document(cc("2044", versione="vigente", data_versione="2010-01-01"))
     assert source.fragments == []
     assert source.pages[-1][1] is None  # the shared session, as before
+
+
+async def test_a_whole_page_of_an_open_act_is_read_in_its_session_never_replacing_it(scraper):
+    source = Normattiva()
+    scraper.request_document = source.request_document
+    with patch.object(scraper_module.http_client, "request", source.request):
+        await scraper.get_document(cc("2043"))
+        act = act_of(cc("2043").urn)
+        session = scraper.sessions.get(act).session
+        page = await scraper.read_act_page(cc("2044").urn)   # an article the fragment cannot serve
+    assert page and source.pages[-1][1] is session
+    assert scraper.sessions.get(act).session is session and not session.closed
+
+
+FUTURE_FRAGMENT = (PAGES / "dpr131_1986_art3_fragment_abrogato_2027.html").read_text(encoding="utf-8")
+FUTURE_WHOLE = (PAGES / "dpr131_1986_art3_undated_abrogato_2027_trimmed.html").read_text(encoding="utf-8")
+
+
+async def test_the_current_versions_fragment_is_the_latest_version_a_later_one_included():
+    """Art. 3 d.P.R. 131/1986 is repealed from 1 January 2027: the undated whole page shows that
+    later version, which the «not in force yet» logic reads (G-355), and so does the fragment of
+    the index's current version (captured 2026-11-28): the same window, the same text."""
+    from visualex_api.services.normattiva_validity import extract_validity
+    whole, piece = extract_validity(FUTURE_WHOLE, article="3"), extract_validity(FUTURE_FRAGMENT, article="3")
+    assert piece["valid_from"] == whole["valid_from"] == "2027-01-01"
+    assert {k: v for k, v in piece.items() if k != "act_updated"} == {k: v for k, v in whole.items() if k != "act_updated"}
+
+
+async def test_a_session_older_than_its_index_may_be_is_not_used():
+    sessions = ActSessions(idle=60, max_age=60)
+    sessions.keep("a", sessions.new(), "a~art1")
+    sessions.get("a").opened_at = time.monotonic() - 120
+    assert sessions.get("a") is None
+
+
+async def test_a_live_session_is_never_replaced():
+    sessions = ActSessions()
+    first, second = sessions.new(), sessions.new()
+    assert sessions.keep("a", first, "a~art1") is True
+    assert sessions.keep("a", second, "a~art2") is False
+    assert sessions.get("a").session is first
+    sessions.drop("a", second)                    # not the act's session: nothing happens
+    assert sessions.get("a").session is first
+    await sessions.close_all()
+    await second.close()
+
+
+async def test_readers_of_one_whole_page_at_once_share_one_read(scraper):
+    asked, gate = [], asyncio.Event()
+
+    async def request_document(url, *, source="base_scraper", **kwargs):
+        asked.append(url)
+        await gate.wait()
+        return WHOLE_2043
+
+    scraper.request_document = request_document
+    readers = [asyncio.create_task(scraper.read_act_page(cc("2043").urn)) for _ in range(5)]
+    await asyncio.sleep(0.01)
+    gate.set()
+    assert set(await asyncio.gather(*readers)) == {WHOLE_2043}
+    assert len(asked) == 1 and len(scraper.sessions) == 1
+
+
+async def test_fragments_refused_in_a_row_stop_being_asked_for_a_while():
+    sessions = ActSessions()
+    for _ in range(4):
+        sessions.failed()
+    assert not sessions.paused()
+    sessions.succeeded()                            # a success starts the count again
+    for _ in range(5):
+        sessions.failed()
+    assert sessions.paused()
+
+
+async def test_while_paused_no_fragment_is_asked(scraper):
+    source = Normattiva()
+    scraper.request_document = source.request_document
+    for _ in range(5):
+        scraper.sessions.failed()
+    with patch.object(scraper_module.http_client, "request", source.request):
+        await scraper.get_document(cc("2043"))
+        await scraper.get_document(cc("2044"))
+    assert source.fragments == [] and len(source.pages) == 2

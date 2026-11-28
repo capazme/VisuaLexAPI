@@ -17,7 +17,7 @@ from ..tools.config import HTTP_TIMEOUT
 from ..tools.exceptions import DocumentNotFoundError, IndexUnavailableError, ParsingError, ResourceNotFoundError
 from ..tools.text_op import parse_date
 from ..tools.selectors import NormattivaSelectors
-from ..tools.single_flight import call_key, single_flight
+from ..tools.single_flight import SingleFlight, call_key, single_flight
 from .akn_fetch import fetch_act_article
 from .http_client import http_client, new_session
 from .normattiva_parts import extract_parts, part_cache_key, part_range, ranges_in_words
@@ -126,6 +126,7 @@ class NormattivaScraper(BaseScraper):
         self.cache = get_cache_manager().get_persistent("normattiva")
         # The acts open on Normattiva, for the fragments of their following articles (G-652).
         self.sessions = ActSessions()
+        self._act_pages = SingleFlight()
 
     # Readers asking for the same text at once share one read (one request, one parse): the
     # memory cache answers the hits, the single flight joins the misses that arrive together.
@@ -206,14 +207,24 @@ class NormattivaScraper(BaseScraper):
         """An article's whole page, read in its act's own session, which is kept when the page
         carries the act's index: the act is open, and its following articles can be read from
         the fragment (G-652). Errors as `request_document` raises them."""
+        # Readers of the same page at once share one read (as the shared client joins its GETs,
+        # which a request in a session of its own is not).
+        return await self._act_pages.run((urn, max_retries), lambda: self._read_act_page(urn, max_retries))
+
+    async def _read_act_page(self, urn: str, max_retries: Optional[int]) -> str:
         act = act_of(urn)
+        open_act = self.sessions.get(act) if act else None
+        if open_act is not None:
+            # The act is open: its session is shared with the fragments other readers may be
+            # reading in it now, so it is used, never replaced.
+            return await self.request_document(urn, source="normattiva", session=open_act.session,
+                                               max_retries=max_retries)
         session = self.sessions.new()
         kept = False
         try:
             page = await self.request_document(urn, source="normattiva", session=session, max_retries=max_retries)
             if act and isinstance(page, str) and "showArticle(" in page:
-                self.sessions.keep(act, session, urn)
-                kept = True
+                kept = self.sessions.keep(act, session, urn)
             return page
         finally:
             if not kept:
@@ -224,7 +235,7 @@ class NormattivaScraper(BaseScraper):
         its act is open and the fragment is unmistakably the article; else None, and the whole
         page is read as before. A refused or unreadable answer costs that one attempt."""
         act = act_of(urn)
-        entry = self.sessions.get(act) if act else None
+        entry = self.sessions.get(act) if act and not self.sessions.paused() else None
         if entry is None:
             return None
         index_page = await self.cache.get(entry.index_key)
@@ -236,12 +247,15 @@ class NormattivaScraper(BaseScraper):
                                                session=entry.session, max_retries=0)).text
         except Exception as exc:  # noqa: BLE001 - the whole page, as before
             log.info("Fragment not read, the whole page instead", error_type=type(exc).__name__)
-            self.sessions.drop(act)
+            self.sessions.drop(act, entry.session)
+            self.sessions.failed()
             return None
         checked = await asyncio.to_thread(self._is_the_article, piece, nv.numero_articolo)
         if not checked:
             log.info("Fragment is not the article asked for, the whole page instead")
+            self.sessions.failed()
             return None
+        self.sessions.succeeded()
         meta = {
             "index": entry.index_key,
             "act_updated": read_act_updated(index_page),

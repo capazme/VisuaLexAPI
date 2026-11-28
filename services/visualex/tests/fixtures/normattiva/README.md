@@ -143,6 +143,9 @@ A trimmed capture of 2026-10-30, for reading one part (`NormattivaScraper.read_p
   c.c. (`/atto/caricaArticolo?…`, the current versions), captured on 2026-11-28 in a session
   opened on art. 2043's whole page, as served (G-652; T133). The extractor's text on each equals
   its text on the whole page.
+- `dpr131_1986_art3_fragment_abrogato_2027.html`: the fragment of art. 3 d.P.R. 131/1986 at the
+  index's current version, captured on 2026-11-28: the version repealed from 1 January 2027, the
+  one the undated whole page shows (`dpr131_1986_art3_undated_abrogato_2027_trimmed.html`).
 
 The extractor's output for every file here is frozen (CLAUDE.md gotcha 23:
 `article_text` is the offset space of every stored highlight and note).

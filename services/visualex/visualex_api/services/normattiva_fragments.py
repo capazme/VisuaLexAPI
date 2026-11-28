@@ -31,9 +31,16 @@ from ..tools.config import HTTP_TIMEOUT
 from .akn_parser import comparable_article_key
 from .http_client import new_session
 
-# How long an act's session is kept unused, and how many are kept at once.
+# How long an act's session is kept unused, and at most from its opening: the fragment's address
+# comes from the index read then, so it is never older than this (a whole page in the cache can be
+# a day old). How many are kept at once.
 SESSION_IDLE_SECONDS = 15 * 60
+SESSION_MAX_AGE_SECONDS = 15 * 60
 MAX_SESSIONS = 32
+# After this many fragments refused or not the article in a row, no fragment is asked for a while:
+# if Normattiva changed, every article would otherwise cost one request more.
+BREAKER_FAILURES = 5
+BREAKER_PAUSE_SECONDS = 10 * 60
 
 # Where a fragment's extras are kept beside it: the index it came from, `act_updated` read from that
 # index, and the article's parts (always none: an article split into parts is never read this way).
@@ -82,21 +89,37 @@ def fragment_link(index_page: str, article: str) -> Optional[str]:
 
 
 class _ActSession:
-    __slots__ = ("session", "index_key", "used_at", "loop")
+    __slots__ = ("session", "index_key", "used_at", "opened_at", "loop")
 
     def __init__(self, session: aiohttp.ClientSession, index_key: str) -> None:
         self.session = session
         self.index_key = index_key
-        self.used_at = time.monotonic()
+        self.used_at = self.opened_at = time.monotonic()
         self.loop = asyncio.get_running_loop()
 
 
 class ActSessions:
     """The open acts: per act, the session its first whole page was read in and that page's key."""
 
-    def __init__(self, idle: float = SESSION_IDLE_SECONDS, size: int = MAX_SESSIONS) -> None:
-        self.idle, self.size = idle, size
+    def __init__(self, idle: float = SESSION_IDLE_SECONDS, size: int = MAX_SESSIONS,
+                 max_age: float = SESSION_MAX_AGE_SECONDS) -> None:
+        self.idle, self.size, self.max_age = idle, size, max_age
         self._acts: "OrderedDict[str, _ActSession]" = OrderedDict()
+        self._failures = 0
+        self._paused_until = 0.0
+
+    def paused(self) -> bool:
+        """No fragment is asked while the breaker is open."""
+        return time.monotonic() < self._paused_until
+
+    def failed(self) -> None:
+        self._failures += 1
+        if self._failures >= BREAKER_FAILURES:
+            self._paused_until = time.monotonic() + BREAKER_PAUSE_SECONDS
+            self._failures = 0
+
+    def succeeded(self) -> None:
+        self._failures = 0
 
     def __len__(self) -> int:
         return len(self._acts)
@@ -109,25 +132,33 @@ class ActSessions:
         entry = self._acts.get(act)
         if entry is None:
             return None
+        now = time.monotonic()
         if (entry.loop is not asyncio.get_running_loop() or entry.session.closed
-                or time.monotonic() - entry.used_at > self.idle):
+                or now - entry.used_at > self.idle or now - entry.opened_at > self.max_age):
             self.drop(act)
             return None
         entry.used_at = time.monotonic()
         self._acts.move_to_end(act)
         return entry
 
-    def keep(self, act: str, session: aiohttp.ClientSession, index_key: str) -> None:
-        if act in self._acts and self._acts[act].session is not session:
-            self.drop(act)
+    def keep(self, act: str, session: aiohttp.ClientSession, index_key: str) -> bool:
+        """Keep `session` as the act's, unless the act already has a live one: that one stays
+        (fragments may be in flight in it) and False says the caller's is not kept."""
+        if self.get(act) is not None:
+            return False
         self._acts[act] = _ActSession(session, index_key)
         self._acts.move_to_end(act)
         while len(self._acts) > self.size:
             self.drop(next(iter(self._acts)))
+        return True
 
-    def drop(self, act: str) -> None:
-        entry = self._acts.pop(act, None)
-        if entry is not None and not entry.session.closed:
+    def drop(self, act: str, session: Optional[aiohttp.ClientSession] = None) -> None:
+        """Forget the act's session (only if it is `session`, when given) and close it."""
+        entry = self._acts.get(act)
+        if entry is None or (session is not None and entry.session is not session):
+            return
+        del self._acts[act]
+        if not entry.session.closed:
             _close_later(entry)
 
     async def close_all(self) -> None:
