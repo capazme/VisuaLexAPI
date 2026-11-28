@@ -1,0 +1,81 @@
+{
+ "_fonte": "Corte costituzionale — dati aperti (https://dati.cortecostituzionale.it), CC BY-SA 3.0. Two records of the massime open data (bundles of 18 Oct 2026), each cut to one short massima; every field is as published.",
+ "anni": {
+  "2020": [
+   {
+    "numero_pronuncia": "156",
+    "tipologia_giudizio": "GIUDIZIO DI LEGITTIMITÀ COSTITUZIONALE IN VIA INCIDENTALE",
+    "data_deposito": "21/07/2020",
+    "anno_pronuncia": "2020",
+    "data_decisione": "25/06/2020",
+    "massime": [
+     {
+      "titolo": "Thema decidendum - Accoglimento della questione di legittimità costituzionale in riferimento ad uno dei parametri evocati - Assorbimento della censura riferita ad altro parametro.",
+      "numero": "43415",
+      "norme": [
+       {
+        "specificazione_articolo": "bis",
+        "descrizione": "codice penale",
+        "comma": "",
+        "numero": "",
+        "data": "",
+        "articolo": "131",
+        "specificazione_comma": ""
+       },
+       {
+        "specificazione_articolo": "1",
+        "descrizione": "decreto legislativo",
+        "comma": "2",
+        "numero": "28",
+        "data": "16/03/2015",
+        "articolo": "",
+        "specificazione_comma": ""
+       }
+      ],
+      "parametri": [
+       {
+        "specificazione_articolo": "",
+        "descrizione": "Costituzione",
+        "comma": "3",
+        "numero": "",
+        "data": "",
+        "articolo": "27",
+        "specificazione_comma": ""
+       }
+      ],
+      "testo": "Accolta  in parte qua  - per violazione dell'art. 3 Cost. - la questione di legittimità costituzionale dell'art. 131- bis  cod. pen., inserito dall'art. 1, comma 2, del d.lgs. n. 28 del 2015, rimane assorbita la questione riferita all'art. 27, terzo comma, Cost. "
+     }
+    ],
+    "tipologia_pronuncia": "S"
+   }
+  ],
+  "2026": [
+   {
+    "numero_pronuncia": "5",
+    "tipologia_giudizio": "GIUDIZIO DI LEGITTIMITÀ COSTITUZIONALE IN VIA INCIDENTALE",
+    "data_deposito": "22/01/2026",
+    "anno_pronuncia": "2026",
+    "data_decisione": "20/11/2025",
+    "massime": [
+     {
+      "titolo": "Reati e pene - Cause di non punibilità - Individuazione - Ampia discrezionalità del legislatore - Limite - Manifesta irragionevolezza. (Classif. 210010).",
+      "numero": "47182",
+      "norme": [
+       {
+        "specificazione_articolo": "bis",
+        "descrizione": "codice penale",
+        "comma": "",
+        "numero": "",
+        "data": "",
+        "articolo": "131",
+        "specificazione_comma": "n.3"
+       }
+      ],
+      "testo": "Va riconosciuta l’ampia discrezionalità del legislatore nell’individuazione dell’ambito oggettivo della causa di non punibilità di cui all’art. 131-bis cod. pen., rimanendo salvo il limite della manifesta irragionevolezza. (Precedenti: S. 156/2025 - mass. 43414; S. 207/2017 - mass. 41153)."
+     }
+    ],
+    "tipologia_pronuncia": "S"
+   }
+  ]
+ }
+}
