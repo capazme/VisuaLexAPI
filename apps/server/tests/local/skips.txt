@@ -1,0 +1,45 @@
+# Single tests of the files in work-files.txt that cannot run on the local file in M1, each by its full name as
+# vitest prints it, under the reason that applies (spec §8). tests/setup.ts skips them on the local file, and the
+# report shows each one with its reason. tests/local/workFiles.test.ts fails on an entry that names no test.
+
+[Connected applications (OAuth and MCP) are online in M1]
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the assistant’s note entries and the light on each entry > counts the notes of the entry’s passages and the assistant’s notes about it, never a bare mark
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the assistant’s note entries and the light on each entry > gives null to an entry the assistant wrote nothing on
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > with the switch on > is not reachable by an exchanged token
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the assistant’s note entries and the light on each entry > starts the assistant’s note entry as proposed and shows its state to the session
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the assistant’s note entries and the light on each entry > validates, flags and edits the note entry, keeping the original
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the generic item PUT > never touches an assistant’s note: its text and state change only through their own routes
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the trash > keeps the user’s own highlights where they are, and an assistant’s note entry’s state
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the trash > brings back an assistant’s note entry trashed before D7b «da validare», a user’s note as it was
+tests/dossierItemsBulk.test.ts > the entries of a dossier in one request > is for the user's own session: a connected application is refused
+tests/dossierNotes.test.ts > POST /api/dossiers/:id/notes > adds a note through an exchanged token, marked with the connection
+tests/dossierNotes.test.ts > POST /api/dossiers/:id/notes > refuses the 101st note of the day through an exchanged token, never the user session
+tests/dossierNotes.test.ts > POST /api/dossiers/:id/notes > costs two points through an exchanged token
+tests/dossierNotes.test.ts > PUT /api/dossiers/:id/items/:itemId — the article a note is about > is not reachable through an exchanged token
+tests/dossierProvenance.test.ts > dossier provenance > a dossier created through an exchanged token records the connection
+tests/praticaFiles.test.ts > Pratica files > refuses an exchanged MCP token on the file and instruction routes (default deny, 403)
+tests/tasks.privacy.test.ts > tasks and the account > a connected application cannot reach the tasks (not in the delegated table)
+tests/tasks.privacy.test.ts > tasks and the dossier > a connected application deletes a whole dossier only with the number of tasks it told the user
+
+[Administration is online]
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the switch > is switched by an admin only
+tests/assistantProposals.test.ts > D7b — the assistant’s proposals, for the web app > the cache of GET /features > answers from memory for a few seconds, and at once after an admin’s change
+
+[The Forum is online]
+tests/dossierKind.test.ts > a dossier taken from a Forum suggestion > is a dossier di studio: someone else's proposal
+
+[Learn and the Forum’s archived environments are online]
+tests/accountData.test.ts > account data controls > exports a validator’s votes and acceptances, and nobody else’s
+tests/accountData.test.ts > account data controls > keeps a `__proto__` key of an archived environment’s content as data
+
+[Signing in, and deleting the account, are not in the local mode (G-514); the deletion runs through Learn’s code, which stays online]
+tests/accountData.test.ts > account data controls > exports the XP credits, without the events’ ids, and deletes them with the account
+tests/accountData.test.ts > account data controls > requires the current password and exact confirmation before deletion
+tests/fieldLimits.test.ts > a field over its limit > a password or a username at the door: refused for its length before any check
+tests/fieldLimits.test.ts > a field over its limit > refuses an email over 254 characters at the door
+tests/history.decisions.test.ts > decisions in the search history > exports the decision key with the history and erases the rows with the account
+tests/praticaFiles.test.ts > Pratica files > removes every file of an account that is deleted, and no one else's
+tests/tasks.privacy.test.ts > tasks and the account > deleting the account deletes its tasks and frees the ones assigned to it
+
+[It compares with the live Postgres schema: it runs in the server job]
+tests/local/checks.test.ts > the local tables keep the CHECK constraints of Postgres > every CHECK live on these tables after the Postgres migrations has a twin in checks.sql

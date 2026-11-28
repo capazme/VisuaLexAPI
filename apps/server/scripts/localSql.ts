@@ -7,7 +7,10 @@
  *   `CURRENT_TIMESTAMP` writes `2026-11-26 21:23:56`, which compares wrongly as text against the adapter's values
  *   and reads back an hour off through raw SQL (measured);
  * - each table named in `prisma/local/checks.sql` gets its CHECK constraints inside its `CREATE TABLE`, since
- *   SQLite cannot add one to an existing table and the Postgres ones live in hand-written migration SQL.
+ *   SQLite cannot add one to an existing table and the Postgres ones live in hand-written migration SQL;
+ * - a JSON default (`DEFAULT []`, `DEFAULT {}`, as `prisma migrate diff` writes `@default("[]")`) becomes a quoted
+ *   string. Bare, SQLite reads `[]` as a quoted name and stores an empty string, which is not JSON: a row written
+ *   without that column by raw SQL, or every existing row when a migration adds such a column, would not read back.
  */
 
 export const ADAPTER_NOW = "(strftime('%Y-%m-%dT%H:%M:%f+00:00','now'))";
@@ -41,7 +44,9 @@ export function parseChecks(text: string): CheckClause[] {
  *   rebuilding it, and Prisma names the copy `new_<table>` before the rename, so that copy gets them too.
  */
 export function localSql(diffSql: string, checks: CheckClause[], { migration = false }: { migration?: boolean } = {}): string {
-  let sql = diffSql.replace(/DEFAULT CURRENT_TIMESTAMP/g, `DEFAULT ${ADAPTER_NOW}`);
+  let sql = diffSql
+    .replace(/DEFAULT CURRENT_TIMESTAMP/g, `DEFAULT ${ADAPTER_NOW}`)
+    .replace(/ DEFAULT (\[\]|\{\})(?=,|\n|$)/g, " DEFAULT '$1'");
   const byTable = new Map<string, CheckClause[]>();
   for (const check of checks) byTable.set(check.table, [...(byTable.get(check.table) ?? []), check]);
   for (const [table, clauses] of byTable) {

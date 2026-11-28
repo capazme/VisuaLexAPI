@@ -20,20 +20,26 @@ describe('the local schema', () => {
     expect(maps(local)).toEqual(maps(source));
   });
 
-  it('keeps no native type, no scalar list, and a "[]" default for every list that had one', () => {
+  it('keeps no native type, no scalar list, and a "[]" default for every list, with one or not in the source', () => {
     expect(local).not.toMatch(/@db\./);
     const models = new Set(names(source, 'model'));
     const lists = [...local.matchAll(/^\s+\w+\s+(\w+)\[\]/gm)].filter((m) => !models.has(m[1]));
     expect(lists).toEqual([]);
-    // The lists that defaulted to [] now default to "[]", beside the Json fields that already did.
+    // Every scalar list now defaults to "[]" (Prisma reads a list without a default as [] on Postgres), beside the
+    // Json fields that already did.
     const count = (text: string, re: RegExp) => (text.match(re) ?? []).length;
-    expect(count(local, /@default\("\[\]"\)/g)).toBe(count(source, /@default\(\[\]\)/g) + count(source, /@default\("\[\]"\)/g));
+    const sourceLists = [...source.matchAll(/^\s+\w+\s+(\w+)\[\]/gm)].filter((m) => !models.has(m[1])).length;
+    expect(count(local, /@default\("\[\]"\)/g)).toBe(sourceLists + count(source, /@default\("\[\]"\)/g));
   });
 
   it('writes the local client to src/generated/prisma-local with the small query compiler, on SQLite', () => {
     expect(local).toMatch(/output\s+=\s+"\.\.\/\.\.\/src\/generated\/prisma-local"/);
     expect(local).toMatch(/compilerBuild\s+=\s+"small"/);
     expect(local).toMatch(/datasource db \{\s*provider = "sqlite"/);
+  });
+
+  it('init.sql leaves no JSON default unquoted', () => {
+    expect(readFileSync(LOCAL_INIT, 'utf8')).not.toMatch(/ DEFAULT [[{]/);
   });
 
   it("init.sql is the local schema's migrate diff, post-processed (npm run local:schema)", () => {

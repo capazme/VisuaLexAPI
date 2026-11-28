@@ -1,0 +1,43 @@
+# The Work test files the local CI job runs on the desktop app's encrypted local file (LEXCRAFT_TEST_DB=local,
+# spec §8, `npm run test:local`), one path per line. A file it does not run is listed as "# not run: <path> — <why>";
+# a single test it does not run is in skips.txt. tests/local/workFiles.test.ts holds both lists to the files.
+
+tests/dossierCaps.test.ts
+tests/dossierItemsBulk.test.ts
+tests/dossierKind.test.ts
+tests/dossierNotes.test.ts
+tests/dossierProvenance.test.ts
+tests/dossiers.idor.test.ts
+tests/dossiers.move.test.ts
+tests/dossiers.recital.test.ts
+tests/dossiers.sentenza.test.ts
+tests/highlightsSplit.test.ts
+tests/highlightsUpdate.test.ts
+tests/history.decisions.test.ts
+tests/tasks.routes.test.ts
+tests/tasks.idor.test.ts
+tests/tasks.privacy.test.ts
+tests/atti.test.ts
+tests/attiVersionCap.test.ts
+tests/praticaFiles.test.ts
+tests/assistantProposals.test.ts
+tests/assistant/entryText.test.ts
+tests/assistant/locateQuote.test.ts
+tests/assistant/ruleTwentyThree.test.ts
+tests/accountData.test.ts
+tests/bulkDeletesGone.test.ts
+tests/fieldLimits.test.ts
+tests/decisionKey.test.ts
+tests/schemas/normEntry.test.ts
+tests/schemas/recitalEntry.test.ts
+tests/schemas/decisionItem.rebuild.test.ts
+tests/smoke.test.ts
+
+# not run: tests/trash.test.ts — it drives the trash through a connected application (OAuth and MCP are online in M1); the trash's own statements run on the local file in tests/local/dialect.test.ts
+# not run: tests/praticaFilesMcp.test.ts — the act files through a connected application (OAuth and MCP are online in M1)
+# not run: tests/assistant/passages.routes.test.ts — the assistant's passages come through a connected application (OAuth and MCP are online in M1)
+# not run: tests/assistant/passages.versionRace.test.ts — through a connected application (OAuth and MCP are online in M1)
+# not run: tests/norms/dossierNorms.test.ts — norms added by reference need the sources, which M1 never reaches (spec §6; M3)
+# not run: tests/norms/dossierDecisions.test.ts — decisions added by reference need the sources, which M1 never reaches (spec §6; M3)
+# not run: tests/assistant/entryText.aknFallback.test.ts — it is about the text the Python API answers, which M1 never asks (spec §6): locally every text is unavailable, so its tests would pass whatever the answer
+# not run: tests/accountExport.otherUser.test.ts — it seeds the other user through the Forum (online)

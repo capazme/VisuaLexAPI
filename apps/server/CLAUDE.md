@@ -63,6 +63,19 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   and the sign-in routes answer before the session (`src/local/online.ts`), and
   the sources say the text needs the network (`src/local/sources.ts`). Any
   change there runs `tests/local/guards.test.ts` and `tests/local/entry.test.ts`.
+- `npm run test:local` runs `tests/local/` and the Work test files of
+  `tests/local/work-files.txt` on the encrypted local file
+  (`LEXCRAFT_TEST_DB=local`: no Postgres; `tests/localRun.ts`), as the CI job
+  «local» does on macOS and Windows. A Work test that cannot run locally in M1
+  (a connected application, the Forum, Learn, signing in, the sources) is listed
+  by name in `tests/local/skips.txt` under its reason, and a whole file in
+  `work-files.txt` as «not run» with its reason; `tests/local/workFiles.test.ts`
+  fails on an entry that no longer names a test. Raw SQL a test writes itself
+  uses `src/lib/sqlDialect.ts` too.
+- `npm run build:local` bundles the local server into `dist-local/` (esbuild:
+  `main.cjs` with both generated clients, `sql/`, and the encrypted driver's
+  native addon for this platform); `npm run local:flow` drives that bundle as the
+  app's shell would (19 checks). The CI job «local» runs both after the tests.
 - `src/index.ts` — graceful shutdown on SIGTERM/SIGINT: clear the MERL-T
   watchdog's and the saved-norm watcher's intervals, `server.close()`, drop each
   keep-alive socket as soon as it goes idle, `prisma.$disconnect()`, exit; a

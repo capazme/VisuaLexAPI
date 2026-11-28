@@ -14,6 +14,7 @@ import {
   withDatabase,
   type Reference,
 } from './testDatabase';
+import { createLocalRun, isLocalRun } from './localRun';
 
 /**
  * Once per run, before the first test file: a database of the run's own is created next to the one
@@ -26,6 +27,7 @@ import {
  * safeguard that is never worked around (G-542), and the repository refuses that reset by hand too.
  */
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
+  if (isLocalRun()) return setupLocal(project);
   assertTestDatabase();
   const baseUrl = process.env.DATABASE_URL ?? '';
   const base = databaseName(baseUrl);
@@ -102,4 +104,16 @@ export default async function setup(project: TestProject): Promise<() => Promise
     throw error;
   }
   return dropRunDatabase;
+}
+
+/**
+ * `LEXCRAFT_TEST_DB=local`: no Postgres at all. A folder of the run's own under the temp folder, a template file
+ * migrated by the app (`tests/localRun.ts`), and the folder removed at the end.
+ */
+async function setupLocal(project: TestProject): Promise<() => Promise<void>> {
+  const known = new Set(Object.keys(process.env));
+  const { run, remove } = await createLocalRun();
+  dropAddedSince(known);
+  project.provide('testDatabase', { url: `file:${run.template}`, emptyEveryTable: '', seededTexts: '[]', schema: run.schema, local: run });
+  return async () => remove();
 }

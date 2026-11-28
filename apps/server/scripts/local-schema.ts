@@ -9,10 +9,13 @@
  * `tests/local/schema.test.ts` fails when either committed file differs from what this writes.
  *
  * What changes, and nothing else: the datasource becomes `sqlite`; every `@db.*` native type is dropped;
- * every scalar or enum list becomes `Json`, `@default([])` becoming `@default("[]")`; the generator writes the
- * local client to `src/generated/prisma-local` with the small query compiler.
+ * every scalar or enum list becomes `Json` with `@default("[]")`, whether it had `@default([])` or no default (on
+ * Postgres Prisma takes a scalar list as optional and reads it back as `[]`: the local client must take a create
+ * without it too); the generator writes the local client to `src/generated/prisma-local` with the small query
+ * compiler.
  */
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { localSql, parseChecks } from './localSql';
@@ -53,17 +56,26 @@ export function deriveLocalSchema(source: string): string {
     const list = model ? /^(\s+)(\w+)(\s+)(\w+)\[\](\??)(.*)$/.exec(next) : null;
     if (list && !models.has(list[4])) {
       const [, indent, name, gap, , , rest] = list;
-      next = `${indent}${name}${gap}Json${rest.replace(/@default\(\[\]\)/, '@default("[]")')}`;
+      const withDefault = /@default\(\[\]\)/.test(rest) ? rest.replace(/@default\(\[\]\)/, '@default("[]")') : ` @default("[]")${rest}`;
+      next = `${indent}${name}${gap}Json${withDefault}`;
     }
     return next;
   });
   return HEADER + lines.join('\n');
 }
 
+/**
+ * The Prisma CLI with the server's own Node, by its file: no `npx`, which on Windows is a `.cmd` that only a shell runs.
+ * Returns what it prints.
+ */
+export function prismaCli(args: string[]): string {
+  const cli = path.join(path.dirname(createRequire(path.join(SERVER, 'package.json')).resolve('prisma/package.json')), 'build/index.js');
+  return execFileSync(process.execPath, [cli, ...args], { cwd: SERVER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
 /** `prisma migrate diff` of the local schema from nothing: SQLite DDL, before post-processing. */
 export function diffFromEmpty(): string {
-  return execFileSync('npx', ['prisma', 'migrate', 'diff', '--config', 'prisma.local.config.ts', '--from-empty',
-    '--to-schema', 'prisma/local/schema.prisma', '--script'], { cwd: SERVER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return prismaCli(['migrate', 'diff', '--config', 'prisma.local.config.ts', '--from-empty', '--to-schema', 'prisma/local/schema.prisma', '--script']);
 }
 
 if (require.main === module) {

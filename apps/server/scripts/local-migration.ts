@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { localSql, parseChecks } from './localSql';
-import { LOCAL_CHECKS } from './local-schema';
+import { LOCAL_CHECKS, prismaCli } from './local-schema';
 
 const SERVER = path.resolve(__dirname, '..');
 
@@ -33,8 +33,7 @@ if (require.main === module) {
   try {
     const from = path.join(dir, 'previous.prisma');
     writeFileSync(from, previous);
-    const diff = execFileSync('npx', ['prisma', 'migrate', 'diff', '--config', 'prisma.local.config.ts', '--from-schema', from,
-      '--to-schema', 'prisma/local/schema.prisma', '--script'], { cwd: SERVER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const diff = prismaCli(['migrate', 'diff', '--config', 'prisma.local.config.ts', '--from-schema', from, '--to-schema', 'prisma/local/schema.prisma', '--script']);
     if (!diff.trim() || /^-- This is an empty migration/m.test(diff)) {
       console.log('the local schema did not change: no migration');
     } else {

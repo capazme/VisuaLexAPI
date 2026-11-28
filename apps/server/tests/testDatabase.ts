@@ -1,3 +1,5 @@
+import type { LocalRun } from './localRun';
+
 /**
  * The test database, shared by `tests/globalSetup.ts` (once per run: a database of the run's own,
  * migrated, and what the files need from it) and `tests/setup.ts` (in every file: the guards, and
@@ -14,6 +16,8 @@ export type TestDatabase = {
   seededTexts: string;
   /** `SCHEMA_FINGERPRINT` of the schema the migrations made. */
   schema: string;
+  /** Set when the run is on the desktop app's encrypted local file instead (`tests/localRun.ts`). */
+  local?: LocalRun;
 };
 
 declare module 'vitest' {

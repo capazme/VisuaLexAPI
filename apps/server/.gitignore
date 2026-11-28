@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# npm run build:local
+dist-local/
 .env
 .env.local
 *.log
