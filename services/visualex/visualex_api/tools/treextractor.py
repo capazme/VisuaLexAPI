@@ -190,11 +190,12 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         logging.debug(f"Empty or too short response from {normurn[:50]}")
         return failure("Empty response from server")
 
-    soup = BeautifulSoup(text, 'html.parser')
-
     if not is_eurlex:
-        result, count, metadata = await _parse_normattiva_tree(
-            soup, normurn, link, True, return_metadata=True)
+        # Parsed in a thread: a code's index page (2.6 MB) takes about 0.3 s of CPU, which on the
+        # event loop held every other request for as long (T133).
+        result, count, metadata = await asyncio.to_thread(
+            lambda: parse_normattiva_tree(BeautifulSoup(text, 'html.parser'), normurn, link, True,
+                                          return_metadata=True))
         if count > 0:
             await _tree_cache.set(_full_key(normurn, link),
                                   {"result": result, "count": count, "metadata": metadata})
@@ -202,6 +203,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         return _narrow(result, count, metadata, details, return_metadata) + (from_copy,)
     else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
+        soup = BeautifulSoup(text, 'html.parser')
         result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
         if count > 0 and not from_copy and eurlex_fetch.is_act_page(text):
             # A page that parsed into articles is the act's: kept where the scraper reads it.
@@ -227,6 +229,11 @@ _ARTICLE_LABEL_PREFIX = re.compile(r'^\s*art(?:\.\s*|\s+)', re.IGNORECASE)
 
 
 async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False):
+    """`parse_normattiva_tree`, for the callers that await it."""
+    return parse_normattiva_tree(soup, normurn, link, details, return_metadata)
+
+
+def parse_normattiva_tree(soup, normurn, link, details, return_metadata=False):
     """
     Parsa la struttura dell'albero degli articoli per Normattiva.
 
